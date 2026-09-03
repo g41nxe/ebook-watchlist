@@ -70,13 +70,19 @@ Voraussetzung: Python 3.12+ und [uv](https://docs.astral.sh/uv/).
 uv sync
 ```
 
-Konfiguration liegt unter `data/` (gitignored):
+Konfiguration liegt unter `data/` (gitignored). Vorlagen liegen in
+[`examples/`](examples) und werden einmalig kopiert:
+
+```bash
+mkdir -p data && cp examples/*.yaml data/
+```
 
 - `data/profile.yaml` — Referenzautor:innen, Genre-Kategorien, Deal-Schwellen
 - `data/watchlist.yaml` — die beobachteten Titel
-- `data/dismissed.yaml` — dauerhaft ausgeblendete Vorschläge
+- `data/dismissed.yaml` — dauerhaft ausgeblendete Vorschläge (ab Ticket 07)
 
-Der Datenpfad lässt sich über `EBW_DATA_DIR` umbiegen.
+Daneben legt der Run dort `snapshots.db` und `digests/` an. Der Datenpfad lässt
+sich über `EBW_DATA_DIR` umbiegen.
 
 ## Benutzung
 

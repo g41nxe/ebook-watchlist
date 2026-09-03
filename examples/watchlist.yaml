@@ -1,0 +1,8 @@
+# Copy to data/watchlist.yaml and edit.
+# Title and author are enough — Sources resolve their own links (ticket 04).
+- title: Die sieben Schwestern
+  author: Lucinda Riley
+
+- title: Der Schwarm
+  author: Frank Schätzing
+  check_library: false

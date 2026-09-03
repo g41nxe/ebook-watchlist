@@ -1,0 +1,14 @@
+# Canned data for the FakeSource. Edit a value, run again, and the Digest names
+# the change — the cheapest way to see the pipeline work end to end.
+- id: fake-1
+  title: Die sieben Schwestern
+  author: Lucinda Riley
+  availability: unavailable
+  reservation_count: 3
+  url: https://example.invalid/fake-1
+
+- id: fake-2
+  title: Der Schwarm
+  author: Frank Schätzing
+  price_cents: 1299
+  url: https://example.invalid/fake-2

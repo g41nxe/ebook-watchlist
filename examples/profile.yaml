@@ -1,0 +1,20 @@
+# Copy to data/profile.yaml and edit.
+slug: default
+name: Meine Leseliste
+
+# Deal thresholds in cents (see CONTEXT.md).
+strong_deal_max_cents: 500   # unter 5,00 € = Strong Deal, ohne Rabatt-Check
+deal_max_cents: 1000         # 5,00-9,99 € nur mit echtem Rabatt
+min_discount_pct: 25
+
+reference_authors: []
+
+# Shop category paths whose new arrivals are surfaced as suggestions (ticket 07).
+genre_categories: []
+
+# Dormant in v1.
+no_gos: []
+
+sources:
+  fake:
+    fixture: fake-source.yaml
