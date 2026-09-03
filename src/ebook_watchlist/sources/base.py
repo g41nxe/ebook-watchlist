@@ -8,15 +8,115 @@ finishes the others and reports the failure in the Digest.
 
 from __future__ import annotations
 
+import dataclasses
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 from ..config import Profile, WatchlistEntry
-from ..models import Observation
+from ..matching import Confidence, Resolution
+from ..models import Attention, Observation
+from ..store import Store
+
+#: How long a failed resolution is trusted before the Source tries again. Long
+#: enough not to hammer a search endpoint, short enough that a title the library
+#: acquires later is eventually found.
+RESOLUTION_RETRY_AFTER = timedelta(days=7)
 
 
 class SourceStructureError(Exception):
     """The page no longer looks the way the parser expects. Loud on purpose."""
+
+
+@dataclass(slots=True)
+class RunContext:
+    """What a Source may reach for beyond its own configuration.
+
+    Deliberately narrow: resolutions it has made before, and a place to report
+    entries it could not place. Sources never touch the Snapshot directly.
+    """
+
+    profile_slug: str
+    store: Store
+    now: datetime
+    attention: list[Attention] = field(default_factory=list)
+
+    def remembered_link(self, source: str, entry: WatchlistEntry) -> tuple[str | None, bool]:
+        """``(url, still_valid)`` for a previous resolution of this entry.
+
+        ``still_valid`` is False when there is nothing remembered, or when a
+        failed attempt has aged out and deserves another try.
+        """
+        row = self.store.get_resolution(self.profile_slug, source, entry.key)
+        if row is None:
+            return None, False
+        if row.url:
+            return row.url, True
+        return None, self.now - row.resolved_at < RESOLUTION_RETRY_AFTER
+
+    def remember(self, source: str, entry: WatchlistEntry, resolution: Resolution) -> None:
+        best = resolution.best
+        accepted = resolution.accepted
+        self._store_resolution(
+            source,
+            entry,
+            url=str(accepted.payload) if accepted else None,
+            confidence=str(resolution.confidence),
+            reason=resolution.reason,
+            matched_title=best.candidate.title if best else None,
+            matched_author=best.candidate.author if best else None,
+        )
+
+    def remember_absence(self, source: str, entry: WatchlistEntry, reason: str) -> None:
+        """The catalogue simply does not have it — worth not asking again soon."""
+        self._store_resolution(
+            source,
+            entry,
+            url=None,
+            confidence=str(Confidence.NO_MATCH),
+            reason=reason,
+            matched_title=None,
+            matched_author=None,
+        )
+
+    def _store_resolution(
+        self,
+        source: str,
+        entry: WatchlistEntry,
+        *,
+        url: str | None,
+        confidence: str,
+        reason: str,
+        matched_title: str | None,
+        matched_author: str | None,
+    ) -> None:
+        self.store.put_resolution(
+            self.profile_slug,
+            source,
+            entry.key,
+            url=url,
+            confidence=confidence,
+            reason=reason,
+            matched_title=matched_title,
+            matched_author=matched_author,
+            resolved_at=self.now,
+        )
+
+    def needs_attention(
+        self, source: str, entry: WatchlistEntry, resolution: Resolution
+    ) -> None:
+        best = resolution.best
+        self.attention.append(
+            Attention(
+                source=source,
+                entry_title=entry.title,
+                entry_author=entry.author,
+                reason=resolution.reason,
+                best_guess=best.candidate.title if best else None,
+                best_guess_url=best.candidate.payload if best else None,
+            )
+        )
 
 
 class Source(ABC):
@@ -28,7 +128,7 @@ class Source(ABC):
 
     @abstractmethod
     def collect(
-        self, profile: Profile, watchlist: Sequence[WatchlistEntry]
+        self, profile: Profile, watchlist: Sequence[WatchlistEntry], context: RunContext
     ) -> list[Observation]:
         """Everything this Source has to say this Run."""
 
@@ -37,26 +137,72 @@ class Source(ABC):
         return None
 
 
-class LibrarySource(Source):
+class ResolvingSource(Source):
+    """A Source that can find a title's own page from just title and author.
+
+    The resolution itself is site-specific; the caching, the retry window and
+    the "needs attention" reporting are the same everywhere and live here.
+    """
+
+    def resolve(self, entry: WatchlistEntry) -> Resolution | None:
+        """Search for ``entry``. ``None`` means a genuine "not in this catalogue"."""
+        return None
+
+    def linked_entry(
+        self, entry: WatchlistEntry, context: RunContext
+    ) -> WatchlistEntry | None:
+        """``entry`` with this Source's link filled in, or ``None`` to skip it."""
+        if entry.resolved_links.get(self.name):
+            return entry  # a hand-pinned link always wins
+
+        remembered, still_valid = context.remembered_link(self.name, entry)
+        if remembered:
+            return dataclasses.replace(
+                entry, resolved_links={**entry.resolved_links, self.name: remembered}
+            )
+        if still_valid:
+            return None  # we looked recently and came up empty; don't ask again
+
+        resolution = self.resolve(entry)
+        if resolution is None:
+            # Not in the catalogue at all. Remember that, quietly.
+            context.remember_absence(self.name, entry, "not in this catalogue")
+            return None
+
+        context.remember(self.name, entry, resolution)
+        accepted = resolution.accepted
+        if accepted is None:
+            context.needs_attention(self.name, entry, resolution)
+            return None
+
+        return dataclasses.replace(
+            entry, resolved_links={**entry.resolved_links, self.name: str(accepted.payload)}
+        )
+
+
+class LibrarySource(ResolvingSource):
     """Reports whether a title can be borrowed right now."""
 
     @abstractmethod
     def check(self, entry: WatchlistEntry) -> Observation | None: ...
 
     def collect(
-        self, profile: Profile, watchlist: Sequence[WatchlistEntry]
+        self, profile: Profile, watchlist: Sequence[WatchlistEntry], context: RunContext
     ) -> list[Observation]:
         observations = []
         for entry in watchlist:
             if not (entry.active and entry.check_library):
                 continue
-            observation = self.check(entry)
+            linked = self.linked_entry(entry, context)
+            if linked is None:
+                continue
+            observation = self.check(linked)
             if observation is not None:
                 observations.append(observation)
         return observations
 
 
-class ShopSource(Source):
+class ShopSource(ResolvingSource):
     """Reports price and catalogue presence."""
 
     @abstractmethod
@@ -67,13 +213,16 @@ class ShopSource(Source):
         return []
 
     def collect(
-        self, profile: Profile, watchlist: Sequence[WatchlistEntry]
+        self, profile: Profile, watchlist: Sequence[WatchlistEntry], context: RunContext
     ) -> list[Observation]:
         observations = []
         for entry in watchlist:
             if not (entry.active and entry.check_shop):
                 continue
-            observation = self.check(entry)
+            linked = self.linked_entry(entry, context)
+            if linked is None:
+                continue
+            observation = self.check(linked)
             if observation is not None:
                 observations.append(observation)
         for author in profile.reference_authors:

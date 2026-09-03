@@ -31,17 +31,24 @@ CARD_DETAIL_LINK = 'a[test-id="mediaInfoLink"]'
 #: Cards carry several ``ic_*`` icons (rating stars among them), so the medium
 #: is picked by name rather than by position.
 CARD_MEDIUM_ICON = 'svg[test-id^="ic_"]'
-MEDIUM_ICONS = frozenset(
-    {
-        "ic_ebook",
-        "ic_eaudio",
-        "ic_epaper",
-        "ic_emagazine",
-        "ic_evideo",
-        "ic_elearning",
-        "ic_ehoerspiel",
-    }
-)
+#: Friendly names for ``profile.yaml``, mapped to the icon the markup uses.
+MEDIUM_BY_NAME = {
+    "ebook": "ic_ebook",
+    "hoerbuch": "ic_eaudio",
+    "hörbuch": "ic_eaudio",
+    "hoerspiel": "ic_ehoerspiel",
+    "epaper": "ic_epaper",
+    "emagazine": "ic_emagazine",
+    "evideo": "ic_evideo",
+    "elearning": "ic_elearning",
+}
+MEDIUM_ICONS = frozenset(MEDIUM_BY_NAME.values())
+
+#: The Onleihe lists the ebook and the audiobook of a novel as two separate
+#: titles with the same title and author. Without a preference the matcher
+#: cannot tell them apart and every such entry would need a human — so a
+#: watchlist means ebooks unless it says otherwise.
+DEFAULT_MEDIA: tuple[str, ...] = ("ic_ebook",)
 CARD_AVAILABILITY = '[test-id="cardAvailability"]'
 CARD_AVAILABILITY_LABEL = '[test-id="cardLabelAvailability"]'
 

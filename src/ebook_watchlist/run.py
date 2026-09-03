@@ -24,6 +24,7 @@ from .http import HttpClient, build_user_agent
 from .models import Observation, SourceFailure
 from .render import render_html, render_text
 from .sources import build_sources
+from .sources.base import RunContext
 from .store import Store
 
 EXIT_OK = 0
@@ -49,13 +50,15 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _collect(sources, profile, watchlist) -> tuple[list[Observation], list[SourceFailure]]:
+def _collect(
+    sources, profile, watchlist, context: RunContext
+) -> tuple[list[Observation], list[SourceFailure]]:
     """Poll every Source. One failing Source does not stop the others (ADR 7)."""
     observations: list[Observation] = []
     failures: list[SourceFailure] = []
     for source in sources:
         try:
-            observations.extend(source.collect(profile, watchlist))
+            observations.extend(source.collect(profile, watchlist, context))
         except Exception as exc:  # noqa: BLE001 - deliberate: isolate one Source
             failures.append(
                 SourceFailure(source=source.name, message=f"{type(exc).__name__}: {exc}")
@@ -104,7 +107,8 @@ def _run(profile, watchlist, sources, *, trigger: str) -> int:
     started_at = datetime.now()
     run_id = store.start_run(profile.slug, trigger, started_at)
 
-    observations, failures = _collect(sources, profile, watchlist)
+    context = RunContext(profile_slug=profile.slug, store=store, now=started_at)
+    observations, failures = _collect(sources, profile, watchlist, context)
     previous = store.latest_observations(profile.slug, keys_of(observations))
     deltas = compute_deltas(observations, previous)
 
@@ -117,6 +121,7 @@ def _run(profile, watchlist, sources, *, trigger: str) -> int:
         since=last_run.started_at if last_run else None,
         deltas=deltas,
         failures=failures,
+        attention=context.attention,
     )
 
     finished_at = datetime.now()

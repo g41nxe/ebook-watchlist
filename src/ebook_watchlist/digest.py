@@ -10,12 +10,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from .models import Delta, DeltaKind, MatchReason, SourceFailure
+from .models import Attention, Delta, DeltaKind, MatchReason, SourceFailure
 
 SECTION_LIBRARY = "Bibliothek"
 SECTION_PRICES = "Watchlist — Preise"
 SECTION_AUTHORS = "Neue Titel deiner Autor:innen"
 SECTION_GENRE = "Genre-Vorschläge (unsicher)"
+SECTION_ATTENTION = "Braucht Aufmerksamkeit"
 SECTION_ERRORS = "⚠️ Fehler"
 
 SECTION_ORDER: tuple[str, ...] = (
@@ -23,6 +24,7 @@ SECTION_ORDER: tuple[str, ...] = (
     SECTION_PRICES,
     SECTION_AUTHORS,
     SECTION_GENRE,
+    SECTION_ATTENTION,
     SECTION_ERRORS,
 )
 
@@ -98,12 +100,26 @@ def build_digest(
     since: datetime | None,
     deltas: list[Delta],
     failures: list[SourceFailure],
+    attention: list[Attention] | None = None,
 ) -> Digest:
     buckets: dict[str, list[DigestEntry]] = {title: [] for title in SECTION_ORDER}
 
     for delta in deltas:
         section, entry = _entry_for(delta)
         buckets[section].append(entry)
+
+    for item in attention or []:
+        detail = f"{item.source}: {item.reason}"
+        if item.best_guess:
+            detail += f" — bester Treffer: „{item.best_guess}“"
+        buckets[SECTION_ATTENTION].append(
+            DigestEntry(
+                title=item.entry_title,
+                author=item.entry_author,
+                detail=detail,
+                url=item.best_guess_url,
+            )
+        )
 
     for failure in failures:
         buckets[SECTION_ERRORS].append(

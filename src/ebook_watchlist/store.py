@@ -15,6 +15,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    UniqueConstraint,
     create_engine,
     func,
     select,
@@ -65,6 +66,33 @@ class ObservationRow(Base):
     # Serves the max-id-per-item lookup that every diff starts with.
     __table_args__ = (
         Index("ix_observation_item", "profile_slug", "source", "source_item_id", "id"),
+    )
+
+
+class ResolutionRow(Base):
+    """What a Source decided a Watchlist Entry refers to.
+
+    Derived state, so it lives here rather than being written back into the
+    user's ``watchlist.yaml`` — that file stays hand-owned, comments and all.
+    Negative outcomes are cached too, so a title the library does not have is
+    not re-searched on every Run.
+    """
+
+    __tablename__ = "resolution"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    profile_slug: Mapped[str] = mapped_column(String, index=True)
+    source: Mapped[str] = mapped_column(String, index=True)
+    watchlist_key: Mapped[str] = mapped_column(String, index=True)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
+    confidence: Mapped[str] = mapped_column(String)
+    reason: Mapped[str] = mapped_column(String, default="")
+    matched_title: Mapped[str | None] = mapped_column(String, nullable=True)
+    matched_author: Mapped[str | None] = mapped_column(String, nullable=True)
+    resolved_at: Mapped[datetime] = mapped_column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint("profile_slug", "source", "watchlist_key", name="uq_resolution_entry"),
     )
 
 
@@ -182,6 +210,53 @@ class Store:
                 if key in wanted:
                     found[key] = _to_observation(row)
         return found
+
+    def get_resolution(
+        self, profile_slug: str, source: str, watchlist_key: str
+    ) -> ResolutionRow | None:
+        with self.session() as session:
+            stmt = select(ResolutionRow).where(
+                ResolutionRow.profile_slug == profile_slug,
+                ResolutionRow.source == source,
+                ResolutionRow.watchlist_key == watchlist_key,
+            )
+            row = session.scalars(stmt).first()
+            if row is not None:
+                session.expunge(row)
+            return row
+
+    def put_resolution(
+        self,
+        profile_slug: str,
+        source: str,
+        watchlist_key: str,
+        *,
+        url: str | None,
+        confidence: str,
+        reason: str,
+        matched_title: str | None,
+        matched_author: str | None,
+        resolved_at: datetime,
+    ) -> None:
+        with self.session() as session:
+            stmt = select(ResolutionRow).where(
+                ResolutionRow.profile_slug == profile_slug,
+                ResolutionRow.source == source,
+                ResolutionRow.watchlist_key == watchlist_key,
+            )
+            row = session.scalars(stmt).first()
+            if row is None:
+                row = ResolutionRow(
+                    profile_slug=profile_slug, source=source, watchlist_key=watchlist_key
+                )
+                session.add(row)
+            row.url = url
+            row.confidence = confidence
+            row.reason = reason
+            row.matched_title = matched_title
+            row.matched_author = matched_author
+            row.resolved_at = resolved_at
+            session.commit()
 
     def append(
         self,

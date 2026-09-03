@@ -6,16 +6,22 @@ holds need an authenticated scrape and are deferred to v2 (ADR 6).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from urllib.parse import urljoin
 
 from ...config import WatchlistEntry
 from ...http import HttpClient, NotFound
+from ...matching import Candidate, Confidence, Query, Resolution, match
 from ...models import MatchReason, Observation
 from ..base import LibrarySource, SourceStructureError
 from . import parse
 from . import selectors as sel
 
 SOURCE_NAME = "voebb"
+
+#: Results paginate 20 to a page; resolution never needs to go deep.
+CARDS_PER_PAGE = 20
+MAX_RESOLUTION_PAGES = 2
 
 
 def title_id_from_url(url: str) -> str | None:
@@ -42,11 +48,16 @@ class VoebbSource(LibrarySource):
     name = SOURCE_NAME
 
     def __init__(
-        self, client: HttpClient, name: str = SOURCE_NAME, base: str = sel.BASE
+        self,
+        client: HttpClient,
+        name: str = SOURCE_NAME,
+        base: str = sel.BASE,
+        media: Sequence[str] = sel.DEFAULT_MEDIA,
     ) -> None:
         self.client = client
         self.name = name
         self.base = base
+        self.media = tuple(media)
 
     def check(self, entry: WatchlistEntry) -> Observation | None:
         """Availability for an entry whose detail page is already pinned.
@@ -82,6 +93,59 @@ class VoebbSource(LibrarySource):
             url=url,
         )
 
+    # --- resolution (ADR 9) ------------------------------------------------
+
+    def _search_page(self, query: str, page: int) -> str:
+        params = dict(sel.SEARCH_PARAMS, pText=query)
+        path = sel.SEARCH_PATH if page == 0 else sel.SEARCH_PAGE_PATH.format(page=page)
+        # The paged path needs the query re-supplied, otherwise the Onleihe
+        # wants a session cookie and answers "Ihre Sitzung ist abgelaufen".
+        return self.client.get(urljoin(self.base, path), params=params)
+
+    def _query_for(self, entry: WatchlistEntry) -> str:
+        """One free-text box has to carry both fields.
+
+        Only the surname goes in: the Onleihe ranks on a single relevance score
+        across title, author and blurb, and a full given name mostly adds noise.
+        """
+        if not entry.author:
+            return entry.title
+        surname = entry.author.split(",")[0].strip() if "," in entry.author else None
+        surname = surname or entry.author.split()[-1]
+        return f"{entry.title} {surname}"
+
+    def _preferred(self, found: list[parse.Candidate]) -> list[parse.Candidate]:
+        """Keep only the formats we want — but never filter everything away."""
+        if not self.media:
+            return found
+        wanted = [card for card in found if card.medium in self.media]
+        return wanted or found
+
+    def resolve(self, entry: WatchlistEntry) -> Resolution | None:
+        query = Query(title=entry.title, author=entry.author)
+        seen: list[Candidate] = []
+
+        for page in range(MAX_RESOLUTION_PAGES):
+            found = parse.parse_search_results(self._search_page(self._query_for(entry), page))
+            if found is None:
+                # "keine Titeltreffer" — an answer, not a malfunction.
+                return None if page == 0 else match(query, seen)
+
+            seen.extend(
+                Candidate(title=card.title, author=card.author, payload=card.url)
+                for card in self._preferred(found)
+            )
+            resolution = match(query, seen)
+            if resolution.confidence is Confidence.AUTO_ACCEPT or len(found) < CARDS_PER_PAGE:
+                return resolution
+
+        return match(query, seen)
+
     def probe(self) -> None:
-        """Known-good page must still parse. Values are free to change."""
+        """Known-good pages must still parse. Values are free to change."""
         parse.parse_detail(self.client.get(urljoin(self.base, sel.PROBE_DETAIL_PATH)))
+        candidates = parse.parse_search_results(self._search_page(sel.PROBE_QUERY, 0))
+        if not candidates:
+            raise SourceStructureError(
+                f"VÖBB: the probe query {sel.PROBE_QUERY!r} returned no parseable hits"
+            )

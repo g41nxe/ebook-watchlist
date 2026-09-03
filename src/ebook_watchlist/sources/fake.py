@@ -15,7 +15,7 @@ import yaml
 
 from ..config import Profile, WatchlistEntry
 from ..models import Availability, MatchReason, Observation
-from .base import Source, SourceStructureError
+from .base import RunContext, Source, SourceStructureError
 
 
 class FakeSource(Source):
@@ -38,7 +38,10 @@ class FakeSource(Source):
         return data
 
     def collect(
-        self, profile: Profile, watchlist: Sequence[WatchlistEntry]
+        self,
+        profile: Profile,
+        watchlist: Sequence[WatchlistEntry],
+        context: RunContext,
     ) -> list[Observation]:
         by_title = {entry.title.casefold(): entry for entry in watchlist if entry.active}
         observations: list[Observation] = []

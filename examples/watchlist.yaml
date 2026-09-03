@@ -1,12 +1,15 @@
 # Copy to data/watchlist.yaml and edit.
+# Title and author are all that is needed — Sources find their own links and
+# remember them. An entry they cannot place confidently is named in the Digest
+# under "Braucht Aufmerksamkeit" rather than guessed at.
 - title: Die sieben Schwestern
   author: Lucinda Riley
-  # Until automatic resolution lands (ticket 04), point the Source at the title
-  # yourself: the mediaInfo path from the Onleihe's own URL.
-  resolved_links:
-    voebb: mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html
 
 - title: Sieben Richtige
   author: Volker Jarck
-  resolved_links:
-    voebb: mediaInfo,0-0-1474715999-200-0-0-0-0-0-0-0.html
+
+# To override the automatic lookup, pin the link yourself; it always wins.
+# - title: Ein schwieriger Fall
+#   author: Jemand Anders
+#   resolved_links:
+#     voebb: mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html

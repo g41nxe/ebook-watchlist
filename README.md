@@ -84,6 +84,12 @@ mkdir -p data && cp examples/*.yaml data/
 Daneben legt der Run dort `snapshots.db` und `digests/` an. Der Datenpfad lässt
 sich über `EBW_DATA_DIR` umbiegen.
 
+Solange v1 in Entwicklung ist, gibt es **keine Schema-Migrationen**: neue
+Tabellen legt der Run selbst an, neue Spalten in bestehenden Tabellen nicht.
+Wenn ein Update sich über eine fehlende Spalte beschwert, ist `snapshots.db`
+löschen der vorgesehene Weg — es geht dabei nur Historie verloren, keine
+Konfiguration.
+
 ## Benutzung
 
 Einen Run starten:

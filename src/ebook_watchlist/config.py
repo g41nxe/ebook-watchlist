@@ -126,10 +126,13 @@ def load_watchlist(path: Path | None = None) -> list[WatchlistEntry]:
         links = raw.get("resolved_links") or {}
         if not isinstance(links, dict):
             raise ConfigError(f"{what}: 'resolved_links' must be a mapping of source to URL")
+        # Blank-but-present fields are a common hand-editing slip; treating them
+        # as absent keeps every consumer from having to re-check.
+        author = str(raw.get("author") or "").strip() or None
         entries.append(
             WatchlistEntry(
-                title=str(_require(raw, "title", what)),
-                author=str(raw["author"]) if raw.get("author") else None,
+                title=str(_require(raw, "title", what)).strip(),
+                author=author,
                 check_library=bool(raw.get("check_library", True)),
                 check_shop=bool(raw.get("check_shop", True)),
                 active=bool(raw.get("active", True)),

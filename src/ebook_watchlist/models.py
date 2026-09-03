@@ -70,3 +70,19 @@ class SourceFailure:
 
     source: str
     message: str
+
+
+@dataclass(frozen=True, slots=True)
+class Attention:
+    """A Watchlist Entry a Source could not confidently place.
+
+    Not an error — the site answered fine, we just will not guess. The entry is
+    skipped for this Run and named in the Digest so it can be pinned by hand.
+    """
+
+    source: str
+    entry_title: str
+    entry_author: str | None
+    reason: str
+    best_guess: str | None = None
+    best_guess_url: str | None = None
