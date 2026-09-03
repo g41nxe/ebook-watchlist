@@ -11,11 +11,12 @@ from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import (
-    Boolean,
     DateTime,
+    Index,
     Integer,
     String,
     create_engine,
+    func,
     select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
@@ -60,8 +61,11 @@ class ObservationRow(Base):
     category: Mapped[str | None] = mapped_column(String, nullable=True)
     url: Mapped[str | None] = mapped_column(String, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
-    # Reserved for Phase 2; present so the append-only log never needs a rewrite.
-    superseded: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Serves the max-id-per-item lookup that every diff starts with.
+    __table_args__ = (
+        Index("ix_observation_item", "profile_slug", "source", "source_item_id", "id"),
+    )
 
 
 def _to_observation(row: ObservationRow) -> Observation:
@@ -147,27 +151,36 @@ class Store:
     def latest_observations(
         self, profile_slug: str, keys: Iterable[tuple[str, str]]
     ) -> dict[tuple[str, str], Observation]:
-        """The most recent stored Observation for each ``(source, source_item_id)``."""
+        """The most recent stored Observation for each ``(source, source_item_id)``.
+
+        Resolved with a max-id-per-item subquery so the cost tracks the number of
+        watched items, not the length of the append-only history.
+        """
         wanted = set(keys)
         if not wanted:
             return {}
         sources = {source for source, _ in wanted}
+        item_ids = {item_id for _, item_id in wanted}
+
+        latest_ids = (
+            select(func.max(ObservationRow.id))
+            .where(
+                ObservationRow.profile_slug == profile_slug,
+                ObservationRow.source.in_(sources),
+                ObservationRow.source_item_id.in_(item_ids),
+            )
+            .group_by(ObservationRow.source, ObservationRow.source_item_id)
+        )
+
         found: dict[tuple[str, str], Observation] = {}
         with self.session() as session:
-            stmt = (
-                select(ObservationRow)
-                .where(
-                    ObservationRow.profile_slug == profile_slug,
-                    ObservationRow.source.in_(sources),
-                )
-                .order_by(ObservationRow.id.desc())
-            )
+            stmt = select(ObservationRow).where(ObservationRow.id.in_(latest_ids))
             for row in session.scalars(stmt):
                 key = (row.source, row.source_item_id)
-                if key in wanted and key not in found:
+                # in_() pairs the sets independently, so a cross-source id
+                # collision can come back; keep only the pairs we asked for.
+                if key in wanted:
                     found[key] = _to_observation(row)
-                    if len(found) == len(wanted):
-                        break
         return found
 
     def append(

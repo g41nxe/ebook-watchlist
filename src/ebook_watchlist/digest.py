@@ -77,6 +77,9 @@ def _entry_for(delta: Delta) -> tuple[str, DigestEntry]:
             title=current.title, author=current.author, detail=detail, url=current.url
         )
 
+    if delta.kind is not DeltaKind.PRICE_DROP:
+        raise ValueError(f"no Digest section defined for delta kind {delta.kind!r}")
+
     detail = f"{_format_price(previous.price_cents)} → {_format_price(current.price_cents)}"
     section = {
         MatchReason.WATCHLIST: SECTION_PRICES,
