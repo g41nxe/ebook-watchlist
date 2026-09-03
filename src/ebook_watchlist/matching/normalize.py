@@ -159,8 +159,9 @@ def split_authors(raw: str) -> list[str]:
 
     A bare comma is the hard case: it separates people in
     ``Anna Meier, Bernd Schulz`` but means sort order in ``Riley, Lucinda``.
-    We only read it as a separator when *every* piece it produces already looks
-    like a full name on its own.
+    We read it as a separator when at least half the pieces it produces already
+    look like a full name — a majority rather than a unanimous vote, because
+    real anthology credits carry stray fragments like ``Jr.`` between the names.
     """
     if not raw:
         return []
@@ -178,7 +179,8 @@ def split_authors(raw: str) -> list[str]:
         if not segment:
             continue
         parts = [part.strip() for part in segment.split(",") if part.strip()]
-        if len(parts) > 1 and all(len(part.split()) >= 2 for part in parts):
+        full_names = sum(1 for part in parts if len(part.split()) >= 2)
+        if len(parts) > 1 and full_names * 2 >= len(parts):
             authors.extend(parts)
         else:
             authors.append(segment)

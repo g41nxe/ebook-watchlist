@@ -70,26 +70,34 @@ def _format_price(cents: int | None) -> str:
     return f"{cents / 100:.2f} €".replace(".", ",")
 
 
+_SECTION_BY_REASON = {
+    MatchReason.WATCHLIST: SECTION_PRICES,
+    MatchReason.PROFILE_AUTHOR: SECTION_AUTHORS,
+    MatchReason.GENRE_CATEGORY: SECTION_GENRE,
+}
+
+
 def _entry_for(delta: Delta, profile: Profile | None) -> tuple[str, DigestEntry]:
     current, previous = delta.current, delta.previous
 
     if delta.kind is DeltaKind.BECAME_AVAILABLE:
         detail = "jetzt verfügbar"
-        if previous.reservation_count:
+        if previous and previous.reservation_count:
             detail += f" (zuvor {previous.reservation_count} Vormerkungen)"
         return SECTION_LIBRARY, DigestEntry(
             title=current.title, author=current.author, detail=detail, url=current.url
         )
 
-    if delta.kind is not DeltaKind.PRICE_DROP:
+    if delta.kind is DeltaKind.FIRST_SEEN:
+        detail = _format_price(current.price_cents)
+        if current.category:
+            detail += f" · {current.category}"
+    elif delta.kind is DeltaKind.PRICE_DROP and previous is not None:
+        detail = f"{_format_price(previous.price_cents)} → {_format_price(current.price_cents)}"
+    else:
         raise ValueError(f"no Digest section defined for delta kind {delta.kind!r}")
 
-    detail = f"{_format_price(previous.price_cents)} → {_format_price(current.price_cents)}"
-    section = {
-        MatchReason.WATCHLIST: SECTION_PRICES,
-        MatchReason.PROFILE_AUTHOR: SECTION_AUTHORS,
-        MatchReason.GENRE_CATEGORY: SECTION_GENRE,
-    }[current.match_reason]
+    section = _SECTION_BY_REASON[current.match_reason]
     flags = deal_flags(current, previous, profile) if profile else ()
     return section, DigestEntry(
         title=current.title,

@@ -110,6 +110,31 @@ def load_profile(path: Path | None = None) -> Profile:
     return profile
 
 
+def load_dismissals(path: Path | None = None) -> dict[str, frozenset[str]]:
+    """Suggestions the reader has permanently waved away, per Source::
+
+        beam:
+          - "1278797"
+
+    The one config file that is genuinely optional — an absent file just means
+    nothing has been dismissed yet.
+    """
+    path = path or paths.dismissed_path()
+    if not path.exists():
+        return {}
+
+    data = _load_yaml(path, "dismissed.yaml")
+    if not isinstance(data, dict):
+        raise ConfigError(f"dismissed.yaml at {path} must map a source name to a list of ids")
+
+    dismissals: dict[str, frozenset[str]] = {}
+    for source, ids in data.items():
+        if not isinstance(ids, list):
+            raise ConfigError(f"dismissed.yaml: entries for {source!r} must be a list")
+        dismissals[str(source)] = frozenset(str(item) for item in ids)
+    return dismissals
+
+
 def load_watchlist(path: Path | None = None) -> list[WatchlistEntry]:
     path = path or paths.watchlist_path()
     data = _load_yaml(path, "watchlist.yaml")

@@ -17,8 +17,8 @@ from pathlib import Path
 from filelock import FileLock, Timeout
 
 from . import paths
-from .config import ConfigError, load_profile, load_watchlist
-from .diff import compute_deltas, keys_of
+from .config import ConfigError, load_dismissals, load_profile, load_watchlist
+from .diff import compute_deltas, keys_of, suppress_unseeded
 from .digest import build_digest
 from .http import HttpClient, build_user_agent
 from .models import Observation, SourceFailure
@@ -100,6 +100,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         profile = load_profile()
         watchlist = load_watchlist()
+        dismissed = load_dismissals()
         client = HttpClient(user_agent=build_user_agent(profile.contact))
         sources = build_sources(profile, client)
     except ConfigError as exc:
@@ -115,20 +116,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_ALREADY_RUNNING
 
     try:
-        return _run(profile, watchlist, sources, trigger=args.trigger)
+        return _run(profile, watchlist, sources, dismissed, trigger=args.trigger)
     finally:
         lock.release()
 
 
-def _run(profile, watchlist, sources, *, trigger: str) -> int:
+def _run(profile, watchlist, sources, dismissed, *, trigger: str) -> int:
     store = Store(paths.db_path())
     started_at = datetime.now()
     run_id = store.start_run(profile.slug, trigger, started_at)
 
-    context = RunContext(profile_slug=profile.slug, store=store, now=started_at)
+    context = RunContext(
+        profile_slug=profile.slug, store=store, now=started_at, dismissed=dismissed
+    )
     observations, failures = _collect(sources, profile, watchlist, context)
     previous = store.latest_observations(profile.slug, keys_of(observations))
-    deltas = compute_deltas(observations, previous)
+    known_scopes = store.known_discovery_scopes(profile.slug)
+    deltas = suppress_unseeded(compute_deltas(observations, previous), known_scopes)
 
     store.append(run_id, profile.slug, observations, started_at)
 

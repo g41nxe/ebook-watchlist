@@ -11,13 +11,40 @@ from urllib.parse import urljoin
 
 from ...config import WatchlistEntry
 from ...http import HttpClient, NotFound
-from ...matching import Candidate, Query, Resolution, match
+from ...matching import Candidate, Query, Resolution, author_matches, match
 from ...models import MatchReason, Observation
 from ..base import ShopSource, SourceStructureError
 from . import parse
 from . import selectors as sel
 
 SOURCE_NAME = "beam"
+
+#: A prolific author fills two or three pages of 100; past that it is
+#: back-catalogue we have already seen.
+MAX_AUTHOR_PAGES = 3
+
+#: Sorted by release date, the front of a shelf is all that can be new. Going
+#: deeper only re-reads the back-catalogue.
+MAX_CATEGORY_PAGES = 1
+
+#: Shopware transliterates umlauts rather than stripping them.
+_SLUG_FOLDS = {"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"}
+
+
+def author_slug(author: str) -> str:
+    """``"John Scalzi"`` → ``"john-scalzi"``.
+
+    Periods survive (``j.r.r.-tolkien``) and the name stays in given-name-first
+    order, which is how the shop builds these URLs.
+    """
+    name = author.strip()
+    if "," in name:
+        surname, _, given = name.partition(",")
+        name = f"{given.strip()} {surname.strip()}".strip()
+    name = name.casefold()
+    for source, target in _SLUG_FOLDS.items():
+        name = name.replace(source, target)
+    return "-".join(name.split())
 
 
 class BeamSource(ShopSource):
@@ -62,6 +89,110 @@ class BeamSource(ShopSource):
             ],
         )
         return resolution
+
+    # --- author discovery (ticket 06) --------------------------------------
+
+    def _author_hub(self, author: str) -> list[parse.Tile] | None:
+        """The shop keeps hand-curated pages for about thirty authors.
+
+        Where one exists it is authoritative — every tile on it is that author.
+        Everyone else 404s, which is the signal to fall back to search.
+        """
+        path = sel.AUTHOR_HUB_PATH.format(slug=author_slug(author))
+        tiles: list[parse.Tile] = []
+        for page in range(1, MAX_AUTHOR_PAGES + 1):
+            params = {"n": str(sel.MAX_PAGE_SIZE)}
+            if page > 1:
+                params["p"] = str(page)
+            try:
+                html = self.client.get(urljoin(self.base, path), params=params)
+            except NotFound:
+                return None if page == 1 else tiles
+            found = parse.parse_tiles(html, self.base)
+            tiles.extend(found)
+            if len(found) < sel.MAX_PAGE_SIZE:
+                break
+        return tiles
+
+    def _author_search(self, author: str) -> list[parse.Tile]:
+        """Search and keep only what is really by this author.
+
+        Shopware's fuzzy search answers "Scalzi" with Scali, Scalzo and
+        H. Beam Piper, so half the tiles get discarded here.
+        """
+        tiles: list[parse.Tile] = []
+        for page in range(1, MAX_AUTHOR_PAGES + 1):
+            found = self.search(author, page_size=sel.MAX_PAGE_SIZE, page=page)
+            tiles.extend(found)
+            if len(found) < sel.MAX_PAGE_SIZE:
+                break
+        return [tile for tile in tiles if author_matches(author, tile.author)]
+
+    def by_author(self, author: str) -> list[Observation]:
+        tiles = self._author_hub(author)
+        if tiles is None:
+            tiles = self._author_search(author)
+
+        seen: set[str] = set()
+        observations = []
+        for tile in tiles:
+            if tile.product_id in seen:
+                continue
+            seen.add(tile.product_id)
+            observations.append(
+                Observation(
+                    source=self.name,
+                    source_item_id=tile.product_id,
+                    title=tile.title,
+                    author=tile.author,
+                    match_reason=MatchReason.PROFILE_AUTHOR,
+                    price_cents=tile.price_cents,
+                    original_price_cents=None,
+                    url=tile.url,
+                )
+            )
+        return observations
+
+    # --- genre discovery (ticket 07) ---------------------------------------
+
+    def by_category(self, category_path: str) -> list[Observation]:
+        """New arrivals on one of the shop's own shelves.
+
+        v1 trusts the shop's shelving rather than classifying anything: sort the
+        category by release date and read the front of it (ADR 11). What counts
+        as *new* is decided later, by the diff against past Observations.
+        """
+        path = category_path.strip("/") + "/"
+        seen: set[str] = set()
+        observations: list[Observation] = []
+
+        for page in range(1, MAX_CATEGORY_PAGES + 1):
+            params = {"o": sel.SORT_BY_RELEASE_DATE, "n": str(sel.MAX_PAGE_SIZE)}
+            if page > 1:
+                params["p"] = str(page)
+            tiles = parse.parse_tiles(
+                self.client.get(urljoin(self.base, path), params=params), self.base
+            )
+            for tile in tiles:
+                if tile.product_id in seen:
+                    continue
+                seen.add(tile.product_id)
+                observations.append(
+                    Observation(
+                        source=self.name,
+                        source_item_id=tile.product_id,
+                        title=tile.title,
+                        author=tile.author,
+                        match_reason=MatchReason.GENRE_CATEGORY,
+                        price_cents=tile.price_cents,
+                        original_price_cents=None,
+                        category=category_path,
+                        url=tile.url,
+                    )
+                )
+            if len(tiles) < sel.MAX_PAGE_SIZE:
+                break
+        return observations
 
     # --- observation -------------------------------------------------------
 

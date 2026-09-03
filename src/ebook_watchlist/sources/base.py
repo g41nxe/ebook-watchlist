@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -41,6 +41,11 @@ class RunContext:
     store: Store
     now: datetime
     attention: list[Attention] = field(default_factory=list)
+    #: Suggestions waved away for good, per Source name.
+    dismissed: Mapping[str, frozenset[str]] = field(default_factory=dict)
+
+    def is_dismissed(self, source: str, source_item_id: str) -> bool:
+        return source_item_id in self.dismissed.get(source, frozenset())
 
     def remembered_link(self, source: str, entry: WatchlistEntry) -> tuple[str | None, bool]:
         """``(url, still_valid)`` for a previous resolution of this entry.
@@ -209,7 +214,11 @@ class ShopSource(ResolvingSource):
     def check(self, entry: WatchlistEntry) -> Observation | None: ...
 
     def by_author(self, author: str) -> list[Observation]:
-        """Titles by a Reference Author. Implemented in ticket 06."""
+        """Everything this shop stocks by one Reference Author."""
+        return []
+
+    def by_category(self, category_path: str) -> list[Observation]:
+        """The newest arrivals on one of the shop's own shelves."""
         return []
 
     def collect(
@@ -225,6 +234,22 @@ class ShopSource(ResolvingSource):
             observation = self.check(linked)
             if observation is not None:
                 observations.append(observation)
+
+        # Discoveries must not collide with what the Watchlist already covers:
+        # two Observations of one item in a single Run would leave the diff with
+        # no single "latest" to compare against next time.
+        seen = {observation.source_item_id for observation in observations}
+
+        def take(discovered: list[Observation]) -> None:
+            for observation in discovered:
+                item_id = observation.source_item_id
+                if item_id in seen or context.is_dismissed(self.name, item_id):
+                    continue
+                seen.add(item_id)
+                observations.append(observation)
+
         for author in profile.reference_authors:
-            observations.extend(self.by_author(author))
+            take(self.by_author(author))
+        for category in profile.genre_categories:
+            take(self.by_category(category))
         return observations

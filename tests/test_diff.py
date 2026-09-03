@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from ebook_watchlist.diff import compare, compute_deltas
 from ebook_watchlist.models import Availability, DeltaKind, MatchReason, Observation
 
@@ -14,8 +16,22 @@ def observation(**overrides) -> Observation:
     return Observation(**{**defaults, **overrides})
 
 
-def test_first_sighting_is_not_a_delta() -> None:
+def test_a_watchlist_titles_first_sighting_is_only_a_baseline() -> None:
     assert compare(observation(price_cents=999), None) == []
+
+
+@pytest.mark.parametrize(
+    "reason", [MatchReason.PROFILE_AUTHOR, MatchReason.GENRE_CATEGORY]
+)
+def test_a_discovery_turning_up_at_all_is_the_news(reason: MatchReason) -> None:
+    deltas = compare(observation(price_cents=999, match_reason=reason), None)
+    assert [d.kind for d in deltas] == [DeltaKind.FIRST_SEEN]
+    assert deltas[0].previous is None
+
+
+def test_a_discovery_is_only_news_once() -> None:
+    before = observation(price_cents=999, match_reason=MatchReason.GENRE_CATEGORY)
+    assert compare(before, before) == []
 
 
 def test_unchanged_is_not_a_delta() -> None:

@@ -24,6 +24,10 @@ class MatchReason(StrEnum):
 
 
 class DeltaKind(StrEnum):
+    #: A discovered title we had never seen before. For a Watchlist Entry a
+    #: first sighting is only a baseline, but for a discovery the appearing
+    #: *is* the news, so it has no previous Observation to point at.
+    FIRST_SEEN = "first_seen"
     BECAME_AVAILABLE = "became_available"
     BECAME_UNAVAILABLE = "became_unavailable"
     PRICE_DROP = "price_drop"
@@ -61,7 +65,8 @@ class Delta:
 
     kind: DeltaKind
     current: Observation
-    previous: Observation
+    #: ``None`` only for :attr:`DeltaKind.FIRST_SEEN`.
+    previous: Observation | None
 
 
 @dataclass(frozen=True, slots=True)

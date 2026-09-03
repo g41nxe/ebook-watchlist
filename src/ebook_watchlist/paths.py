@@ -26,6 +26,10 @@ def watchlist_path() -> Path:
     return data_dir() / "watchlist.yaml"
 
 
+def dismissed_path() -> Path:
+    return data_dir() / "dismissed.yaml"
+
+
 def db_path() -> Path:
     return data_dir() / "snapshots.db"
 

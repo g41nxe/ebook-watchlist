@@ -1,0 +1,178 @@
+"""Genre discovery: what turned up on a shelf the reader follows."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import datetime
+from pathlib import Path
+
+import pytest
+
+from ebook_watchlist.config import ConfigError, Profile, load_dismissals
+from ebook_watchlist.diff import compute_deltas, discovery_scope, suppress_unseeded
+from ebook_watchlist.digest import SECTION_GENRE, build_digest
+from ebook_watchlist.models import MatchReason, Observation
+from ebook_watchlist.sources.base import RunContext
+from ebook_watchlist.sources.beam.source import BeamSource
+from ebook_watchlist.store import Store
+
+FIXTURES = Path(__file__).parent / "fixtures" / "beam"
+NOW = datetime(2026, 9, 4, 6, 0)
+SPACE_OPERA = "belletristik/science-fiction/space-opera"
+
+
+def fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+class RecordingClient:
+    def __init__(self, html: str) -> None:
+        self.html = html
+        self.requests: list[tuple[str, dict | None]] = []
+
+    def get(self, url: str, params: dict | None = None) -> str:
+        self.requests.append((url, params))
+        return self.html
+
+
+def source() -> BeamSource:
+    return BeamSource(client=RecordingClient(fixture("category-new-arrivals.html")))  # type: ignore[arg-type]
+
+
+def context(tmp_path: Path, **kwargs) -> RunContext:
+    return RunContext(profile_slug="t", store=Store(tmp_path / "s.db"), now=NOW, **kwargs)
+
+
+# --- fetching a shelf -----------------------------------------------------
+
+
+def test_a_category_is_read_newest_first() -> None:
+    beam = source()
+    beam.by_category(SPACE_OPERA)
+
+    url, params = beam.client.requests[0]  # type: ignore[attr-defined]
+    assert url.endswith("/belletristik/science-fiction/space-opera/")
+    assert params["o"] == "1"  # sort by release date
+
+
+def test_the_shelf_is_recorded_on_every_observation() -> None:
+    observations = source().by_category(SPACE_OPERA)
+
+    assert observations
+    assert all(o.match_reason is MatchReason.GENRE_CATEGORY for o in observations)
+    assert all(o.category == SPACE_OPERA for o in observations)
+    assert all(o.original_price_cents is None for o in observations)
+
+
+def test_a_leading_or_trailing_slash_does_not_change_the_request() -> None:
+    beam = source()
+    beam.by_category("/" + SPACE_OPERA + "/")
+    url, _ = beam.client.requests[0]  # type: ignore[attr-defined]
+    assert url.endswith("/belletristik/science-fiction/space-opera/")
+
+
+# --- what counts as new ---------------------------------------------------
+
+
+def test_a_new_arrival_is_reported_once_and_then_stays_quiet() -> None:
+    observations = source().by_category(SPACE_OPERA)
+
+    first_run = compute_deltas(observations, {})
+    assert len(first_run) == len(observations)
+
+    already_known = {o.key: o for o in observations}
+    assert compute_deltas(observations, already_known) == []
+
+
+def test_a_shelf_being_followed_for_the_first_time_is_seeded_quietly() -> None:
+    """Everything on a fresh shelf is technically new; none of it is news."""
+    observations = source().by_category(SPACE_OPERA)
+    deltas = compute_deltas(observations, {})
+
+    assert suppress_unseeded(deltas, known_scopes=set()) == []
+
+    scope = discovery_scope(observations[0])
+    assert suppress_unseeded(deltas, known_scopes={scope}) == deltas
+
+
+def test_seeding_only_silences_first_sightings_not_real_changes() -> None:
+    dropped = Observation(
+        source="beam",
+        source_item_id="1",
+        title="Ein Titel",
+        match_reason=MatchReason.GENRE_CATEGORY,
+        category=SPACE_OPERA,
+        price_cents=499,
+    )
+    before = replace(dropped, price_cents=1299)
+    deltas = compute_deltas([dropped], {dropped.key: before})
+
+    assert suppress_unseeded(deltas, known_scopes=set()) == deltas
+
+
+def test_each_shelf_is_seeded_on_its_own() -> None:
+    observations = source().by_category(SPACE_OPERA)
+    deltas = compute_deltas(observations, {})
+    other_shelf = ("beam", str(MatchReason.GENRE_CATEGORY), "belletristik/krimi-thriller")
+
+    assert suppress_unseeded(deltas, known_scopes={other_shelf}) == []
+
+
+def test_suggestions_land_in_their_own_section_never_among_real_hits() -> None:
+    observations = source().by_category(SPACE_OPERA)
+    digest = build_digest(
+        profile_name="T",
+        generated_at=NOW,
+        since=None,
+        deltas=compute_deltas(observations, {}),
+        failures=[],
+        profile=Profile(slug="t", name="T"),
+    )
+
+    assert [section.title for section in digest.sections] == [SECTION_GENRE]
+    assert digest.sections[0].entries[0].detail
+    assert SPACE_OPERA in digest.sections[0].entries[0].detail
+
+
+# --- dismissals -----------------------------------------------------------
+
+
+def test_a_dismissed_suggestion_never_comes_back(tmp_path: Path) -> None:
+    beam = source()
+    all_ids = {o.source_item_id for o in beam.by_category(SPACE_OPERA)}
+    unwanted = sorted(all_ids)[0]
+
+    profile = Profile(slug="t", name="T", genre_categories=[SPACE_OPERA])
+    ctx = context(tmp_path, dismissed={"beam": frozenset({unwanted})})
+    observations = beam.collect(profile, [], ctx)
+
+    assert unwanted not in {o.source_item_id for o in observations}
+    assert len(observations) == len(all_ids) - 1
+
+
+def test_dismissals_are_scoped_to_one_source(tmp_path: Path) -> None:
+    ctx = context(tmp_path, dismissed={"voebb": frozenset({"123"})})
+    assert ctx.is_dismissed("voebb", "123")
+    assert not ctx.is_dismissed("beam", "123")
+
+
+def test_an_absent_dismissal_file_simply_means_nothing_is_dismissed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+    assert load_dismissals() == {}
+
+
+def test_dismissals_are_read_per_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+    (tmp_path / "dismissed.yaml").write_text("beam:\n  - 1278797\n", encoding="utf-8")
+    assert load_dismissals() == {"beam": frozenset({"1278797"})}
+
+
+def test_a_malformed_dismissal_file_fails_loudly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+    (tmp_path / "dismissed.yaml").write_text("beam: 1278797\n", encoding="utf-8")
+    with pytest.raises(ConfigError, match="must be a list"):
+        load_dismissals()

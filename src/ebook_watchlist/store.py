@@ -258,6 +258,27 @@ class Store:
             row.resolved_at = resolved_at
             session.commit()
 
+    def known_discovery_scopes(self, profile_slug: str) -> set[tuple[str, str, str]]:
+        """Which ``(source, match_reason, category)`` scopes we have already seen.
+
+        Asked *before* this Run's Observations are appended, so a shelf being
+        followed for the first time is recognisable as such.
+        """
+        with self.session() as session:
+            stmt = (
+                select(
+                    ObservationRow.source,
+                    ObservationRow.match_reason,
+                    ObservationRow.category,
+                )
+                .where(ObservationRow.profile_slug == profile_slug)
+                .distinct()
+            )
+            return {
+                (source, reason, category or "")
+                for source, reason, category in session.execute(stmt)
+            }
+
     def append(
         self,
         run_id: int,

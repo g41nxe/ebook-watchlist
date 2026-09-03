@@ -159,6 +159,33 @@ def score(query: Query, candidate: Candidate, source_rank: int = 0) -> Scored:
     )
 
 
+def author_matches(target: str, credited: str | None, threshold: int = STRONG_AUTHOR) -> bool:
+    """Is ``target`` one of the people credited on this item?
+
+    Used for author discovery, where the shop's search returns a lot of
+    near-namesakes ("Scali", "Scalzo") and anthologies crediting twenty people
+    in one string.
+    """
+    if not credited:
+        return False
+    targets = normalize_authors(target)
+    credits = normalize_authors(credited)
+    if not targets or not credits:
+        return False
+
+    for wanted in targets:
+        for person in credits:
+            if wanted.full == person.full:
+                return True
+            score = max(
+                fuzz.token_set_ratio(wanted.full, person.full),
+                fuzz.token_set_ratio(wanted.substantial, person.substantial),
+            )
+            if score >= threshold:
+                return True
+    return False
+
+
 def _is_tied(best: Scored, runner_up: Scored) -> bool:
     """Two hits we cannot honestly tell apart — the case Calibre punts to its GUI."""
     return (
