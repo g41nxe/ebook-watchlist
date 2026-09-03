@@ -1,0 +1,193 @@
+"""Offline tests against HTML captured from the live beam-shop on 2026-09-04."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from ebook_watchlist.config import WatchlistEntry
+from ebook_watchlist.matching import Confidence
+from ebook_watchlist.models import MatchReason
+from ebook_watchlist.sources.base import SourceStructureError
+from ebook_watchlist.sources.beam import parse
+from ebook_watchlist.sources.beam import selectors as sel
+from ebook_watchlist.sources.beam.source import BeamSource
+
+FIXTURES = Path(__file__).parent / "fixtures" / "beam"
+
+
+def fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+class ScriptedClient:
+    def __init__(self, *pages: str) -> None:
+        self.pages = list(pages)
+        self.requests: list[tuple[str, dict | None]] = []
+
+    def get(self, url: str, params: dict | None = None) -> str:
+        self.requests.append((url, params))
+        return self.pages.pop(0) if len(self.pages) > 1 else self.pages[0]
+
+
+def source(*pages: str) -> BeamSource:
+    return BeamSource(client=ScriptedClient(*pages))  # type: ignore[arg-type]
+
+
+# --- prices ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "cents"),
+    [
+        ("9,99 €", 999),
+        ("9,99\xa0€", 999),  # the shop uses a non-breaking space
+        ("4,99 €", 499),
+        ("0,99 €", 99),
+        ("1.234,56 €", 123456),  # de-DE thousands separator
+        ("kostenlos", None),
+        ("", None),
+    ],
+)
+def test_parse_price(text: str, cents: int | None) -> None:
+    assert parse.parse_price(text) == cents
+
+
+# --- listing tiles --------------------------------------------------------
+
+
+def test_search_results_parse_into_tiles() -> None:
+    tiles = parse.parse_tiles(fixture("search-hits.html"))
+    assert len(tiles) == 48
+
+    first = tiles[0]
+    assert first.title == "Krieg der Klone"
+    assert first.author == "John Scalzi"
+    assert first.price_cents == 499
+    assert first.product_id == "606983"
+    assert first.order_number == "SW9783104911854450914"
+    assert first.url.endswith("/606983/krieg-der-klone")
+
+
+def test_the_title_excludes_the_subtitle() -> None:
+    """The link's own text runs title and subtitle together."""
+    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    starwars = next(tile for tile in tiles if tile.product_id == "1278797")
+    assert starwars.title == "Star Wars™ - Die Verschollenen"
+    assert starwars.subtitle and "Jubiläum" in starwars.subtitle
+
+
+def test_the_leading_von_is_stripped_from_the_author() -> None:
+    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    starwars = next(tile for tile in tiles if tile.product_id == "1278797")
+    assert starwars.author == "Zahn, Timothy"
+
+
+def test_the_product_url_drops_the_category_context_param() -> None:
+    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    assert all("?" not in tile.url for tile in tiles)
+    assert all(tile.url.startswith("https://www.beam-shop.de/") for tile in tiles)
+
+
+def test_badges_are_deduplicated_across_layout_slots() -> None:
+    """A tile repeats its badge markup once per slot; the set must not."""
+    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    starwars = next(tile for tile in tiles if tile.product_id == "1278797")
+    assert starwars.badges == {sel.BADGE_PREORDER, sel.BADGE_NEW}
+    assert starwars.is_preorder
+    assert starwars.is_new
+
+
+def test_no_results_is_an_answer_not_a_failure() -> None:
+    assert parse.parse_tiles(fixture("search-no-results.html")) == []
+
+
+def test_a_page_with_neither_tiles_nor_the_message_raises() -> None:
+    with pytest.raises(SourceStructureError, match="listing markup changed"):
+        parse.parse_tiles("<html><body><p>Wartungsarbeiten</p></body></html>")
+
+
+def test_total_pages_is_read_off_the_listing() -> None:
+    assert parse.total_pages(fixture("category-new-arrivals.html")) == 236
+    assert parse.total_pages(fixture("author-hub.html")) == 2
+    assert parse.total_pages(fixture("search-no-results.html")) is None
+
+
+# --- product detail page --------------------------------------------------
+
+
+def test_detail_price_comes_from_the_main_product_not_a_recommendation() -> None:
+    """The page carries well over a hundred cross-sell tiles with the same classes."""
+    detail = parse.parse_detail(fixture("product-detail.html"))
+    assert detail.title == "Krieg der Klone"
+    assert detail.price_cents == 499
+
+
+def test_a_detail_page_without_the_product_block_raises() -> None:
+    with pytest.raises(SourceStructureError, match="detail markup changed"):
+        parse.parse_detail("<html><body><h1>Beam Shop</h1></body></html>")
+
+
+def test_a_detail_page_without_a_price_raises() -> None:
+    html = '<html><body><div class="product--details"><h2>Titel</h2></div></body></html>'
+    with pytest.raises(SourceStructureError, match="machine-readable price"):
+        parse.parse_detail(html)
+
+
+# --- the Source -----------------------------------------------------------
+
+
+def test_resolution_ignores_search_rank_and_re_matches_every_tile() -> None:
+    beam = source(fixture("search-hits.html"))
+    resolution = beam.resolve(WatchlistEntry(title="Krieg der Klone", author="John Scalzi"))
+
+    assert resolution is not None
+    assert resolution.confidence is Confidence.AUTO_ACCEPT, resolution.reason
+    assert resolution.accepted is not None
+    assert resolution.accepted.payload.endswith("/606983/krieg-der-klone")
+
+
+def test_a_query_the_shop_cannot_serve_is_not_sent() -> None:
+    """Shopware silently returns nothing below four characters."""
+    beam = source(fixture("search-hits.html"))
+    assert beam.search("abc") == []
+    assert beam.client.requests == []  # type: ignore[attr-defined]
+
+
+def test_no_search_results_means_not_stocked() -> None:
+    beam = source(fixture("search-no-results.html"))
+    assert beam.resolve(WatchlistEntry(title="Gibt es nicht", author="Niemand")) is None
+
+
+def test_check_reads_the_price_off_the_pinned_product_page() -> None:
+    beam = source(fixture("product-detail.html"))
+    entry = WatchlistEntry(
+        title="Krieg der Klone",
+        author="John Scalzi",
+        resolved_links={
+            "beam": "https://www.beam-shop.de/belletristik/science-fiction/"
+            "science-fiction-allgemein/606983/krieg-der-klone"
+        },
+    )
+
+    observation = beam.check(entry)
+
+    assert observation is not None
+    assert observation.source == "beam"
+    assert observation.source_item_id == "606983"
+    assert observation.price_cents == 499
+    assert observation.match_reason is MatchReason.WATCHLIST
+    assert observation.watchlist_key == entry.key
+
+
+def test_the_struck_price_is_always_absent_here() -> None:
+    """German fixed-book-price law: the shop never renders one."""
+    beam = source(fixture("product-detail.html"))
+    entry = WatchlistEntry(
+        title="Krieg der Klone",
+        resolved_links={"beam": "https://www.beam-shop.de/x/y/z/606983/krieg-der-klone"},
+    )
+    observation = beam.check(entry)
+    assert observation is not None
+    assert observation.original_price_cents is None

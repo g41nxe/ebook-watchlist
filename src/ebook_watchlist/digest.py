@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from .config import Profile
+from .deals import deal_flags
 from .models import Attention, Delta, DeltaKind, MatchReason, SourceFailure
 
 SECTION_LIBRARY = "Bibliothek"
@@ -68,7 +70,7 @@ def _format_price(cents: int | None) -> str:
     return f"{cents / 100:.2f} €".replace(".", ",")
 
 
-def _entry_for(delta: Delta) -> tuple[str, DigestEntry]:
+def _entry_for(delta: Delta, profile: Profile | None) -> tuple[str, DigestEntry]:
     current, previous = delta.current, delta.previous
 
     if delta.kind is DeltaKind.BECAME_AVAILABLE:
@@ -88,8 +90,13 @@ def _entry_for(delta: Delta) -> tuple[str, DigestEntry]:
         MatchReason.PROFILE_AUTHOR: SECTION_AUTHORS,
         MatchReason.GENRE_CATEGORY: SECTION_GENRE,
     }[current.match_reason]
+    flags = deal_flags(current, previous, profile) if profile else ()
     return section, DigestEntry(
-        title=current.title, author=current.author, detail=detail, url=current.url
+        title=current.title,
+        author=current.author,
+        detail=detail,
+        flags=flags,
+        url=current.url,
     )
 
 
@@ -101,11 +108,12 @@ def build_digest(
     deltas: list[Delta],
     failures: list[SourceFailure],
     attention: list[Attention] | None = None,
+    profile: Profile | None = None,
 ) -> Digest:
     buckets: dict[str, list[DigestEntry]] = {title: [] for title in SECTION_ORDER}
 
     for delta in deltas:
-        section, entry = _entry_for(delta)
+        section, entry = _entry_for(delta, profile)
         buckets[section].append(entry)
 
     for item in attention or []:

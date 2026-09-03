@@ -33,6 +33,23 @@ EXIT_CONFIG_ERROR = 2
 EXIT_SOURCE_FAILURE = 1
 
 
+def _survive_a_narrow_console() -> None:
+    """Never lose a whole Run's Digest to a console that cannot render an arrow.
+
+    Windows still hands us a cp1252 stdout, which raises on "→" and on the
+    warning sign in the error heading. The HTML digest is always written in full
+    UTF-8; this only softens what the terminal gets.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(errors="replace")
+        except (ValueError, OSError):  # pragma: no cover - stream not reconfigurable
+            pass
+
+
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="ebw", description="Run one check cycle.")
     parser.add_argument(
@@ -75,6 +92,7 @@ def _write_html(digest, generated_at: datetime) -> Path:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    _survive_a_narrow_console()
     args = _parse_args(argv)
     if args.data_dir is not None:
         os.environ["EBW_DATA_DIR"] = str(args.data_dir)
@@ -122,6 +140,7 @@ def _run(profile, watchlist, sources, *, trigger: str) -> int:
         deltas=deltas,
         failures=failures,
         attention=context.attention,
+        profile=profile,
     )
 
     finished_at = datetime.now()

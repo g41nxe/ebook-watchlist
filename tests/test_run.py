@@ -111,6 +111,32 @@ def test_a_second_concurrent_run_backs_off(
         held.release()
 
 
+def test_output_survives_a_console_that_cannot_render_the_digest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windows hands us a cp1252 stdout, which raises on the price arrow. Losing
+    a whole Run's Digest at the very last step is not an acceptable failure."""
+    from ebook_watchlist.run import _survive_a_narrow_console
+
+    class Narrow:
+        def __init__(self) -> None:
+            self.kwargs: dict = {}
+
+        def reconfigure(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+    class Plain:
+        """A stream with no reconfigure at all — must simply be left alone."""
+
+    narrow, plain = Narrow(), Plain()
+    monkeypatch.setattr("ebook_watchlist.run.sys.stdout", narrow)
+    monkeypatch.setattr("ebook_watchlist.run.sys.stderr", plain)
+
+    _survive_a_narrow_console()
+
+    assert narrow.kwargs == {"errors": "replace"}
+
+
 def test_run_journal_records_every_run(data_dir: Path) -> None:
     main([])
     main([])

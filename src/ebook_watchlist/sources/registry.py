@@ -21,6 +21,7 @@ from .. import paths
 from ..config import ConfigError, Profile
 from ..http import HttpClient
 from .base import Source
+from .beam import BeamSource
 from .fake import FakeSource
 from .voebb import VoebbSource
 from .voebb import selectors as voebb_selectors
@@ -55,9 +56,14 @@ def _build_voebb(name: str, options: dict, client: HttpClient) -> Source:
     return VoebbSource(client=client, name=name, media=media)
 
 
+def _build_beam(name: str, options: dict, client: HttpClient) -> Source:
+    return BeamSource(client=client, name=name)
+
+
 _BUILDERS: dict[str, Callable[[str, dict, HttpClient], Source]] = {
     "fake": _build_fake,
     "voebb": _build_voebb,
+    "beam": _build_beam,
 }
 
 

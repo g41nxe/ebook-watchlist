@@ -21,6 +21,10 @@ no_gos: []
 
 sources:
   voebb:
+    # Which formats to watch. The Onleihe lists the ebook and the audiobook of a
+    # novel as two separate titles, so without a preference neither can win.
+    media: [ebook]
+  beam:
   # A canned source for trying the pipeline out without touching the network.
   # fake:
   #   fixture: fake-source.yaml
