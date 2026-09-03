@@ -7,7 +7,12 @@ strong_deal_max_cents: 500   # unter 5,00 € = Strong Deal, ohne Rabatt-Check
 deal_max_cents: 1000         # 5,00-9,99 € nur mit echtem Rabatt
 min_discount_pct: 25
 
-reference_authors: []
+# Either a plain list, or split into a list swept every run and a long tail
+# swept once a week.
+reference_authors:
+  core: []
+  extended: []
+extended_sweep_weekday: 6  # 0 = Monday
 
 # Shop category paths whose new arrivals are surfaced as suggestions (ticket 07).
 genre_categories: []

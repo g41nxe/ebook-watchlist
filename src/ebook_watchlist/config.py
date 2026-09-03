@@ -24,13 +24,24 @@ class Profile:
     strong_deal_max_cents: int = 500
     deal_max_cents: int = 1000
     min_discount_pct: int = 25
+    #: Swept every Run.
     reference_authors: list[str] = field(default_factory=list)
+    #: Swept once a week — the long tail, where a missed day costs nothing.
+    extended_authors: list[str] = field(default_factory=list)
+    #: Monday is 0. The day the extended list is swept on.
+    extended_sweep_weekday: int = 6
     genre_categories: list[str] = field(default_factory=list)
     no_gos: list[str] = field(default_factory=list)
     sources: dict[str, dict[str, Any]] = field(default_factory=dict)
     #: Appended to the outgoing User-Agent so a site operator can reach you.
     #: Opt-in — nothing personal is sent unless you put it here yourself.
     contact: str | None = None
+
+    def authors_to_sweep(self, include_extended: bool) -> list[str]:
+        if not include_extended:
+            return list(self.reference_authors)
+        extra = [a for a in self.extended_authors if a not in self.reference_authors]
+        return [*self.reference_authors, *extra]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +92,32 @@ def _positive_int(mapping: dict[str, Any], key: str, default: int, what: str) ->
     return value
 
 
+def _reference_authors(data: dict[str, Any], what: str) -> tuple[list[str], list[str]]:
+    """``reference_authors`` is either a plain list or a core/extended split::
+
+        reference_authors:
+          core: [...]       # every Run
+          extended: [...]   # once a week
+    """
+    raw = data.get("reference_authors")
+    if raw is None or isinstance(raw, list):
+        return _str_list(data, "reference_authors", what), []
+    if not isinstance(raw, dict):
+        raise ConfigError(
+            f"{what}: 'reference_authors' must be a list, or a mapping of core/extended"
+        )
+    unknown = set(raw) - {"core", "extended"}
+    if unknown:
+        raise ConfigError(
+            f"{what}: 'reference_authors' has unknown key(s) {sorted(unknown)} "
+            "— expected 'core' and/or 'extended'"
+        )
+    return (
+        _str_list(raw, "core", f"{what}: reference_authors"),
+        _str_list(raw, "extended", f"{what}: reference_authors"),
+    )
+
+
 def load_profile(path: Path | None = None) -> Profile:
     path = path or paths.profile_path()
     data = _load_yaml(path, "profile.yaml")
@@ -88,13 +125,22 @@ def load_profile(path: Path | None = None) -> Profile:
         raise ConfigError(f"profile.yaml at {path} must be a mapping")
 
     what = "profile.yaml"
+    core_authors, extended_authors = _reference_authors(data, what)
+    weekday = data.get("extended_sweep_weekday", 6)
+    if not isinstance(weekday, int) or isinstance(weekday, bool) or not 0 <= weekday <= 6:
+        raise ConfigError(
+            f"{what}: 'extended_sweep_weekday' must be 0 (Monday) to 6 (Sunday), got {weekday!r}"
+        )
+
     profile = Profile(
         slug=str(_require(data, "slug", what)),
         name=str(_require(data, "name", what)),
         strong_deal_max_cents=_positive_int(data, "strong_deal_max_cents", 500, what),
         deal_max_cents=_positive_int(data, "deal_max_cents", 1000, what),
         min_discount_pct=_positive_int(data, "min_discount_pct", 25, what),
-        reference_authors=_str_list(data, "reference_authors", what),
+        reference_authors=core_authors,
+        extended_authors=extended_authors,
+        extended_sweep_weekday=weekday,
         genre_categories=_str_list(data, "genre_categories", what),
         no_gos=_str_list(data, "no_gos", what),
         sources=data.get("sources") or {},

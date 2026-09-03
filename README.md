@@ -49,10 +49,9 @@ Preis. Deals dort werden also erst erkannt, sobald genug Preishistorie da ist.
 
 ## Status
 
-Design abgeschlossen, Implementierung läuft.
-
-- **Phase 1 — Headless Core** *(in Arbeit)*: Quellen, Matcher, SQLite-Snapshot,
-  YAML-Konfiguration, Text- und HTML-Digest, `ebw doctor`.
+- **Phase 1 — Headless Core** *(fertig)*: beide Quellen, Matcher mit
+  automatischer Titelauflösung, SQLite-Snapshot, YAML-Konfiguration, Text- und
+  HTML-Digest, Selbsttest.
 - **Phase 2 — Lokale Web-UI**: FastAPI + Jinja + HTMX, Dashboard und Editoren für
   Profil/Watchlist, Konfiguration wandert aus YAML in die Datenbank.
 - **v2**: Bibliotheks-Vormerkungen mit Login, verlässliche Genre-Klassifikation,
@@ -98,11 +97,21 @@ Einen Run starten:
 uv run python -m ebook_watchlist.run
 ```
 
-Selbsttest aller Quellen-Parser (kommt mit Ticket 08):
+Er schreibt nur dann etwas, wenn sich etwas geändert hat oder eine Quelle
+gestreikt hat. Der Exit-Code ist `0` bei Erfolg, `1` wenn eine Quelle
+fehlgeschlagen ist, `2` bei kaputter Konfiguration.
+
+Selbsttest: jede Quelle bekommt eine bekannte Seite vorgelegt und muss sie
+parsen können.
 
 ```bash
 uv run python -m ebook_watchlist.run doctor
 ```
+
+Derselbe Test läuft am Anfang jedes Runs. Eine Quelle, die ihn nicht besteht,
+setzt diesen Run aus und taucht im Digest unter „⚠️ Fehler" auf — eine
+halb gelesene, umgebaute Seite würde sonst Unsinn in den Snapshot schreiben und
+jeden künftigen Vergleich vergiften. Mit `--skip-probes` lässt er sich abschalten.
 
 Tests und Linter:
 
@@ -113,14 +122,73 @@ uv run pytest && uv run ruff check .
 Die Live-Smoke-Tests gegen die echten Seiten sind mit `@pytest.mark.live` markiert
 und laufen standardmäßig **nicht** mit.
 
+## Kadenz
+
+Ein Lauf pro Tag reicht. Jeder Lauf prüft die komplette Watchlist, die
+Bibliothek, die `core`-Referenzautor:innen und alle Genre-Kategorien. Die
+`extended`-Liste — der lange Schwanz, bei dem ein verpasster Tag nichts kostet —
+wird einmal pro Woche an dem in `extended_sweep_weekday` gesetzten Tag
+mitgenommen (0 = Montag). Fällt dieser Lauf aus, holt der nächste Lauf ihn nach,
+sobald mehr als sieben Tage vergangen sind.
+
+```yaml
+reference_authors:
+  core: [Frank Schätzing]        # jeden Lauf
+  extended: [Andreas Eschbach]   # einmal pro Woche
+extended_sweep_weekday: 6        # Sonntag
+```
+
 ## Betrieb
 
-Es gibt keinen eigenen Scheduler — der Run wird von außen getaktet: Windows Task
-Scheduler auf dem Arbeitsrechner, systemd-Timer oder Cron auf dem Raspberry Pi.
-Der Code ist host-agnostisch (nur `pathlib`, keine plattformspezifischen
-Abhängigkeiten); ein Umzug ist *Repo kopieren, `uv sync`, `data/` mitnehmen*.
+Es gibt keinen eigenen Scheduler — der Run wird von außen getaktet. Der Code ist
+host-agnostisch (nur `pathlib`, keine plattformspezifischen Abhängigkeiten); ein
+Umzug ist *Repo kopieren, `uv sync`, `data/` mitnehmen*. Ein `filelock`
+serialisiert parallele Runs, ein zweiter Start beendet sich sofort wieder.
 
-Ein `filelock` serialisiert parallele Runs.
+### Windows — Task Scheduler
+
+```bash
+schtasks /create /tn "eBook-Watchlist" /sc daily /st 06:00 /tr "cmd /c cd /d C:\Users\g41nx\Repositories\ebook-watchlist && uv run python -m ebook_watchlist.run >> data\run.log 2>&1"
+```
+
+### Linux / Raspberry Pi — systemd-Timer
+
+`~/.config/systemd/user/ebook-watchlist.service`:
+
+```ini
+[Unit]
+Description=eBook-Watchlist & Deal-Finder
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/ebook-watchlist
+ExecStart=%h/.local/bin/uv run python -m ebook_watchlist.run --trigger cron
+```
+
+`~/.config/systemd/user/ebook-watchlist.timer`:
+
+```ini
+[Unit]
+Description=Taeglicher eBook-Watchlist-Lauf
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+systemctl --user enable --now ebook-watchlist.timer
+```
+
+`Persistent=true` holt einen verpassten Lauf nach dem Einschalten nach. Nötig ist
+das nicht — ein Run vergleicht immer gegen den letzten gespeicherten Snapshot,
+nie gegen „gestern", ausgefallene Läufe gehen also ohnehin nicht verloren.
+
+Alle Zeiten sind Ortszeit; bei der Zeitumstellung kann ein Lauf ausfallen oder
+doppelt laufen. Beides ist unkritisch.
 
 ## Dokumentation
 

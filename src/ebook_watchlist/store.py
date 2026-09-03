@@ -96,6 +96,16 @@ class ResolutionRow(Base):
     )
 
 
+class StateRow(Base):
+    """Small bits of bookkeeping that belong to no other table."""
+
+    __tablename__ = "state"
+
+    profile_slug: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[datetime] = mapped_column(DateTime)
+
+
 def _to_observation(row: ObservationRow) -> Observation:
     return Observation(
         source=row.source,
@@ -256,6 +266,20 @@ class Store:
             row.matched_title = matched_title
             row.matched_author = matched_author
             row.resolved_at = resolved_at
+            session.commit()
+
+    def get_state(self, profile_slug: str, key: str) -> datetime | None:
+        with self.session() as session:
+            row = session.get(StateRow, (profile_slug, key))
+            return row.value if row is not None else None
+
+    def set_state(self, profile_slug: str, key: str, value: datetime) -> None:
+        with self.session() as session:
+            row = session.get(StateRow, (profile_slug, key))
+            if row is None:
+                row = StateRow(profile_slug=profile_slug, key=key)
+                session.add(row)
+            row.value = value
             session.commit()
 
     def known_discovery_scopes(self, profile_slug: str) -> set[tuple[str, str, str]]:

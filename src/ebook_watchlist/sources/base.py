@@ -43,6 +43,8 @@ class RunContext:
     attention: list[Attention] = field(default_factory=list)
     #: Suggestions waved away for good, per Source name.
     dismissed: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    #: Whether this Run also walks the weekly long tail of Reference Authors.
+    sweep_extended: bool = False
 
     def is_dismissed(self, source: str, source_item_id: str) -> bool:
         return source_item_id in self.dismissed.get(source, frozenset())
@@ -248,7 +250,7 @@ class ShopSource(ResolvingSource):
                 seen.add(item_id)
                 observations.append(observation)
 
-        for author in profile.reference_authors:
+        for author in profile.authors_to_sweep(context.sweep_extended):
             take(self.by_author(author))
         for category in profile.genre_categories:
             take(self.by_category(category))
