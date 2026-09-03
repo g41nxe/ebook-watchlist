@@ -1,0 +1,179 @@
+# The matcher's labelled corpus.
+#
+# Each case is a query, the candidates a Source might have returned, and what
+# the matcher must decide. `winner` names the expected candidate by its title;
+# omit it for `no_match`. Add a case here whenever a real resolution goes wrong
+# — this file is the regression suite for the whole matching layer.
+
+- name: identical title and author
+  query: {title: Der Schwarm, author: Frank Schätzing}
+  candidates:
+    - {title: Der Schwarm, author: "Schätzing, Frank"}
+  expect: auto_accept
+  winner: Der Schwarm
+
+- name: author given as Last, First
+  query: {title: Die sieben Schwestern, author: Lucinda Riley}
+  candidates:
+    - {title: Die sieben Schwestern, author: "Riley, Lucinda"}
+  expect: auto_accept
+  winner: Die sieben Schwestern
+
+- name: diacritics dropped on one side
+  query: {title: Der Schwarm, author: Frank Schatzing}
+  candidates:
+    - {title: Der Schwarm, author: Frank Schätzing}
+  expect: auto_accept
+  winner: Der Schwarm
+
+- name: eszett spelled out
+  query: {title: Die Straße, author: Cormac McCarthy}
+  candidates:
+    - {title: Die Strasse, author: "McCarthy, Cormac"}
+  expect: auto_accept
+  winner: Die Strasse
+
+- name: leading article differs
+  query: {title: Schwarm, author: Frank Schätzing}
+  candidates:
+    - {title: Der Schwarm, author: Frank Schätzing}
+  expect: auto_accept
+  winner: Der Schwarm
+
+- name: series subtitle on the candidate
+  query: {title: Die sieben Schwestern, author: Lucinda Riley}
+  candidates:
+    - {title: "Die sieben Schwestern - Roman - Die sieben Schwestern 1", author: "Riley, Lucinda"}
+  expect: auto_accept
+  winner: "Die sieben Schwestern - Roman - Die sieben Schwestern 1"
+
+- name: colon subtitle on the candidate
+  query: {title: Atlas, author: Lucinda Riley}
+  candidates:
+    - {title: "Atlas: Die Geschichte von Pa Salt", author: "Riley, Lucinda"}
+  expect: auto_accept
+  winner: "Atlas: Die Geschichte von Pa Salt"
+
+- name: format token in the candidate title
+  query: {title: Der Schwarm, author: Frank Schätzing}
+  candidates:
+    - {title: Der Schwarm (ungekürzt), author: Frank Schätzing}
+  expect: auto_accept
+  winner: Der Schwarm (ungekürzt)
+
+- name: edition marker in brackets
+  query: {title: Faust, author: Johann Wolfgang von Goethe}
+  candidates:
+    - {title: "Faust [Neue Auflage]", author: "Goethe, Johann Wolfgang von"}
+  expect: auto_accept
+  winner: "Faust [Neue Auflage]"
+
+- name: nobiliary particle dropped
+  query: {title: Faust, author: Johann Wolfgang Goethe}
+  candidates:
+    - {title: Faust, author: Johann Wolfgang von Goethe}
+  expect: auto_accept
+  winner: Faust
+
+- name: multi-author field, semicolon separated
+  query: {title: Atlas, author: Harry Whittaker}
+  candidates:
+    - {title: Atlas, author: "Riley, Lucinda; Whittaker, Harry"}
+  expect: auto_accept
+  winner: Atlas
+
+- name: multi-author field joined with und
+  query: {title: Die Känguru-Chroniken, author: Marc-Uwe Kling}
+  candidates:
+    - {title: Die Känguru-Chroniken, author: Marc-Uwe Kling und Anna Beispiel}
+  expect: auto_accept
+  winner: Die Känguru-Chroniken
+
+- name: comma separated full names are two people
+  query: {title: Handbuch, author: Bernd Schulz}
+  candidates:
+    - {title: Handbuch, author: "Anna Meier, Bernd Schulz"}
+  expect: auto_accept
+  winner: Handbuch
+
+- name: right title picked out of a noisy result list
+  query: {title: Die sieben Schwestern, author: Lucinda Riley}
+  candidates:
+    - {title: Atlas - Die Geschichte von Pa Salt, author: "Riley, Lucinda; Whittaker, Harry"}
+    - {title: Die Sturmschwester, author: "Riley, Lucinda"}
+    - {title: Die sieben Schwestern, author: "Riley, Lucinda"}
+  expect: auto_accept
+  winner: Die sieben Schwestern
+
+- name: same title by a different author is not a match
+  query: {title: Der Schwarm, author: Frank Schätzing}
+  candidates:
+    - {title: Der Schwarm, author: Erika Mustermann}
+  expect: provisional
+
+- name: sequel is not the book we asked for
+  query: {title: Der Schwarm, author: Frank Schätzing}
+  candidates:
+    - {title: Der Schwarm 2 - Die Rückkehr, author: Frank Schätzing}
+  expect: provisional
+
+- name: series volume number is not silently absorbed
+  query: {title: Die sieben Schwestern, author: Lucinda Riley}
+  candidates:
+    - {title: Die sieben Schwestern 8, author: "Riley, Lucinda"}
+  expect: provisional
+
+- name: the real volume still wins over its siblings
+  query: {title: Die sieben Schwestern, author: Lucinda Riley}
+  candidates:
+    - {title: Die sieben Schwestern 8, author: "Riley, Lucinda"}
+    - {title: Die sieben Schwestern, author: "Riley, Lucinda"}
+    - {title: Die sieben Schwestern 2, author: "Riley, Lucinda"}
+  expect: auto_accept
+  winner: Die sieben Schwestern
+
+- name: unrelated title does not match at all
+  query: {title: Der Schwarm, author: Frank Schätzing}
+  candidates:
+    - {title: Kochen mit Kräutern, author: Erika Mustermann}
+  expect: no_match
+
+- name: empty candidate list
+  query: {title: Der Schwarm, author: Frank Schätzing}
+  candidates: []
+  expect: no_match
+
+- name: two identical titles by the same author are ambiguous
+  query: {title: Die sieben Schwestern, author: Lucinda Riley}
+  candidates:
+    - {title: Die sieben Schwestern, author: "Riley, Lucinda"}
+    - {title: Die sieben Schwestern, author: "Riley, Lucinda"}
+  expect: provisional
+
+- name: no author on the entry, one exact title
+  query: {title: Die sieben Schwestern}
+  candidates:
+    - {title: Die sieben Schwestern, author: "Riley, Lucinda"}
+  expect: auto_accept
+  winner: Die sieben Schwestern
+
+- name: no author on the entry, competing exact titles
+  query: {title: Die sieben Schwestern}
+  candidates:
+    - {title: Die sieben Schwestern, author: "Riley, Lucinda"}
+    - {title: Die sieben Schwestern, author: Erika Mustermann}
+  expect: provisional
+
+- name: identifier settles it outright
+  query: {title: Irgendwas, author: Wer Auch Immer, identifier: "9783453270398"}
+  candidates:
+    - {title: Der Schwarm, author: Frank Schätzing, identifier: "9783453270398"}
+  expect: auto_accept
+  winner: Der Schwarm
+
+- name: two editions of the same book are ambiguous, not auto-accepted
+  query: {title: Faust, author: Johann Wolfgang von Goethe, year: 2015}
+  candidates:
+    - {title: Faust, author: "Goethe, Johann Wolfgang von", year: 1999}
+    - {title: Faust, author: "Goethe, Johann Wolfgang von", year: 2015}
+  expect: provisional
