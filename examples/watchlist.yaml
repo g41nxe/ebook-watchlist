@@ -1,8 +1,12 @@
 # Copy to data/watchlist.yaml and edit.
-# Title and author are enough — Sources resolve their own links (ticket 04).
 - title: Die sieben Schwestern
   author: Lucinda Riley
+  # Until automatic resolution lands (ticket 04), point the Source at the title
+  # yourself: the mediaInfo path from the Onleihe's own URL.
+  resolved_links:
+    voebb: mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html
 
-- title: Der Schwarm
-  author: Frank Schätzing
-  check_library: false
+- title: Sieben Richtige
+  author: Volker Jarck
+  resolved_links:
+    voebb: mediaInfo,0-0-1474715999-200-0-0-0-0-0-0-0.html

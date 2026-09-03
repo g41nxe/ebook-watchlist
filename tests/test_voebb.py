@@ -1,0 +1,189 @@
+"""Offline parser tests against HTML captured from the live Onleihe.
+
+The fixtures are whole pages as served on 2026-09-04; re-capture them when the
+site changes rather than hand-editing (ADR 14).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from ebook_watchlist.config import WatchlistEntry
+from ebook_watchlist.http import NotFound
+from ebook_watchlist.models import Availability
+from ebook_watchlist.sources.base import SourceStructureError
+from ebook_watchlist.sources.voebb import parse
+from ebook_watchlist.sources.voebb.source import VoebbSource, title_id_from_url
+
+FIXTURES = Path(__file__).parent / "fixtures" / "voebb"
+
+
+def fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+class StubClient:
+    """Serves canned HTML and records what was asked for."""
+
+    def __init__(self, html: str) -> None:
+        self.html = html
+        self.requests: list[tuple[str, dict | None]] = []
+
+    def get(self, url: str, params: dict | None = None) -> str:
+        self.requests.append((url, params))
+        return self.html
+
+
+# --- detail page ----------------------------------------------------------
+
+
+def test_unavailable_title_reports_queue_and_eta() -> None:
+    detail = parse.parse_detail(fixture("detail-unavailable.html"))
+    assert detail.title == "Die sieben Schwestern"
+    assert detail.author == "Riley, Lucinda"
+    assert detail.copies == 4
+    assert detail.available_copies == 0
+    assert detail.reservations == 16
+    assert detail.available_from == "18.12.2026"
+    assert detail.availability is Availability.UNAVAILABLE
+
+
+def test_available_title_has_no_eta() -> None:
+    detail = parse.parse_detail(fixture("detail-available.html"))
+    assert detail.title == "Sieben Richtige"
+    assert detail.available_copies == 5
+    assert detail.reservations == 0
+    assert detail.available_from is None
+    assert detail.availability is Availability.AVAILABLE
+
+
+def test_detail_page_without_the_exemplar_block_raises() -> None:
+    with pytest.raises(SourceStructureError, match="Exemplare"):
+        parse.parse_detail("<html><body><h1>Wartungsarbeiten</h1></body></html>")
+
+
+# --- search results -------------------------------------------------------
+
+
+def test_search_results_parse_into_candidates() -> None:
+    candidates = parse.parse_search_results(fixture("search-hits.html"))
+    assert candidates is not None
+    assert len(candidates) == 8
+
+    first = candidates[0]
+    assert first.title == "Die sieben Schwestern"
+    assert first.author == "Riley, Lucinda"
+    assert first.subtitle == "Roman - Die sieben Schwestern 1"
+    assert first.url.endswith("mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html")
+    assert first.url.startswith("https://voebb.onleihe.de/berlin/frontend/")
+
+
+def test_medium_icon_is_the_format_not_the_rating_star() -> None:
+    """Cards carry ``ic_star`` rating icons too; picking by position gets it wrong."""
+    candidates = parse.parse_search_results(fixture("search-hits.html"))
+    assert candidates is not None
+    media = {candidate.medium for candidate in candidates}
+    assert "ic_star" not in media
+    assert media <= {"ic_ebook", "ic_eaudio", None}
+
+
+def test_no_hits_is_an_answer_not_a_failure() -> None:
+    assert parse.parse_search_results(fixture("search-no-hits.html")) is None
+    assert parse.total_hits(fixture("search-no-hits.html")) == 0
+
+
+def test_hit_count_is_read_from_the_page() -> None:
+    assert parse.total_hits(fixture("search-hits.html")) == 8
+
+
+def test_cards_gone_without_the_no_hits_marker_raises() -> None:
+    """What a captcha or a redesign looks like — never a silent empty list."""
+    with pytest.raises(SourceStructureError, match="markup changed"):
+        parse.parse_search_results("<html><body><p>Etwas ganz anderes</p></body></html>")
+
+
+def test_expired_session_is_named_explicitly() -> None:
+    html = "<html><body><p>Ihre Sitzung ist abgelaufen! Bitte erneut versuchen.</p></body></html>"
+    with pytest.raises(SourceStructureError, match="session expired"):
+        parse.parse_search_results(html)
+
+
+# --- the Source -----------------------------------------------------------
+
+
+def test_title_id_is_extracted_from_the_detail_url() -> None:
+    assert title_id_from_url("mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html") == "373164461"
+    assert title_id_from_url("https://x/frontend/mediaInfo,0-0-42-200-0.html") == "42"
+    assert title_id_from_url("search,0-0-0.html") is None
+
+
+def test_check_reads_the_pinned_detail_page() -> None:
+    client = StubClient(fixture("detail-unavailable.html"))
+    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    entry = WatchlistEntry(
+        title="Die sieben Schwestern",
+        author="Lucinda Riley",
+        resolved_links={"voebb": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
+    )
+
+    observation = source.check(entry)
+
+    assert observation is not None
+    assert observation.source == "voebb"
+    assert observation.source_item_id == "373164461"
+    assert observation.availability is Availability.UNAVAILABLE
+    assert observation.reservation_count == 16
+    assert observation.available_from == "18.12.2026"
+    assert observation.watchlist_key == entry.key
+    assert client.requests[0][0].startswith("https://voebb.onleihe.de/berlin/frontend/mediaInfo,")
+
+
+def test_check_reports_the_scraped_title_so_a_bad_resolve_is_visible() -> None:
+    client = StubClient(fixture("detail-available.html"))
+    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    entry = WatchlistEntry(
+        title="Ganz anderer Titel",
+        author="Jemand Anders",
+        resolved_links={"voebb": "mediaInfo,0-0-1474715999-200-0-0-0-0-0-0-0.html"},
+    )
+
+    observation = source.check(entry)
+
+    assert observation is not None
+    assert observation.title == "Sieben Richtige"
+    assert observation.author == "Jarck, Volker"
+
+
+def test_unpinned_entry_is_skipped_until_resolution_exists() -> None:
+    client = StubClient("")
+    source = VoebbSource(client=client)  # type: ignore[arg-type]
+
+    assert source.check(WatchlistEntry(title="Noch nicht aufgelöst")) is None
+    assert client.requests == []
+
+
+def test_a_vanished_title_skips_that_entry_instead_of_failing_the_source() -> None:
+    """One dead pinned link must not take the whole library check down with it."""
+
+    class GoneClient:
+        def get(self, url: str, params: dict | None = None) -> str:
+            raise NotFound(f"{url} answered 404")
+
+    source = VoebbSource(client=GoneClient())  # type: ignore[arg-type]
+    entry = WatchlistEntry(
+        title="Aus dem Bestand entfernt",
+        resolved_links={"voebb": "mediaInfo,0-0-999-200-0-0-0-0-0-0-0.html"},
+    )
+    assert source.check(entry) is None
+
+
+def test_an_unkeyable_link_raises_rather_than_inventing_an_identity() -> None:
+    client = StubClient(fixture("detail-available.html"))
+    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    entry = WatchlistEntry(
+        title="Falsch gepinnt", resolved_links={"voebb": "irgendwas,0-0-0.html"}
+    )
+    with pytest.raises(SourceStructureError, match="title id"):
+        source.check(entry)

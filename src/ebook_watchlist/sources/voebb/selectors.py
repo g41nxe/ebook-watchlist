@@ -1,0 +1,72 @@
+"""Every VÖBB-specific string in one place (ADR 7).
+
+When the Onleihe redesigns, this module is the whole diff. Nothing else in the
+codebase may hard-code a selector or a German label for this Source.
+
+Sourced from ``docs/research/voebb-search-interface.md``.
+"""
+
+from __future__ import annotations
+
+BASE = "https://voebb.onleihe.de/berlin/frontend/"
+
+SEARCH_PATH = "search,0-0-0-0-0-0-0-0-0-0-0.html"
+#: Paged results. ``{page}`` is a 0-based index (0 = page 1).
+SEARCH_PAGE_PATH = "search,0-0-0-700-0-0-{page}-1000-0-0-0.html"
+
+#: The form declares POST but honours GET, which keeps pagination stateless.
+SEARCH_PARAMS = {
+    "cmdId": "703",  # "new search"
+    "sK": "1000",  # search-context key, echoed into pagination URLs
+    "pMediaType": "-1",  # all media; we filter client-side
+}
+
+# --- results page ---------------------------------------------------------
+
+CARD = '[test-id="mediaCard"]'
+CARD_TITLE = '[test-id="cardTitle"]'
+CARD_SUBTITLE = '[test-id="cardSubTitle"]'
+CARD_AUTHOR = '[test-id="cardAuthor"]'
+CARD_DETAIL_LINK = 'a[test-id="mediaInfoLink"]'
+#: Cards carry several ``ic_*`` icons (rating stars among them), so the medium
+#: is picked by name rather than by position.
+CARD_MEDIUM_ICON = 'svg[test-id^="ic_"]'
+MEDIUM_ICONS = frozenset(
+    {
+        "ic_ebook",
+        "ic_eaudio",
+        "ic_epaper",
+        "ic_emagazine",
+        "ic_evideo",
+        "ic_elearning",
+        "ic_ehoerspiel",
+    }
+)
+CARD_AVAILABILITY = '[test-id="cardAvailability"]'
+CARD_AVAILABILITY_LABEL = '[test-id="cardLabelAvailability"]'
+
+# --- detail page ----------------------------------------------------------
+
+EXEMPLAR_COUNT = ".exemplar-count"
+AVAILABILITY_COUNT = ".availability-count"
+RESERVATION_COUNT = ".reservation-count"
+DETAIL_TITLE = '[test-id="cardTitle"]'
+DETAIL_SUBTITLE = "h4.headline.subtitle"
+#: Bibliographic rows are ``<b>LABEL:</b><span>VALUE</span>`` pairs.
+DESCRIPTION_ROW = "p.horizontalDescription"
+
+# --- German literals ------------------------------------------------------
+
+HITS_MARKER = "Titeltreffer"
+NO_HITS_MARKER = "keine Titeltreffer"
+SESSION_EXPIRED_MARKER = "Ihre Sitzung ist abgelaufen"
+LABEL_AVAILABLE_FROM = "Voraussichtlich verfügbar ab:"
+LABEL_AUTHOR = "Autor*in:"
+LABEL_YEAR = "Jahr:"
+
+# --- doctor probe ---------------------------------------------------------
+
+#: A query and a title that must stay parseable. We assert the *fields* parse,
+#: never their values — copies and queue lengths change by the hour.
+PROBE_QUERY = "Die sieben Schwestern"
+PROBE_DETAIL_PATH = "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"

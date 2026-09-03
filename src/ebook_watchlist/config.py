@@ -28,6 +28,9 @@ class Profile:
     genre_categories: list[str] = field(default_factory=list)
     no_gos: list[str] = field(default_factory=list)
     sources: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: Appended to the outgoing User-Agent so a site operator can reach you.
+    #: Opt-in — nothing personal is sent unless you put it here yourself.
+    contact: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +98,7 @@ def load_profile(path: Path | None = None) -> Profile:
         genre_categories=_str_list(data, "genre_categories", what),
         no_gos=_str_list(data, "no_gos", what),
         sources=data.get("sources") or {},
+        contact=str(data["contact"]) if data.get("contact") else None,
     )
     if profile.strong_deal_max_cents >= profile.deal_max_cents:
         raise ConfigError(

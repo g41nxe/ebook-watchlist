@@ -20,6 +20,7 @@ from . import paths
 from .config import ConfigError, load_profile, load_watchlist
 from .diff import compute_deltas, keys_of
 from .digest import build_digest
+from .http import HttpClient, build_user_agent
 from .models import Observation, SourceFailure
 from .render import render_html, render_text
 from .sources import build_sources
@@ -78,7 +79,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         profile = load_profile()
         watchlist = load_watchlist()
-        sources = build_sources(profile)
+        client = HttpClient(user_agent=build_user_agent(profile.contact))
+        sources = build_sources(profile, client)
     except ConfigError as exc:
         print(f"config error: {exc}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
