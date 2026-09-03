@@ -147,8 +147,13 @@ serialisiert parallele Runs, ein zweiter Start beendet sich sofort wieder.
 
 ### Windows — Task Scheduler
 
+[`scripts/run-daily.cmd`](scripts/run-daily.cmd) wechselt ins Repo, startet den
+Run und hängt die Ausgabe an `data/run.log` an. Die Task zeigt einfach auf diese
+Datei — die ganze Kommandozeile bei `schtasks` zu hinterlegen heißt sonst, sich
+mit den Anführungszeichen-Regeln von `cmd` zu prügeln.
+
 ```bash
-schtasks /create /tn "eBook-Watchlist" /sc daily /st 06:00 /tr "cmd /c cd /d C:\Users\g41nx\Repositories\ebook-watchlist && uv run python -m ebook_watchlist.run >> data\run.log 2>&1"
+schtasks /create /tn "eBook-Watchlist" /sc daily /st 06:00 /tr "C:\Users\g41nx\Repositories\ebook-watchlist\scripts\run-daily.cmd"
 ```
 
 ### Linux / Raspberry Pi — systemd-Timer
@@ -162,7 +167,7 @@ Description=eBook-Watchlist & Deal-Finder
 [Service]
 Type=oneshot
 WorkingDirectory=%h/ebook-watchlist
-ExecStart=%h/.local/bin/uv run python -m ebook_watchlist.run --trigger cron
+ExecStart=%h/ebook-watchlist/scripts/run-daily.sh
 ```
 
 `~/.config/systemd/user/ebook-watchlist.timer`:
