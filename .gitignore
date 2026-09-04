@@ -10,3 +10,6 @@ __pycache__/
 
 # skill scratch / working tickets
 .scratch/
+
+# Ad-hoc-Testlaeufe gegen die echten Quellen
+testlauf/
