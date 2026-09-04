@@ -7,6 +7,7 @@ from ebook_watchlist.digest import (
     SECTION_GENRE,
     SECTION_LIBRARY,
     SECTION_PRICES,
+    GateNote,
     build_digest,
 )
 from ebook_watchlist.models import (
@@ -17,6 +18,7 @@ from ebook_watchlist.models import (
     Observation,
     SourceFailure,
 )
+from ebook_watchlist.rating import Rating
 from ebook_watchlist.render import render_html, render_text
 
 NOW = datetime(2026, 9, 4, 6, 0)
@@ -136,3 +138,51 @@ def test_html_escapes_scraped_text() -> None:
     html = render_html(digest)
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;" in html
+
+
+# --- das Bewertungstor im Digest (Ticket 20) --------------------------------
+
+
+def discovered() -> Delta:
+    return Delta(
+        DeltaKind.FIRST_SEEN,
+        observation(source_item_id="7", match_reason=MatchReason.GENRE_CATEGORY),
+        None,
+    )
+
+
+def test_the_digest_names_what_the_gate_held_back() -> None:
+    """Auf stderr wirft ein Cron-Job es weg; ein zu scharfer Schwellwert sähe
+    dann aus wie ein ruhiger Tag."""
+    digest = build(deltas=[discovered()], gate=GateNote(held_back=12, threshold=3))
+
+    assert "12 Vorschläge unter 3 Sternen zurückgehalten" in render_text(digest)
+    assert "12 Vorschläge" in render_html(digest)
+
+
+def test_a_digest_that_only_has_something_held_back_is_not_empty() -> None:
+    """Genau dann muss die Leserin merken, dass das Tor arbeitet."""
+    assert not build(gate=GateNote(held_back=3, threshold=3)).is_empty
+    assert build(gate=GateNote(threshold=3)).is_empty
+
+
+def test_the_digest_says_what_the_budget_left_unjudged() -> None:
+    text = render_text(build(gate=GateNote(threshold=3, over_budget=8)))
+    assert "8 heute nicht bewertet" in text
+    assert "ungeprüft gezeigt" in text
+
+
+def test_a_suggestion_carries_its_judgement() -> None:
+    """Sterne und Begründung waren gespeichert und für niemanden nachprüfbar
+    (ADR 19, Ticket 14)."""
+    delta = discovered()
+    judgement = Rating(
+        stars=4, reason="Achse D: isoliertes Setting", confidence="teils", rubric_version=1
+    )
+    digest = build(deltas=[delta], judgements={delta.current.key: judgement})
+
+    text = render_text(digest)
+    assert "★★★★☆" in text
+    assert "Achse D: isoliertes Setting" in text
+    assert "(teils)" in text
+    assert "Achse D" in render_html(digest)

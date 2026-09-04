@@ -131,7 +131,7 @@ def test_a_good_fit_passes(store: Store) -> None:
     deltas = [first_seen(discovery(isbn="9783104911854"))]
     kept, report = gate.apply(
         deltas, store=store, rater=StubRater(rating(4)), rubric_version=1,
-        threshold=3, now=NOW,
+        threshold=3, budget=10, now=NOW,
     )
     assert kept == deltas
     assert report.held_back == 0
@@ -141,7 +141,7 @@ def test_a_poor_fit_never_reaches_the_pile(store: Store) -> None:
     deltas = [first_seen(discovery(isbn="9783104911854"))]
     kept, report = gate.apply(
         deltas, store=store, rater=StubRater(rating(1)), rubric_version=1,
-        threshold=3, now=NOW,
+        threshold=3, budget=10, now=NOW,
     )
     assert kept == []
     assert report.held_back == 1
@@ -152,9 +152,9 @@ def test_a_book_is_judged_once_not_every_run(store: Store) -> None:
     rater = StubRater(rating(4))
     deltas = [first_seen(discovery(isbn="9783104911854"))]
 
-    gate.apply(deltas, store=store, rater=rater, rubric_version=1, threshold=3, now=NOW)
+    gate.apply(deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW)
     _, second = gate.apply(
-        deltas, store=store, rater=rater, rubric_version=1, threshold=3, now=NOW
+        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW
     )
 
     assert len(rater.calls) == 1
@@ -166,8 +166,8 @@ def test_a_new_rubric_invalidates_the_judgement(store: Store) -> None:
     rater = StubRater(rating(4))
     deltas = [first_seen(discovery(isbn="9783104911854"))]
 
-    gate.apply(deltas, store=store, rater=rater, rubric_version=1, threshold=3, now=NOW)
-    gate.apply(deltas, store=store, rater=rater, rubric_version=2, threshold=3, now=NOW)
+    gate.apply(deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW)
+    gate.apply(deltas, store=store, rater=rater, rubric_version=2, threshold=3, budget=10, now=NOW)
 
     assert len(rater.calls) == 2
 
@@ -182,6 +182,7 @@ def test_the_gate_never_fails_closed(store: Store) -> None:
         rater=StubRater(RatingUnavailable("kein Netz")),
         rubric_version=1,
         threshold=3,
+        budget=10,
         now=NOW,
     )
     assert kept == deltas
@@ -191,7 +192,7 @@ def test_the_gate_never_fails_closed(store: Store) -> None:
 def test_without_a_rater_nothing_is_held_back(store: Store) -> None:
     deltas = [first_seen(discovery())]
     kept, report = gate.apply(
-        deltas, store=store, rater=None, rubric_version=1, threshold=3, now=NOW
+        deltas, store=store, rater=None, rubric_version=1, threshold=3, budget=10, now=NOW
     )
     assert kept == deltas
     assert report.held_back == 0
@@ -204,7 +205,7 @@ def test_a_watchlist_title_is_never_judged(store: Store) -> None:
     deltas = [first_seen(discovery(match_reason=MatchReason.WATCHLIST))]
 
     kept, _ = gate.apply(
-        deltas, store=store, rater=rater, rubric_version=1, threshold=3, now=NOW
+        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW
     )
 
     assert kept == deltas
@@ -217,7 +218,7 @@ def test_a_price_drop_is_not_judged_again(store: Store) -> None:
     drop = Delta(DeltaKind.PRICE_DROP, discovery(price_cents=299), discovery(price_cents=999))
 
     kept, _ = gate.apply(
-        [drop], store=store, rater=rater, rubric_version=1, threshold=3, now=NOW
+        [drop], store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW
     )
 
     assert kept == [drop]
@@ -233,8 +234,10 @@ def test_the_judgement_follows_the_isbn_across_sources(store: Store) -> None:
                   match_reason=MatchReason.PROFILE_AUTHOR)
     )
 
-    gate.apply([at_beam], store=store, rater=rater, rubric_version=1, threshold=3, now=NOW)
-    gate.apply([at_voebb], store=store, rater=rater, rubric_version=1, threshold=3, now=NOW)
+    for deltas in ([at_beam], [at_voebb]):
+        gate.apply(
+            deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW
+        )
 
     assert len(rater.calls) == 1
 
@@ -244,3 +247,105 @@ def test_without_an_isbn_the_find_itself_is_the_subject(store: Store) -> None:
     als eines, das über den Titel geraten wäre."""
     assert gate.subject_of(discovery(isbn=None)) == "item:beam:1"
     assert gate.subject_of(discovery(isbn="9783104911854")) == "isbn:9783104911854"
+
+
+# --- das Budget (Ticket 20) -------------------------------------------------
+
+
+def test_a_run_stops_asking_once_the_budget_is_spent(store: Store) -> None:
+    """Der erste Lauf mit einem Schlüssel trifft einen Rückstand von
+    dreihundert Entdeckungen. Er darf ihn nicht am Stück abfeuern (ADR 7)."""
+    rater = StubRater(rating(4))
+    deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(5)]
+
+    _, report = gate.apply(
+        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=2, now=NOW
+    )
+
+    assert len(rater.calls) == 2
+    assert report.over_budget == 3
+
+
+def test_what_the_budget_skips_is_shown_not_dropped(store: Store) -> None:
+    """Übersprungen heißt unbewertet. Sonst verschluckte ausgerechnet das
+    Sparen die Neuzugänge."""
+    rater = StubRater(rating(4))
+    deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(3)]
+
+    kept, report = gate.apply(
+        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=1, now=NOW
+    )
+
+    assert kept == deltas
+    assert report.held_back == 0
+
+
+def test_the_rest_is_judged_on_the_next_run(store: Store) -> None:
+    """Der Rückstand wird über Läufe abgearbeitet, nicht verloren."""
+    rater = StubRater(rating(4))
+    deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(4)]
+    kwargs = dict(store=store, rater=rater, rubric_version=1, threshold=3, budget=2, now=NOW)
+
+    gate.apply(deltas, **kwargs)
+    _, second = gate.apply(deltas, **kwargs)
+
+    assert len(rater.calls) == 4
+    assert second.reused == 2
+    assert second.over_budget == 0
+
+
+def test_a_stored_judgement_does_not_cost_budget(store: Store) -> None:
+    """Ein gespeichertes Urteil kostet keinen Aufruf — also auch kein Budget."""
+    rater = StubRater(rating(4))
+    known = first_seen(discovery(source_item_id="alt"))
+    gate.apply(
+        [known], store=store, rater=rater, rubric_version=1, threshold=3, budget=5, now=NOW
+    )
+
+    _, report = gate.apply(
+        [known, first_seen(discovery(source_item_id="neu"))],
+        store=store, rater=rater, rubric_version=1, threshold=3, budget=1, now=NOW,
+    )
+
+    assert (report.reused, report.rated, report.over_budget) == (1, 1, 0)
+
+
+# --- was der Lauf weitergibt ------------------------------------------------
+
+
+def test_without_a_rater_only_discoveries_count_as_unrated() -> None:
+    """Ein Watchlist-Titel wird nie beurteilt. Ihn als unbewertet zu zählen
+    ergab im Lauf eine andere Zahl als im Tor — eine der beiden war falsch."""
+    report = gate.unrated_report(
+        [
+            first_seen(discovery(source_item_id="1")),
+            first_seen(discovery(source_item_id="2", match_reason=MatchReason.WATCHLIST)),
+        ]
+    )
+    assert report.unrated == 1
+
+
+def test_the_judgement_of_a_passing_find_is_reported(store: Store) -> None:
+    """Gespeichert und nie gezeigt konnte niemand das Urteil nachprüfen."""
+    found = discovery(isbn="9783104911854")
+    _, report = gate.apply(
+        [first_seen(found)],
+        store=store, rater=StubRater(rating(4)), rubric_version=1,
+        threshold=3, budget=5, now=NOW,
+    )
+    assert report.judgements[found.key].stars == 4
+
+
+def test_a_dead_network_costs_the_budget_too(store: Store) -> None:
+    """Sonst wären dreihundert vergebliche Anfragen am Stück möglich — genau
+    der Ausbruch, den das Budget verhindern soll."""
+    rater = StubRater(RatingUnavailable("kein Netz"))
+    deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(5)]
+
+    kept, report = gate.apply(
+        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=2, now=NOW
+    )
+
+    assert len(rater.calls) == 2
+    assert (report.unrated, report.over_budget) == (2, 3)
+    assert kept == deltas

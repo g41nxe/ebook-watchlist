@@ -19,12 +19,12 @@ from filelock import FileLock, Timeout
 
 from . import gate, paths
 from .cleaning import clean_blurb
-from .config import ConfigError, load_dismissals, load_profile, load_watchlist
+from .config import ConfigError, Profile, load_dismissals, load_profile, load_watchlist
 from .configuration import NotSeeded
 from .configuration import load as load_configuration
 from .covers import CoverStore
 from .diff import compute_deltas, keys_of, suppress_unseeded_interests
-from .digest import build_digest
+from .digest import GateNote, build_digest
 from .http import HttpClient, RateLimited, build_user_agent
 from .models import Observation, SourceFailure
 from .rating import DEFAULT_THRESHOLD, RatingUnavailable, build_rater, load_rubric
@@ -194,7 +194,7 @@ def _fetch_covers(store: Store, client: HttpClient, observations: Sequence[Obser
             store.set_cover(book_id, name)
 
 
-def _apply_gate(store: Store, deltas, now: datetime):
+def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
     """Entdeckungen gegen das Leseprofil pruefen (ADR 19).
 
     Ohne Schluessel gibt es kein Tor — dann bleibt alles unbewertet und wird
@@ -202,12 +202,12 @@ def _apply_gate(store: Store, deltas, now: datetime):
     """
     rater = build_rater()
     if rater is None:
-        return deltas, gate.GateReport(unrated=len(deltas))
+        return deltas, gate.unrated_report(deltas)
     try:
         _, version = load_rubric()
     except RatingUnavailable as exc:
         print(f"Bewertung übersprungen: {exc}", file=sys.stderr)
-        return deltas, gate.GateReport(unrated=len(deltas))
+        return deltas, gate.unrated_report(deltas)
 
     kept, report = gate.apply(
         deltas,
@@ -215,14 +215,15 @@ def _apply_gate(store: Store, deltas, now: datetime):
         rater=rater,
         rubric_version=version,
         threshold=DEFAULT_THRESHOLD,
+        budget=profile.rating_budget,
         now=now,
     )
-    if report.held_back:
-        # Sichtbar machen, was zurueckgehalten wurde: ein zu scharf gesetzter
-        # Schwellwert soll auffallen, nicht still wirken.
+    if report.held_back or report.over_budget:
+        # Fuer das Log. Was die Leserin sehen muss, steht im Digest — stderr
+        # wirft ein Cron-Job weg (Ticket 20).
         print(
-            f"Bewertungstor: {report.held_back} Vorschläge unter "
-            f"{DEFAULT_THRESHOLD} Sternen zurückgehalten "
+            f"Bewertungstor: {report.held_back} unter {DEFAULT_THRESHOLD} Sternen "
+            f"zurückgehalten, {report.over_budget} über dem Budget "
             f"({report.rated} bewertet, {report.reused} aus dem Speicher)",
             file=sys.stderr,
         )
@@ -481,7 +482,7 @@ def _run(
     # Das Tor sitzt hinter dem Snapshot: ein Ausfall kostet ein Urteil, nie
     # Geschichte. Und hinter der Preisregel: ein Buch zu bewerten, das ohnehin
     # niemand zu sehen bekommt, waere Verschwendung (ADR 19).
-    deltas, gate_report = _apply_gate(store, deltas, started_at)
+    deltas, gate_report = _apply_gate(store, deltas, profile, started_at)
     for source_name, interest_id in context.swept:
         store.mark_interest_seeded(interest_id, source_name, now=started_at)
 
@@ -494,6 +495,12 @@ def _run(
         failures=failures,
         attention=context.attention,
         profile=profile,
+        judgements=gate_report.judgements,
+        gate=GateNote(
+            held_back=gate_report.held_back,
+            threshold=DEFAULT_THRESHOLD,
+            over_budget=gate_report.over_budget,
+        ),
     )
 
     finished_at = datetime.now()

@@ -14,6 +14,8 @@ def _lines_for(entry: DigestEntry) -> list[str]:
     if entry.flags:
         parts.extend(f"**{flag}**" for flag in entry.flags)
     lines = ["  - " + " ".join(parts)]
+    if entry.judgement:
+        lines.append(f"    {entry.judgement}")
     if entry.url:
         lines.append(f"    {entry.url}")
     return lines
@@ -24,6 +26,8 @@ def render_text(digest: Digest) -> str:
         f"{digest.profile_name} — {digest.headline}",
         "=" * 60,
     ]
+    if digest.gate is not None and digest.gate.is_worth_saying:
+        lines.append(digest.gate.text)
     for section in digest.sections:
         lines.append("")
         lines.append(section.title)

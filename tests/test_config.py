@@ -99,6 +99,28 @@ def test_the_price_ceilings_still_have_to_be_positive(data_dir: Path) -> None:
         load_profile()
 
 
+def test_the_rating_budget_is_configurable(data_dir: Path) -> None:
+    """Wie viele Urteile ein Lauf einholt, entscheidet die Konfiguration —
+    im Zweifel weniger (ADR 19, Ticket 20)."""
+    assert load_profile().rating_budget == 40
+    (data_dir / "profile.yaml").write_text(
+        "slug: t\nname: T\nrating_budget: 5\nsources: {fake: {fixture: f.yaml}}\n",
+        encoding="utf-8",
+    )
+    assert load_profile().rating_budget == 5
+
+
+def test_a_budget_of_zero_is_rejected(data_dir: Path) -> None:
+    """Kein Budget heißt "kein Tor" — dafür lässt man den Schlüssel weg,
+    statt eine Null zu konfigurieren, die wie eine Panne aussieht."""
+    (data_dir / "profile.yaml").write_text(
+        "slug: t\nname: T\nrating_budget: 0\nsources: {fake: {fixture: f.yaml}}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="positive integer"):
+        load_profile()
+
+
 def test_liked_books_are_kept_even_though_nothing_reads_them_yet(data_dir: Path) -> None:
     """Dormant like no_gos: the seed for judging whether a discovered title fits
     the reader, and the list only gets sharper the longer it is kept."""

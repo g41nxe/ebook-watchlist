@@ -7,6 +7,12 @@ strong_deal_max_cents: 500   # unter 5,00 € = Strong Deal, ohne Rabatt-Check
 deal_max_cents: 1000         # 5,00-9,99 € nur mit echtem Rabatt
 min_discount_pct: 25
 
+# Wie viele Urteile das Bewertungstor pro Lauf höchstens einholt (ADR 19).
+# Der erste Lauf mit einem ANTHROPIC_API_KEY trifft den ganzen Rückstand; er
+# arbeitet ihn über mehrere Läufe ab. Was übrig bleibt, gilt als unbewertet
+# und wird gezeigt.
+rating_budget: 40
+
 # Either a plain list, or split into a list swept every run and a long tail
 # swept once a week.
 reference_authors:
