@@ -82,6 +82,44 @@ def test_near_namesakes_are_rejected() -> None:
         assert not author_matches("John Scalzi", impostor), impostor
 
 
+@pytest.mark.parametrize(
+    ("wanted", "credited"),
+    [
+        # A longer name is a different person, not a better match. token_set_ratio
+        # alone scores every one of these a perfect 100.
+        ("Chris Carter", "Chris James Carter"),
+        ("Chris Carter", "E. M. Carter"),
+        ("S.A. Barnes", "Rodney Barnes"),
+        ("S.A. Barnes", "Barnes, Jennifer Lynn"),
+        ("S.A. Barnes", "Brad Harmer-Barnes"),
+        # Sharing a surname and an initial is not enough either — dropping the
+        # initials would reduce both of these to a bare "barnes".
+        ("S.A. Barnes", "J.S. Barnes"),
+        # A bare given name must not swallow a full one.
+        ("Max Barry", "Max & Jakob"),
+        ("Max Barry", "Bobby & Max, Hannah Richter"),
+    ],
+)
+def test_a_namesake_is_not_the_author(wanted: str, credited: str) -> None:
+    """All eight turned up as real false positives on a live discovery run."""
+    assert not author_matches(wanted, credited)
+
+
+@pytest.mark.parametrize(
+    ("wanted", "credited"),
+    [
+        ("Chris Carter", "Chris Carter"),
+        ("Chris Carter", "Carter, Chris"),
+        ("S.A. Barnes", "S.A. Barnes"),
+        ("Max Barry", "Barry, Max"),
+        ("John Scalzi", "Scalzi, John"),
+        ("J.R.R. Tolkien", "Tolkien, J.R.R."),
+    ],
+)
+def test_the_author_is_still_recognised_in_either_name_order(wanted: str, credited: str) -> None:
+    assert author_matches(wanted, credited)
+
+
 def test_a_member_of_an_anthology_still_counts() -> None:
     credits = (
         "Joe Haldeman, Julie E. Czerneda, David Brin, Fonda Lee, David Weber, "

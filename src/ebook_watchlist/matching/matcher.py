@@ -162,9 +162,22 @@ def score(query: Query, candidate: Candidate, source_rank: int = 0) -> Scored:
 def author_matches(target: str, credited: str | None, threshold: int = STRONG_AUTHOR) -> bool:
     """Is ``target`` one of the people credited on this item?
 
-    Used for author discovery, where the shop's search returns a lot of
-    near-namesakes ("Scali", "Scalzo") and anthologies crediting twenty people
-    in one string.
+    Deliberately stricter than the author score used while ranking a title
+    (:func:`_author_scores`). There the author only corroborates a title that
+    already matched, so being generous costs little; here the author *is* the
+    entire decision, and every false positive becomes a book recommendation for
+    a stranger.
+
+    Two traps, both found against real shop data:
+
+    ``token_set_ratio`` alone scores a perfect 100 whenever one name's tokens
+    are a subset of the other's, which makes "Chris Carter" match "Chris James
+    Carter" and plain "Max" match "Max Barry". Taking the lower of it and
+    ``token_sort_ratio`` makes the extra given name count against the match.
+
+    And the initials-stripped variant is not consulted at all: it reduces
+    "S.A. Barnes" and "J.S. Barnes" to the same bare "barnes", which would make
+    every author sharing a surname the same person.
     """
     if not credited:
         return False
@@ -177,9 +190,9 @@ def author_matches(target: str, credited: str | None, threshold: int = STRONG_AU
         for person in credits:
             if wanted.full == person.full:
                 return True
-            score = max(
+            score = min(
                 fuzz.token_set_ratio(wanted.full, person.full),
-                fuzz.token_set_ratio(wanted.substantial, person.substantial),
+                fuzz.token_sort_ratio(wanted.full, person.full),
             )
             if score >= threshold:
                 return True
