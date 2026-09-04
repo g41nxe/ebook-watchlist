@@ -24,6 +24,11 @@ class Profile:
     strong_deal_max_cents: int = 500
     deal_max_cents: int = 1000
     min_discount_pct: int = 25
+    #: Wie viele Urteile ein Lauf höchstens einholt (ADR 19, Ticket 20). Der
+    #: erste Lauf mit einem Schlüssel trifft einen Rückstand von dreihundert
+    #: Entdeckungen; er soll ihn über Tage abarbeiten, nicht am Stück. Was das
+    #: Budget übrig lässt, gilt als unbewertet und wird gezeigt.
+    rating_budget: int = 40
     #: Swept every Run.
     reference_authors: list[str] = field(default_factory=list)
     #: Swept once a week — the long tail, where a missed day costs nothing.
@@ -157,6 +162,7 @@ def load_profile(path: Path | None = None) -> Profile:
         strong_deal_max_cents=_positive_int(data, "strong_deal_max_cents", 500, what),
         deal_max_cents=_positive_int(data, "deal_max_cents", 1000, what),
         min_discount_pct=_percentage(data, "min_discount_pct", 25, what),
+        rating_budget=_positive_int(data, "rating_budget", 40, what),
         reference_authors=core_authors,
         extended_authors=extended_authors,
         extended_sweep_weekday=weekday,

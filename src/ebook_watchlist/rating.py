@@ -25,6 +25,7 @@ import requests
 
 from .cleaning import is_truncated
 from .models import Observation
+from .reasons import THEMA, thema_name
 
 RUBRIC_PATH = Path(__file__).resolve().parents[2] / "docs" / "leseprofil.md"
 _VERSION = re.compile(r"Maßstabsversion:\s*(\d+)", re.IGNORECASE)
@@ -34,6 +35,12 @@ _VERSION = re.compile(r"Maßstabsversion:\s*(\d+)", re.IGNORECASE)
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
+#: Der Schlüssel kommt aus der Umgebung, bewusst und nur von dort (Ticket 20).
+#: ADR 6 sieht eine Secrets-Datei für die Bibliothekskennung vor, weil ein Lauf
+#: sich dort *anmelden* muss und die Kennung der Leserin gehört. Dieser
+#: Schlüssel gehört dem Host, nicht dem Profil: ein Cron-Job setzt ihn, und
+#: eine zweite Fundstelle im Datenverzeichnis wäre ein weiterer Ort, an dem ein
+#: Geheimnis versehentlich in ein Backup gerät.
 KEY_ENV = "ANTHROPIC_API_KEY"
 
 #: Unter wie vielen Sternen ein Vorschlag gar nicht erst erscheint. Großzügig
@@ -92,7 +99,10 @@ def prompt_for(observation: Observation, rubric: str) -> str:
     if observation.series:
         facts.append(f"Reihe: {observation.series}")
     if observation.category:
-        facts.append(f"Regal des Shops: {observation.category}")
+        # "Thema", nicht "Regal des Shops": das Wort, das die Leserin sieht, ist
+        # auch hier das richtige — und der lesbare Name sagt dem Modell mehr als
+        # ein Pfad aus dem Shop (Ticket 14, Ticket 20).
+        facts.append(f"{THEMA}: {thema_name(observation.category)}")
     if observation.price_cents is not None:
         facts.append(f"Preis: {observation.price_cents / 100:.2f} EUR")
     if observation.blurb:

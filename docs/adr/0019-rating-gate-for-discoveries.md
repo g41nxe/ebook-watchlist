@@ -96,6 +96,13 @@ version are kept in a table of their own.
 
 Below a threshold the book never reaches the triage list.
 
+> **Nachtrag aus der Nachschau (Ticket 20):** Und was durchkommt, trägt sein
+> Urteil sichtbar mit — Sterne, Konfidenz und Begründung stehen im Digest unter
+> dem Vorschlag. Gespeichert und nie gezeigt war die Begründung für niemanden
+> nachprüfbar, obwohl sie der Grund ist, den ein Vorschlag mitbringt
+> (Ticket 14). Die Triage-Oberfläche zeigt sie noch nicht; das gehört zu der
+> Überarbeitung, die dieser ADR unter "Consequences" ohnehin verlangt.
+
 Rating is keyed to the book and its rubric version, so a Run re-rates nothing:
 a book already judged under the current rubric is passed over. Raising the
 rubric version invalidates the cached judgements deliberately — that is the one
@@ -138,6 +145,31 @@ same reasoning that makes a broken Source an error rather than a quiet day
 
 Rating happens after the Snapshot is written, so a rating outage costs judgement
 and never costs history.
+
+### Ein Lauf hat ein Budget
+
+> **Nachtrag aus der Nachschau (Ticket 20):** Die Zahl der Urteile je Lauf ist
+> begrenzt (`rating_budget` in `profile.yaml`, Voreinstellung 40). Der erste
+> Lauf mit einem Schlüssel trifft den einmaligen Rückstand von 316 Entdeckungen
+> und feuerte sonst 316 Aufrufe am Stück — dieselbe Zurückhaltung, die ADR 7
+> jeder anderen ausgehenden Anfrage auferlegt, gilt auch hier. Was das Budget
+> nicht mehr abdeckt, ist **unbewertet und wird gezeigt**, nie verworfen: sonst
+> verschluckte ausgerechnet das Sparen die Neuzugänge. Ein gespeichertes Urteil
+> kostet keinen Aufruf und deshalb kein Budget, also arbeitet sich der Rückstand
+> über die nächsten Läufe von selbst ab.
+>
+> Der Digest nennt beides — wie viele Vorschläge unter dem Schwellwert
+> zurückgehalten wurden und wie viele das Budget ungeprüft durchgelassen hat.
+> Vorher stand das auf stderr, wo ein Cron-Job es wegwirft; ein zu scharf
+> gesetzter Schwellwert sah damit aus wie ein ruhiger Tag. Ein Digest, der nur
+> diesen Satz enthält, gilt deshalb nicht als leer.
+>
+> Ebenfalls entschieden: der Schlüssel wird weiterhin **nur** aus der Umgebung
+> gelesen. Die Secrets-Datei aus ADR 6 gehört zur Bibliothekskennung — die ist
+> die Identität der Leserin und gehört zum Profil. Dieser Schlüssel gehört dem
+> Host, den ein Cron-Job ohnehin einrichtet; ein zweiter Ablageort im
+> Datenverzeichnis wäre eine weitere Stelle, an der ein Geheimnis in ein Backup
+> geraten kann.
 
 ### The cheap filters stand in front of the gate
 

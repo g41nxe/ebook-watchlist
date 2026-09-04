@@ -13,6 +13,7 @@ from datetime import datetime
 from .config import Profile
 from .deals import deal_flags
 from .models import Attention, Delta, DeltaKind, MatchReason, SourceFailure
+from .rating import Rating
 from .reasons import why_shown
 
 SECTION_LIBRARY = "Bibliothek"
@@ -39,6 +40,9 @@ class DigestEntry:
     detail: str | None = None
     flags: tuple[str, ...] = ()
     url: str | None = None
+    #: Das Urteil des Bewertungstors, ausgeschrieben. Gespeichert und nie
+    #: gezeigt war es nachprüfbar für niemanden (ADR 19, Ticket 20).
+    judgement: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,14 +52,53 @@ class DigestSection:
 
 
 @dataclass(frozen=True, slots=True)
+class GateNote:
+    """Was das Bewertungstor zurückgehalten hat — im Digest, nicht auf stderr.
+
+    Ein zu scharf gesetzter Schwellwert sieht sonst aus wie ein ruhiger Tag,
+    und ein Cron-Job wirft stderr weg (ADR 19, Ticket 20).
+    """
+
+    held_back: int = 0
+    threshold: int = 0
+    #: Über dem Budget: nicht bewertet, aber gezeigt.
+    over_budget: int = 0
+
+    @property
+    def is_worth_saying(self) -> bool:
+        return bool(self.held_back or self.over_budget)
+
+    @property
+    def text(self) -> str:
+        """Eine Stelle für die Formulierung, damit Text und HTML dasselbe sagen."""
+        parts = []
+        if self.held_back:
+            noun = "Vorschlag" if self.held_back == 1 else "Vorschläge"
+            parts.append(
+                f"{self.held_back} {noun} unter {self.threshold} Sternen zurückgehalten"
+            )
+        if self.over_budget:
+            parts.append(
+                f"{self.over_budget} heute nicht bewertet (Budget erschöpft) "
+                "und deshalb ungeprüft gezeigt"
+            )
+        return "Bewertungstor: " + ", ".join(parts)
+
+
+@dataclass(frozen=True, slots=True)
 class Digest:
     profile_name: str
     generated_at: datetime
     since: datetime | None
     sections: tuple[DigestSection, ...] = field(default_factory=tuple)
+    gate: GateNote | None = None
 
     @property
     def is_empty(self) -> bool:
+        # Ein Digest, der nur sagt "zwölf Vorschläge zurückgehalten", ist kein
+        # leerer: genau dann muss die Leserin merken, dass das Tor arbeitet.
+        if self.gate is not None and self.gate.is_worth_saying:
+            return False
         return not self.sections
 
     @property
@@ -78,7 +121,20 @@ _SECTION_BY_REASON = {
 }
 
 
-def _entry_for(delta: Delta, profile: Profile | None) -> tuple[str, DigestEntry]:
+def _judgement_text(rating: Rating | None) -> str | None:
+    """Maschinensterne bleiben als solche erkennbar (ADR 17): eine 4 vom Modell
+    ist ein Vorschlag, eine 4 der Leserin eine Tatsache."""
+    if rating is None:
+        return None
+    stars = "★" * rating.stars + "☆" * (5 - rating.stars)
+    return f"Bewertung {stars} ({rating.confidence}): {rating.reason}"
+
+
+def _entry_for(
+    delta: Delta,
+    profile: Profile | None,
+    judgements: dict[tuple[str, str], Rating],
+) -> tuple[str, DigestEntry]:
     current, previous = delta.current, delta.previous
 
     if delta.kind is DeltaKind.BECAME_AVAILABLE:
@@ -109,6 +165,7 @@ def _entry_for(delta: Delta, profile: Profile | None) -> tuple[str, DigestEntry]
         detail=detail,
         flags=flags,
         url=current.url,
+        judgement=_judgement_text(judgements.get(current.key)),
     )
 
 
@@ -121,11 +178,14 @@ def build_digest(
     failures: list[SourceFailure],
     attention: list[Attention] | None = None,
     profile: Profile | None = None,
+    judgements: dict[tuple[str, str], Rating] | None = None,
+    gate: GateNote | None = None,
 ) -> Digest:
     buckets: dict[str, list[DigestEntry]] = {title: [] for title in SECTION_ORDER}
+    judgements = judgements or {}
 
     for delta in deltas:
-        section, entry = _entry_for(delta, profile)
+        section, entry = _entry_for(delta, profile, judgements)
         buckets[section].append(entry)
 
     for item in attention or []:
@@ -156,4 +216,5 @@ def build_digest(
         generated_at=generated_at,
         since=since,
         sections=sections,
+        gate=gate,
     )

@@ -33,19 +33,35 @@ def subject_of(observation: Observation) -> str:
 class GateReport:
     """Was das Tor getan hat.
 
-    Der Digest nennt die Zahl, damit ein zu scharf gesetzter Schwellwert
-    sichtbar ist statt still zu wirken (ADR 19).
+    Der Digest nennt die Zahlen, damit ein zu scharf gesetzter Schwellwert und
+    ein aufgebrauchtes Budget sichtbar sind statt still zu wirken (ADR 19).
     """
 
     held_back: int = 0
     rated: int = 0
     reused: int = 0
     unrated: int = 0
-    reasons: dict[str, Rating] = field(default_factory=dict)
+    #: Über dem Budget und deshalb ungefragt durchgelassen — unbewertet und
+    #: gezeigt, nie verworfen.
+    over_budget: int = 0
+    #: Das Urteil zu jedem durchgelassenen Fund, am Schlüssel der Beobachtung.
+    #: Der Digest zeigt es: die Begründung ist der Grund, den ein Vorschlag
+    #: mitbringt (ADR 19, Ticket 14).
+    judgements: dict[tuple[str, str], Rating] = field(default_factory=dict)
 
     @property
     def calls(self) -> int:
         return self.rated
+
+
+def unrated_report(deltas: list[Delta]) -> GateReport:
+    """Der Bericht für einen Lauf ohne Tor.
+
+    Eine Stelle für beide Wege dorthin — der Lauf zählte hier einmal *jedes*
+    Delta als unbewertet, auch Watchlist-Titel, die das Tor nie beurteilt
+    (Ticket 20).
+    """
+    return GateReport(unrated=sum(1 for delta in deltas if _is_discovery(delta)))
 
 
 def apply(
@@ -55,6 +71,7 @@ def apply(
     rater: Rater | None,
     rubric_version: int,
     threshold: int,
+    budget: int,
     now: datetime,
 ) -> tuple[list[Delta], GateReport]:
     """Entdeckungen unter dem Schwellwert aussortieren.
@@ -62,11 +79,16 @@ def apply(
     Ohne Bewerter passiert nichts — das ist der Zustand ohne Schlüssel, und er
     ist ausdrücklich erlaubt: gezeigt wird dann alles, was die Preisregel
     durchgelassen hat.
+
+    ``budget`` begrenzt die *Aufrufe* eines Laufs. Der erste Lauf mit einem
+    Schlüssel trifft einen Rückstand von dreihundert Entdeckungen, und die alle
+    am Stück abzufeuern widerspräche derselben Zurückhaltung, die jede andere
+    ausgehende Anfrage in diesem Projekt bindet (ADR 7). Ein gespeichertes
+    Urteil kostet nichts und zählt deshalb nicht mit.
     """
     report = GateReport()
     if rater is None:
-        report.unrated = sum(1 for delta in deltas if _is_discovery(delta))
-        return deltas, report
+        return deltas, unrated_report(deltas)
 
     kept: list[Delta] = []
     for delta in deltas:
@@ -84,6 +106,18 @@ def apply(
                 confidence=stored.confidence,
                 rubric_version=stored.rubric_version,
             )
+        elif report.rated + report.unrated >= budget:
+            # Budget aufgebraucht: der Rest wartet auf den naechsten Lauf und
+            # wird solange gezeigt. Uebersprungen heisst unbewertet, nicht
+            # aussortiert — sonst verschluckte ausgerechnet das Sparen die
+            # Neuzugaenge.
+            #
+            # Gezaehlt werden *Versuche*, nicht Urteile: ein totes Netz haette
+            # sonst dreihundert vergebliche Anfragen am Stueck gekostet, also
+            # genau den Ausbruch, den das Budget verhindern soll.
+            report.over_budget += 1
+            kept.append(delta)
+            continue
         else:
             try:
                 rating = rater.rate(delta.current)
@@ -105,7 +139,7 @@ def apply(
             )
 
         if rating.passes(threshold):
-            report.reasons[subject] = rating
+            report.judgements[delta.current.key] = rating
             kept.append(delta)
         else:
             report.held_back += 1

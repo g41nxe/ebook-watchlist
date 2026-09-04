@@ -22,6 +22,9 @@ ul { list-style: none; padding: 0; }
 li { padding: 0.5rem 0; border-bottom: 1px solid #f0f0ee; }
 .author { color: #555; }
 .detail { color: #444; }
+.gate { color: #555; background: #f4f4f1; border-left: 3px solid #ccc;
+        padding: 0.4rem 0.7rem; font-size: 0.9rem; }
+.judgement { color: #555; font-size: 0.9rem; margin-top: 0.2rem; }
 .flag { display: inline-block; background: #1a6b3c; color: #fff; border-radius: 3px;
         padding: 0 0.4rem; font-size: 0.8rem; margin-left: 0.4rem; }
 a { color: #1a4d8f; }
@@ -38,7 +41,10 @@ def _entry_html(entry: DigestEntry) -> str:
     if entry.detail:
         bits.append(f'<span class="detail">{escape(entry.detail)}</span>')
     bits.extend(f'<span class="flag">{escape(flag)}</span>' for flag in entry.flags)
-    return "<li>" + " · ".join(bits) + "</li>"
+    line = " · ".join(bits)
+    if entry.judgement:
+        line += f'<div class="judgement">{escape(entry.judgement)}</div>'
+    return "<li>" + line + "</li>"
 
 
 def render_html(digest: Digest) -> str:
@@ -46,6 +52,8 @@ def render_html(digest: Digest) -> str:
         f"<h1>{escape(digest.profile_name)}</h1>",
         f'<p class="since">{escape(digest.headline)}</p>',
     ]
+    if digest.gate is not None and digest.gate.is_worth_saying:
+        body.append(f'<p class="gate">{escape(digest.gate.text)}</p>')
     for section in digest.sections:
         body.append(f"<h2>{escape(section.title)}</h2>")
         body.append("<ul>")
