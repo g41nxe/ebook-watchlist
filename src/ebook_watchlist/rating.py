@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -207,17 +209,122 @@ class ModelRater:
         return parse_answer(text, self.version)
 
 
+#: Der Weg ohne Schlüssel: Claude Code hat bereits eine Anmeldung, und ``-p``
+#: führt genau einen Auftrag aus und beendet sich. Es gibt kein Abo-Guthaben
+#: für die API (die Console rechnet getrennt ab), also ist das für ein privates
+#: Werkzeug auf dem eigenen Rechner der naheliegende Weg. Die Leserin hat
+#: bestätigt, dass sie das so nutzen darf.
+CLI_NAME = "claude"
+CLI_TIMEOUT = 120.0
+
+
+@dataclass(slots=True)
+class ClaudeCodeRater:
+    """Fragt die lokal angemeldete Claude-Code-Installation statt der API.
+
+    Kein Schlüssel, kein Guthaben, keine zweite Anmeldung. Dafür ein
+    Unterprozess je Buch, und der ist **teuer**: eine Messung an einem echten
+    Titel ergab 34 Sekunden — gegenüber wenigen Sekunden für einen POST. Beim
+    voreingestellten Budget von 40 Aufrufen ist das im schlimmsten Fall über
+    zwanzig Minuten Laufzeit.
+
+    Das ist tragbar, weil ein nächtlicher Lauf Zeit hat und weil vor dem Tor
+    schon die Preisregel steht: es sieht nur, was ohnehin gemeldet würde, und
+    jedes Buch wird genau einmal beurteilt. Wer es schneller braucht, setzt
+    einen Schlüssel — oder senkt ``rating_budget``.
+
+    ``--output-format json`` liefert eine Hülle mit dem Ergebnis in ``result``;
+    kommt sie nicht, wird die rohe Ausgabe gelesen. Beides landet in derselben
+    Auswertung wie die API-Antwort, damit es nur *eine* Stelle gibt, die eine
+    Antwort in Sterne übersetzt.
+    """
+
+    executable: str = CLI_NAME
+    timeout: float = CLI_TIMEOUT
+    rubric: str = ""
+    version: int = 0
+
+    def __post_init__(self) -> None:
+        if not self.rubric:
+            self.rubric, self.version = load_rubric()
+
+    def rate(self, observation: Observation) -> Rating:
+        command = [
+            self.executable,
+            "-p",
+            prompt_for(observation, self.rubric),
+            "--output-format",
+            "json",
+        ]
+        try:
+            completed = subprocess.run(  # noqa: S603 - fester Befehl, kein Shell
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=self.timeout,
+            )
+        except FileNotFoundError as exc:
+            raise RatingUnavailable(f"{self.executable} nicht gefunden") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise RatingUnavailable(
+                f"{self.executable} antwortete nicht in {self.timeout}s"
+            ) from exc
+        if completed.returncode != 0:
+            detail = (completed.stderr or "").strip().splitlines()
+            raise RatingUnavailable(
+                f"{self.executable} endete mit {completed.returncode}"
+                + (f": {detail[-1]}" if detail else "")
+            )
+        return parse_answer(_cli_text(completed.stdout), self.version)
+
+
+def _cli_text(stdout: str) -> str:
+    """Die Antwort aus der JSON-Hülle — oder die rohe Ausgabe.
+
+    Die Hülle kann sich ändern; auf ihr Format zu bestehen hiesse, an einer
+    fremden Version zu hängen. Fehlt sie oder sieht sie anders aus, geht der
+    Text unverändert weiter und ``parse_answer`` sucht sich das JSON darin.
+    """
+    try:
+        envelope = json.loads(stdout)
+    except (ValueError, TypeError):
+        return stdout
+    if isinstance(envelope, dict):
+        result = envelope.get("result")
+        if isinstance(result, str):
+            return result
+    return stdout
+
+
 def build_rater(model: str | None = None) -> Rater | None:
     """Der Bewerter, falls einer möglich ist — sonst ``None``.
 
-    Ohne Schlüssel ist das kein Fehler, sondern der Zustand ohne Tor: alles
-    bleibt unbewertet und wird gezeigt.
+    Zwei Wege, in dieser Reihenfolge:
+
+    1. **Ein API-Schlüssel in der Umgebung.** Schneller, weil ein POST statt
+       eines Unterprozesses, und der Weg für einen Rechner ohne Claude Code.
+    2. **Die lokal angemeldete Claude-Code-Installation** über ``claude -p``.
+       Kein Schlüssel, kein zusätzliches Guthaben — API-Zugang ist in keinem
+       Claude-Abo enthalten, die Console rechnet getrennt ab.
+
+    Der Schlüssel geht vor, wo beides da ist: wer ihn setzt, hat sich für ihn
+    entschieden. Ist keiner von beiden verfügbar, ist das **kein Fehler**,
+    sondern der Zustand ohne Tor — alles bleibt unbewertet und wird gezeigt.
     """
-    key = os.environ.get(KEY_ENV)
-    if not key:
-        return None
     try:
         rubric, version = load_rubric()
     except RatingUnavailable:
         return None
-    return ModelRater(api_key=key, model=model or DEFAULT_MODEL, rubric=rubric, version=version)
+
+    key = os.environ.get(KEY_ENV)
+    if key:
+        return ModelRater(
+            api_key=key, model=model or DEFAULT_MODEL, rubric=rubric, version=version
+        )
+
+    executable = shutil.which(CLI_NAME)
+    if executable:
+        return ClaudeCodeRater(executable=executable, rubric=rubric, version=version)
+    return None

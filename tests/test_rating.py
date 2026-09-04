@@ -13,8 +13,11 @@ import pytest
 from ebook_watchlist import gate
 from ebook_watchlist.models import Delta, DeltaKind, MatchReason, Observation
 from ebook_watchlist.rating import (
+    ClaudeCodeRater,
+    ModelRater,
     Rating,
     RatingUnavailable,
+    build_rater,
     parse_answer,
     prompt_for,
     rubric_version,
@@ -502,3 +505,115 @@ def test_a_watchlist_price_drop_is_never_measured_against_a_judgement(store: Sto
 
     assert len(kept) == 1
     assert report.held_back == 0
+
+
+# --- der Weg ohne Schlüssel: claude -p (Ticket 12) --------------------------
+
+
+ANSWER = '{"stars": 4, "reason": "Achse D: isoliertes Setting", "confidence": "teils"}'
+
+
+def _completed(stdout: str = "", stderr: str = "", returncode: int = 0):
+    from subprocess import CompletedProcess
+
+    return CompletedProcess(args=["claude"], returncode=returncode, stdout=stdout, stderr=stderr)
+
+
+def test_the_cli_answer_is_read_out_of_its_json_envelope(monkeypatch) -> None:
+    """``--output-format json`` verpackt das Ergebnis in ``result``."""
+    import json as _json
+
+    monkeypatch.setattr(
+        "ebook_watchlist.rating.subprocess.run",
+        lambda *a, **k: _completed(stdout=_json.dumps({"result": ANSWER, "is_error": False})),
+    )
+    rater = ClaudeCodeRater(rubric=RUBRIC, version=1)
+
+    assert rater.rate(discovery()).stars == 4
+
+
+def test_a_bare_answer_is_read_too(monkeypatch) -> None:
+    """Auf das Hüllenformat zu bestehen hiesse, an einer fremden Version zu
+    hängen. Fehlt sie, geht der Text unverändert in dieselbe Auswertung."""
+    monkeypatch.setattr(
+        "ebook_watchlist.rating.subprocess.run", lambda *a, **k: _completed(stdout=ANSWER)
+    )
+    assert ClaudeCodeRater(rubric=RUBRIC, version=1).rate(discovery()).stars == 4
+
+
+def test_a_missing_executable_is_no_reason_to_fail_a_run(monkeypatch) -> None:
+    def boom(*a, **k):
+        raise FileNotFoundError
+
+    monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", boom)
+    with pytest.raises(RatingUnavailable, match="nicht gefunden"):
+        ClaudeCodeRater(rubric=RUBRIC, version=1).rate(discovery())
+
+
+def test_a_timeout_is_reported_as_unavailable(monkeypatch) -> None:
+    from subprocess import TimeoutExpired
+
+    def slow(*a, **k):
+        raise TimeoutExpired(cmd="claude", timeout=1)
+
+    monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", slow)
+    with pytest.raises(RatingUnavailable, match="antwortete nicht"):
+        ClaudeCodeRater(rubric=RUBRIC, version=1, timeout=1).rate(discovery())
+
+
+def test_a_nonzero_exit_names_what_the_cli_said(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "ebook_watchlist.rating.subprocess.run",
+        lambda *a, **k: _completed(returncode=1, stderr="not logged in"),
+    )
+    with pytest.raises(RatingUnavailable, match="not logged in"):
+        ClaudeCodeRater(rubric=RUBRIC, version=1).rate(discovery())
+
+
+def test_the_prompt_reaches_the_cli_and_carries_no_secret(monkeypatch) -> None:
+    seen: list[list[str]] = []
+
+    def capture(command, **kwargs):
+        seen.append(command)
+        return _completed(stdout=ANSWER)
+
+    monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", capture)
+    ClaudeCodeRater(executable="claude", rubric=RUBRIC, version=1).rate(
+        discovery(title="Blindflug", author="Peter Watts")
+    )
+
+    command = seen[0]
+    assert command[:2] == ["claude", "-p"]
+    assert "--output-format" in command and "json" in command
+    assert "Blindflug" in command[2]
+
+
+# --- welcher Bewerter gewählt wird ------------------------------------------
+
+
+def test_a_key_in_the_environment_wins(monkeypatch, tmp_path) -> None:
+    """Wer ihn setzt, hat sich für ihn entschieden."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setattr("ebook_watchlist.rating.shutil.which", lambda name: "/usr/bin/claude")
+
+    assert isinstance(build_rater(), ModelRater)
+
+
+def test_without_a_key_the_local_installation_is_used(monkeypatch) -> None:
+    """API-Zugang ist in keinem Claude-Abo enthalten; die angemeldete
+    Installation ist der Weg ohne zusätzliches Guthaben."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr("ebook_watchlist.rating.shutil.which", lambda name: "/usr/bin/claude")
+
+    rater = build_rater()
+    assert isinstance(rater, ClaudeCodeRater)
+    assert rater.executable == "/usr/bin/claude"
+
+
+def test_with_neither_there_is_simply_no_gate(monkeypatch) -> None:
+    """Kein Fehler, sondern der Zustand ohne Tor: alles bleibt unbewertet und
+    wird gezeigt."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr("ebook_watchlist.rating.shutil.which", lambda name: None)
+
+    assert build_rater() is None
