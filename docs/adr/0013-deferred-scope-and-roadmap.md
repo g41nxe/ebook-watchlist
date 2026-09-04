@@ -24,6 +24,20 @@ re-scoped.
   category-only heuristic of ADR 11 if it proves insufficient.
 - **Keyword refinement** of category discovery (`genre_keywords`,
   `no_go_keywords`) if v1's category feed is noisy.
+- **Series tracking** — a Watchlist Entry that names a *series* rather than a
+  title, so the next volume is caught the moment it appears instead of having to
+  be added by hand. The reader's profile leans heavily on investigator and
+  profiler series, which makes this the most-wanted gap after v1. Both Sources
+  expose the raw material already: the Onleihe has a `Reihe:` field on the
+  detail page, and beam-shop carries the series in the tile subtitle
+  ("Die sieben Schwestern 1"). Needs its own matching rules — a series name is
+  a much weaker signal than a title — so it gets an ADR of its own when it
+  arrives.
+- **Profile matching of discoveries** — deciding whether a *found* title fits
+  the reader's profile, not just whether its author or shelf does. This is what
+  the LLM classification above is ultimately for; the atmosphere criteria in the
+  profile ("beklemmend", "isolierte Settings", "Katz-und-Maus") are exactly the
+  kind of thing a shelf label cannot capture.
 - **Additional Sources** — a second German-language shop and/or library,
   exercising the pluggable Source interface. (A non-fixed-price / English-language
   shop is explicitly *not* planned — the focus is German-language literature,
