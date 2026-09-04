@@ -613,6 +613,21 @@ class Store:
                 session.expunge(row)
             return rows
 
+    def book_by_source_item(self, source: str, source_item_id: str) -> int | None:
+        """Welches Buch diese Quelle unter dieser Nummer fuehrt, falls bekannt.
+
+        Der Weg zurueck von der Nummer zum Buch. Ohne ihn muesste jede
+        Aufloesung noch einmal beim Shop nachfragen, obwohl die Antwort schon
+        in der Datenbank steht (Ticket 17).
+        """
+        with self.session() as session:
+            return session.scalars(
+                select(BookSourceRow.book_id).where(
+                    BookSourceRow.source == source,
+                    BookSourceRow.source_item_id == source_item_id,
+                )
+            ).first()
+
     def put_book_source(
         self,
         book_id: int,

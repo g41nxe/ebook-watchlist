@@ -12,6 +12,7 @@ from conftest import beam_fixture
 from ebook_watchlist.config import ConfigError, Profile, load_dismissals
 from ebook_watchlist.diff import compute_deltas, suppress_unseeded_interests
 from ebook_watchlist.digest import SECTION_GENRE, build_digest
+from ebook_watchlist.dismissals import Dismissed
 from ebook_watchlist.junk import is_junk
 from ebook_watchlist.models import MatchReason, Observation
 from ebook_watchlist.sources.base import RunContext
@@ -44,6 +45,16 @@ def source() -> BeamSource:
 
 def context(tmp_path: Path, **kwargs) -> RunContext:
     return RunContext(profile_slug="t", store=Store(tmp_path / "s.db"), now=NOW, **kwargs)
+
+
+def discovery(source_name: str, item_id: str, isbn: str | None = None) -> Observation:
+    return Observation(
+        source=source_name,
+        source_item_id=item_id,
+        title="Egal",
+        match_reason=MatchReason.GENRE_CATEGORY,
+        isbn=isbn,
+    )
 
 
 # --- fetching a shelf -----------------------------------------------------
@@ -171,17 +182,30 @@ def test_a_dismissed_suggestion_never_comes_back(tmp_path: Path) -> None:
     unwanted = sorted(all_ids)[0]
 
     profile = Profile(slug="t", name="T", genre_categories=[SPACE_OPERA])
-    ctx = context(tmp_path, dismissed={"beam": frozenset({unwanted})})
+    ctx = context(tmp_path, dismissed=Dismissed(items=frozenset({("beam", unwanted)})))
     observations = beam.collect(profile, [], ctx)
 
     assert unwanted not in {o.source_item_id for o in observations}
     assert len(observations) == len(all_ids) - 1
 
 
-def test_dismissals_are_scoped_to_one_source(tmp_path: Path) -> None:
-    ctx = context(tmp_path, dismissed={"voebb": frozenset({"123"})})
-    assert ctx.is_dismissed("voebb", "123")
-    assert not ctx.is_dismissed("beam", "123")
+def test_a_product_number_only_speaks_for_its_own_shop(tmp_path: Path) -> None:
+    """Die Nummer ist die Sprache eines Shops. Sie auf eine andere Quelle zu
+    übertragen hiesse, zwei fremde Nummernkreise gleichzusetzen."""
+    ctx = context(tmp_path, dismissed=Dismissed(items=frozenset({("voebb", "123")})))
+    assert ctx.is_dismissed(discovery("voebb", "123"))
+    assert not ctx.is_dismissed(discovery("beam", "123"))
+
+
+def test_the_isbn_carries_a_dismissal_to_every_source(tmp_path: Path) -> None:
+    """Der eigentliche Anlass von Ticket 17: "das besitze ich schon" gilt dem
+    Buch, nicht dem Regal eines Shops (ADR 18)."""
+    ctx = context(tmp_path, dismissed=Dismissed(isbns=frozenset({"9783641117009"})))
+
+    assert ctx.is_dismissed(discovery("voebb", "irgendwas", isbn="9783641117009"))
+    assert not ctx.is_dismissed(discovery("voebb", "irgendwas", isbn="9783641130008"))
+    # Ohne ISBN bleibt nur die Nummer, und die kennt diese Ablehnung nicht.
+    assert not ctx.is_dismissed(discovery("voebb", "irgendwas"))
 
 
 def test_an_absent_dismissal_file_simply_means_nothing_is_dismissed(

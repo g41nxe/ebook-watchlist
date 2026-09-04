@@ -33,7 +33,6 @@ def test_the_watchlist_comes_from_relations(store: Store) -> None:
         store,
         Profile(slug="t", name="Test"),
         [WatchlistEntry(title="Blindflug", author="Peter Watts", notes="düster")],
-        {},
         now=NOW,
     )
     configured = load(store, SETTINGS)
@@ -45,7 +44,7 @@ def test_the_watchlist_comes_from_relations(store: Store) -> None:
 
 
 def test_a_deactivated_relation_is_not_watched_any_more(store: Store) -> None:
-    seed(store, Profile(slug="t", name="T"), [WatchlistEntry(title="Providence")], {}, now=NOW)
+    seed(store, Profile(slug="t", name="T"), [WatchlistEntry(title="Providence")], now=NOW)
     book = store.books()[0]
     store.deactivate_relation("t", book.id, str(RelationKind.WATCHING), now=NOW)
 
@@ -58,7 +57,6 @@ def test_a_restriction_survives_the_round_trip(store: Store) -> None:
         store,
         Profile(slug="t", name="T"),
         [WatchlistEntry(title="Providence", author="Max Barry", check_shop=False)],
-        {},
         now=NOW,
     )
     entry = load(store, SETTINGS).watchlist[0]
@@ -77,7 +75,6 @@ def test_interests_become_the_two_author_lists(store: Store) -> None:
             genre_categories=["belletristik/krimi-thriller/psychothriller"],
         ),
         [],
-        {},
         now=NOW,
     )
     configured = load(store, SETTINGS)
@@ -92,7 +89,7 @@ def test_interests_become_the_two_author_lists(store: Store) -> None:
 def test_the_settings_that_never_were_relations_stay_from_the_file(store: Store) -> None:
     """Schwellwerte, Quellen und Kontakt haben keine Zeile in ADR 18 und
     gehören weiter in eine Datei, die man versionieren kann."""
-    seed(store, Profile(slug="t", name="T"), [WatchlistEntry(title="X")], {}, now=NOW)
+    seed(store, Profile(slug="t", name="T"), [WatchlistEntry(title="X")], now=NOW)
 
     assert load(store, SETTINGS).profile.strong_deal_max_cents == 400
 
@@ -111,7 +108,6 @@ def test_free_text_book_lists_are_emptied(store: Store) -> None:
             reference_authors=["Chris Carter"],
         ),
         [],
-        {},
         now=NOW,
     )
     assert load(store, SETTINGS).profile.liked_books == []

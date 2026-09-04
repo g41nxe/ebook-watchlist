@@ -212,6 +212,12 @@ class Detail:
     price_cents: int | None
     isbn: str | None = None
     cover_url: str | None = None
+    #: Only the tile normally carries the author, and whoever arrives by
+    #: product id alone never sees a tile (Ticket 17).
+    author: str | None = None
+    #: The speaking address the shop itself gives this page. Coming in through
+    #: the numeric detail route, this is the only way to learn it.
+    url: str | None = None
 
 
 def _isbn_from_order_number(order_number: str | None) -> str | None:
@@ -228,7 +234,8 @@ def _isbn_from_order_number(order_number: str | None) -> str | None:
 
 def parse_detail(html: str) -> Detail:
     """The pinned product's own page — the authoritative current price."""
-    scope = soup(html).select_one(sel.DETAIL_SCOPE)
+    page = soup(html)
+    scope = page.select_one(sel.DETAIL_SCOPE)
     if scope is None:
         raise SourceStructureError(
             f"beam-shop: no {sel.DETAIL_SCOPE} block on the product page — "
@@ -250,11 +257,22 @@ def parse_detail(html: str) -> Detail:
     isbn = _isbn_from_order_number(order_number if isinstance(order_number, str) else None)
 
     title_node = scope.select_one(sel.DETAIL_TITLE)
+    # Der Autorenlink wird *im Produktblock* gesucht: die Seite haengt weiter
+    # unten hundertfach Empfehlungen an, und jede bringt ihren eigenen mit.
+    author_node = scope.select_one(sel.DETAIL_AUTHOR)
+    author = author_node.get_text(" ", strip=True) if author_node else None
+
+    # Die kanonische Adresse steht im Kopf der Seite, nicht im Produktblock.
+    canonical = page.select_one(sel.DETAIL_CANONICAL)
+    href = canonical.get("href") if canonical is not None else None
+
     return Detail(
         title=title_node.get_text(" ", strip=True) if title_node else None,
         price_cents=price_cents,
         isbn=isbn,
         cover_url=_cover_from(scope.select_one(sel.DETAIL_IMAGE)),
+        author=author or None,
+        url=canonical_url(href) if isinstance(href, str) and href else None,
     )
 
 

@@ -10,6 +10,11 @@ from __future__ import annotations
 BASE = "https://www.beam-shop.de/"
 SEARCH_PATH = "search"
 AUTHOR_HUB_PATH = "autor-innenwelt/{slug}/"
+#: The way to a product page when a product id is all we have. The speaking
+#: address carries the category path and the slug, and a bare number says
+#: neither; Shopware's own detail route needs only the number and redirects to
+#: the speaking one (Ticket 17).
+DETAIL_PATH = "detail/index/sArticle/{product_id}"
 
 #: Shopware ignores queries shorter than this and renders an empty result page.
 MIN_QUERY_LENGTH = 4
@@ -56,6 +61,15 @@ DETAIL_PRICE_META = 'meta[itemprop="price"]'
 DETAIL_ORDER_NUMBER = 'input[name="sAdd"]'
 #: Auf der Detailseite ist das Bild groesser (600x600 statt 200x200).
 DETAIL_IMAGE = "img[data-srcset], img[srcset]"
+#: Die Autor:in auf der Produktseite. Anders als die Kachel traegt der
+#: Produktblock keine ``product--author``-Klasse; der Link auf die
+#: Autorensuche ist innerhalb des Blocks der einzige seiner Art. Nach der
+#: Beschriftung zu greifen hiesse, an einer deutschen UI-Zeichenkette zu
+#: haengen, die ein Theme-Update umformuliert.
+DETAIL_AUTHOR = 'a[href*="saltFieldLimitation=author"]'
+#: Die sprechende Adresse der Seite. Wer ueber die Produktnummer kommt, kennt
+#: sie nicht — die Seite selbst nennt sie.
+DETAIL_CANONICAL = 'link[rel="canonical"]'
 
 # --- listing --------------------------------------------------------------
 

@@ -98,7 +98,6 @@ def test_the_watchlist_becomes_books_and_relations(store: Store) -> None:
         store,
         profile(),
         [WatchlistEntry(title="Blindflug", author="Peter Watts")],
-        {},
         now=NOW,
     )
     assert report.books == 1
@@ -116,7 +115,6 @@ def test_several_relations_hold_at_once(store: Store) -> None:
         store,
         profile(liked_books=["Cold Eternity - S.A. Barnes"]),
         [WatchlistEntry(title="Cold Eternity", author="S.A. Barnes")],
-        {},
         now=NOW,
     )
     book = store.books()[0]
@@ -127,7 +125,7 @@ def test_several_relations_hold_at_once(store: Store) -> None:
 def test_a_relation_is_deactivated_not_deleted(store: Store) -> None:
     """Providence von der Watchlist zu nehmen zerstörte bisher die Tatsache,
     dass es je beobachtet wurde."""
-    seed(store, profile(), [WatchlistEntry(title="Providence", author="Max Barry")], {}, now=NOW)
+    seed(store, profile(), [WatchlistEntry(title="Providence", author="Max Barry")], now=NOW)
     book = store.books()[0]
 
     store.deactivate_relation("t", book.id, str(RelationKind.WATCHING), now=NOW)
@@ -146,7 +144,6 @@ def test_authors_and_themes_become_interests(store: Store) -> None:
             genre_categories=["belletristik/krimi-thriller/psychothriller"],
         ),
         [],
-        {},
         now=NOW,
     )
     assert report.interests == 3
@@ -163,20 +160,9 @@ def test_an_author_on_both_lists_is_swept_daily_not_twice(store: Store) -> None:
         store,
         profile(reference_authors=["Chris Carter"], extended_authors=["Chris Carter"]),
         [],
-        {},
         now=NOW,
     )
     assert report.interests == 1
-
-
-def test_dismissals_are_not_guessed_into_books(store: Store) -> None:
-    """Eine Produktnummer sagt nicht, welches Buch gemeint ist. Das käme nur
-    über eine Abfrage beim Shop, und die gehört nicht in einen Import."""
-    report = seed(store, profile(), [], {"beam": ["1067554"]}, now=NOW)
-
-    assert report.needs_attention
-    assert "beam:1067554" in report.unresolved[0]
-    assert store.books() == []
 
 
 def test_importing_twice_changes_nothing(store: Store) -> None:
@@ -184,7 +170,6 @@ def test_importing_twice_changes_nothing(store: Store) -> None:
     args = (
         profile(reference_authors=["Chris Carter"], liked_books=["Cry Baby - Gillian Flynn"]),
         [WatchlistEntry(title="Blindflug", author="Peter Watts")],
-        {},
     )
     seed(store, *args, now=NOW)
     first = (len(store.books()), len(store.relations("t")), len(store.interests("t")))
@@ -194,7 +179,7 @@ def test_importing_twice_changes_nothing(store: Store) -> None:
 
 
 def test_a_second_import_does_not_revive_what_was_switched_off(store: Store) -> None:
-    args = (profile(), [WatchlistEntry(title="Providence", author="Max Barry", active=False)], {})
+    args = (profile(), [WatchlistEntry(title="Providence", author="Max Barry", active=False)])
     seed(store, *args, now=NOW)
     assert store.relations("t", kind=str(RelationKind.WATCHING)) == []
 
@@ -206,7 +191,7 @@ def test_each_interest_is_seeded_on_its_own(store: Store) -> None:
     """Der behobene Fehler: der alte Schlüssel liess 'category' bei Autor:innen
     leer, so dass alle Autor:innen sich eine Aussaat teilten — die erste säte
     still an, jede weitere meldete ihre ganze Backlist."""
-    seed(store, profile(reference_authors=["Chris Carter", "Jo Nesbø"]), [], {}, now=NOW)
+    seed(store, profile(reference_authors=["Chris Carter", "Jo Nesbø"]), [], now=NOW)
     carter, nesbo = store.interests("t", key=str(InterestKey.AUTHOR))
 
     store.mark_interest_seeded(carter.id, "beam", now=NOW)
@@ -216,7 +201,7 @@ def test_each_interest_is_seeded_on_its_own(store: Store) -> None:
 
 
 def test_seeding_is_per_source(store: Store) -> None:
-    seed(store, profile(reference_authors=["Chris Carter"]), [], {}, now=NOW)
+    seed(store, profile(reference_authors=["Chris Carter"]), [], now=NOW)
     carter = store.interests("t")[0]
 
     store.mark_interest_seeded(carter.id, "beam", now=NOW)
@@ -250,7 +235,6 @@ def test_a_restriction_names_the_kind_of_source_not_its_name(store: Store) -> No
         store,
         profile(),
         [WatchlistEntry(title="Providence", author="Max Barry", check_shop=False)],
-        {},
         now=NOW,
     )
     relation = store.relations("t", kind=str(RelationKind.WATCHING))[0]

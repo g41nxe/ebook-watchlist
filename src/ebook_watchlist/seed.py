@@ -5,6 +5,10 @@ Vier Dateien werden zu vier Begriffen: **Profil**, **Buch**, **Beziehung**,
 in ``owned.yaml`` als Titel, in ``dismissed.yaml`` als beam-Produktnummer, und
 war einmal eine Zeile in ``watchlist.yaml``.
 
+``dismissed.yaml`` gehört ausdrücklich nicht dazu: es nennt Produktnummern, und
+welches Buch eine Nummer meint, weiß nur der Shop. Das ist eine Anfrage und
+kein Import — sie steht in :mod:`ebook_watchlist.dismissals` (Ticket 17).
+
 Das Risiko ist nicht das Schema, sondern der Import. ``liked_books`` ist
 Freitext wie ``"Cry Baby - Gillian Flynn"``, und daraus ein Buch zu machen
 heißt raten. Es gilt dieselbe Regel wie überall sonst: was sich nicht
@@ -92,7 +96,7 @@ def _book_for_free_text(
     return book.id, note
 
 
-def seed(store: Store, profile: Profile, watchlist: list[WatchlistEntry], dismissed: dict,
+def seed(store: Store, profile: Profile, watchlist: list[WatchlistEntry],
          *, now: datetime | None = None) -> SeedReport:
     """Alles einlesen, was heute in YAML steht."""
     at = now or datetime.now()
@@ -137,16 +141,10 @@ def seed(store: Store, profile: Profile, watchlist: list[WatchlistEntry], dismis
             store.put_relation(profile.slug, book_id, str(kind), now=at, **details)
             report.relations += 1
 
-    # --- Verworfen: bisher eine Produktnummer je Shop -----------------------
-    #
-    # Die alte Form kannte nur "dieser Shop soll das nicht mehr zeigen". Eine
-    # Buch-Zeile daraus zu bauen ginge nur ueber eine Abfrage beim Shop, und die
-    # gehoert nicht in einen Import. Sie bleiben deshalb als Notiz am Profil
-    # liegen und werden beim naechsten Lauf zu Beziehungen, sobald der Shop
-    # sagt, welches Buch die Nummer meint.
-    for source, item_ids in (dismissed or {}).items():
-        for item_id in item_ids:
-            report.unresolved.append(f"dismissed: {source}:{item_id}")
+    # Die alten Ablehnungen stehen hier bewusst nicht mehr. Sie sind je Shop
+    # eine Produktnummer, und die sagt nicht, welches Buch gemeint ist — nur
+    # der Shop kann das. Das ist eine Anfrage, und eine Anfrage gehoert nicht
+    # in einen Import: ``ebw dismissals`` loest sie einmalig auf (Ticket 17).
 
     # --- Interessen: Autor:innen und Themen --------------------------------
     for author in profile.reference_authors:

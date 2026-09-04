@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import dataclasses
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from ..config import Profile, WatchlistEntry
+from ..dismissals import Dismissed
 from ..matching import Confidence, Resolution
 from ..models import Attention, LinkOutcome, Observation
 from ..store import Store
@@ -29,6 +30,22 @@ class SourceStructureError(Exception):
     """The page no longer looks the way the parser expects. Loud on purpose."""
 
 
+@dataclass(frozen=True, slots=True)
+class Item:
+    """What a Source says about *one* product, asked for by its own id.
+
+    Deliberately not an Observation: nothing here is observed, diffed or
+    carried forward. It answers a single question — which book does this
+    product number mean — and that question has one caller (Ticket 17).
+    """
+
+    source_item_id: str
+    title: str
+    author: str | None = None
+    isbn: str | None = None
+    url: str | None = None
+
+
 @dataclass(slots=True)
 class RunContext:
     """What a Source may reach for beyond its own configuration.
@@ -41,8 +58,10 @@ class RunContext:
     store: Store
     now: datetime
     attention: list[Attention] = field(default_factory=list)
-    #: Suggestions waved away for good, per Source name.
-    dismissed: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    #: Suggestions waved away for good. Read off the Book Relations, not off a
+    #: per-shop id list: "I already own this" is true of the book, so it has to
+    #: hold at every Source (ADR 18, Ticket 17).
+    dismissed: Dismissed = field(default_factory=Dismissed)
     #: Whether this Run also walks the weekly long tail of Reference Authors.
     sweep_extended: bool = False
     #: Watchlist-Key -> Buch-Id, damit ein Eintrag nicht pro Quelle neu
@@ -61,8 +80,16 @@ class RunContext:
     #: flutet beim naechsten Mal erneut.
     swept: set[tuple[str, int]] = field(default_factory=set)
 
-    def is_dismissed(self, source: str, source_item_id: str) -> bool:
-        return source_item_id in self.dismissed.get(source, frozenset())
+    def is_dismissed(self, observation: Observation) -> bool:
+        """Whether this find is a book the reader has waved away for good.
+
+        The whole Observation rather than the id, because the id only settles
+        it at the shop it came from. The ISBN is what carries the answer to the
+        *other* Source — which was the point of moving dismissals onto the book.
+        """
+        return self.dismissed.covers(
+            observation.source, observation.source_item_id, observation.isbn
+        )
 
     def book_for(self, entry: WatchlistEntry) -> int:
         """Die Buch-Zeile zu diesem Watchlist-Eintrag, angelegt falls noetig.
@@ -160,6 +187,15 @@ class Source(ABC):
 
     def probe(self) -> None:
         """Known-good self-check for ``ebw doctor`` (ticket 08). Raises on failure."""
+        return None
+
+    def item(self, source_item_id: str) -> Item | None:
+        """Which book this Source's own id means. ``None`` if it no longer knows.
+
+        The reverse of everything else here: not "find me this book", but "tell
+        me what you filed under this number". A Source that cannot answer that
+        says so by leaving this alone.
+        """
         return None
 
 
@@ -272,7 +308,7 @@ class ShopSource(ResolvingSource):
         def take(discovered: list[Observation], interest_id: int | None) -> None:
             for observation in discovered:
                 item_id = observation.source_item_id
-                if item_id in seen or context.is_dismissed(self.name, item_id):
+                if item_id in seen or context.is_dismissed(observation):
                     continue
                 seen.add(item_id)
                 observations.append(observation)
