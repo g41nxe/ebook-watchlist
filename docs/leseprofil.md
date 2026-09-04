@@ -186,7 +186,23 @@ das bedient — und der fehlende Stern ist begründet, nicht bloß vergeben.
 
 ---
 
-## 5. Nichts erfinden
+## 5. Notizen — Beobachtungen ohne Regelkraft
+
+Einzelne Belege, die eine Achse betreffen, aber noch keine Änderung
+rechtfertigen. Stufe-3-Änderungen brauchen **zwei unabhängige** Bücher (ADR 17);
+bis dahin steht die Beobachtung hier, damit sie nicht verlorengeht — und wirkt
+ausdrücklich **nicht** auf Bewertungen.
+
+- **Achse E bündelt womöglich zwei Dinge.** *Der Schwarm* (Frank Schätzing)
+  steht auf `disliked_books`, Grund: langsames Erzähltempo. Das Buch ist dabei
+  ausgesprochen düster. Düsternis und Tempo sind also trennbar, und das Tempo
+  scheint allein zu genügen, um ein Buch zu verlieren. Ob E deshalb in zwei
+  Achsen zerfallen sollte, entscheidet der zweite Beleg.
+  *(Eintrag 2026-09-04, ein Beleg)*
+
+---
+
+## 6. Nichts erfinden
 
 Wenn Reihe, Erzählperspektive oder Zielgruppe eines Buches unklar sind, wird
 **nachgeschlagen**, bevor bewertet wird. Unsicherheit zu etikettieren statt sie
