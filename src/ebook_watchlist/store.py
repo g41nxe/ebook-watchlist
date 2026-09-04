@@ -139,6 +139,39 @@ class BookSourceRow(Base):
     details: Mapped[str] = mapped_column(String, default="{}")
 
 
+class RatingRow(Base):
+    """Was das Werkzeug von einem Buch hält (ADR 19).
+
+    Bewusst **nicht** an der ``book``-Zeile. ADR 18 hält fest, dass ein Buch nur
+    entsteht, wo die Leserin eine Beziehung hat — 243 Funde kamen im ersten
+    echten Lauf herein, und eine Tabelle namens ``book``, die mehrheitlich aus
+    ungeprüften Dubletten besteht, verdient den Namen nicht. Ratings an die
+    Buch-Zeile zu hängen hätte genau das erzwungen: dreihundert Buch-Zeilen pro
+    Lauf, damit das Tor irgendwo hinschreiben kann.
+
+    Der Schlüssel ist deshalb der Fund selbst: die ISBN, wo es eine gibt,
+    sonst ``(Quelle, Item-Id)``. Ein Buch, das später eine Beziehung bekommt,
+    findet sein Urteil über die ISBN wieder.
+
+    Maschinensterne und die der Leserin bleiben getrennt: eine 4 von ihr ist
+    eine Tatsache, eine 4 von hier ein Vorschlag. Ihre stehen an der Beziehung.
+    """
+
+    __tablename__ = "rating"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    #: Der Schlüssel des Fundes: ``isbn:978…`` oder ``item:beam:1279702``.
+    subject: Mapped[str] = mapped_column(String, unique=True)
+    stars: Mapped[int] = mapped_column(Integer)
+    confidence: Mapped[str] = mapped_column(String)
+    reason: Mapped[str] = mapped_column(String)
+    #: Die Version des Maßstabs, gegen den geurteilt wurde. Eine neue Version
+    #: macht das Urteil ungültig — das ist die eine Änderung, bei der ein
+    #: erneuter Aufruf richtig ist.
+    rubric_version: Mapped[int] = mapped_column(Integer)
+    rated_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 class BookRelationRow(Base):
     """Was die Leserin zu einem Buch sagt (ADR 18).
 
@@ -561,6 +594,43 @@ class Store:
             row.source_item_id = source_item_id
             row.resolved_at = resolved_at
             row.details = json.dumps({"outcome": outcome, **details}, ensure_ascii=False)
+            session.commit()
+
+    # --- Bewertungen (Ticket 12) -------------------------------------------
+
+    def rating(self, subject: str, rubric_version: int) -> RatingRow | None:
+        """Das gespeicherte Urteil — aber nur, wenn es zum heutigen Maßstab passt."""
+        with self.session() as session:
+            row = session.scalars(
+                select(RatingRow).where(RatingRow.subject == subject)
+            ).first()
+            if row is None or row.rubric_version != rubric_version:
+                return None
+            session.expunge(row)
+            return row
+
+    def put_rating(
+        self,
+        subject: str,
+        *,
+        stars: int,
+        confidence: str,
+        reason: str,
+        rubric_version: int,
+        now: datetime,
+    ) -> None:
+        with self.session() as session:
+            row = session.scalars(
+                select(RatingRow).where(RatingRow.subject == subject)
+            ).first()
+            if row is None:
+                row = RatingRow(subject=subject)
+                session.add(row)
+            row.stars = stars
+            row.confidence = confidence
+            row.reason = reason
+            row.rubric_version = rubric_version
+            row.rated_at = now
             session.commit()
 
     # --- Beziehungen und Interessen (Ticket 05) ----------------------------

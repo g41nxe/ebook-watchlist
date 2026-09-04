@@ -17,7 +17,7 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 
-from . import paths
+from . import gate, paths
 from .cleaning import clean_blurb
 from .config import ConfigError, load_dismissals, load_profile, load_watchlist
 from .configuration import NotSeeded
@@ -27,6 +27,7 @@ from .diff import compute_deltas, keys_of, suppress_unseeded_interests
 from .digest import build_digest
 from .http import HttpClient, RateLimited, build_user_agent
 from .models import Observation, SourceFailure
+from .rating import DEFAULT_THRESHOLD, RatingUnavailable, build_rater, load_rubric
 from .render import render_html, render_text
 from .seed import seed
 from .sources import build_sources
@@ -191,6 +192,41 @@ def _fetch_covers(store: Store, client: HttpClient, observations: Sequence[Obser
             return
         if name:
             store.set_cover(book_id, name)
+
+
+def _apply_gate(store: Store, deltas, now: datetime):
+    """Entdeckungen gegen das Leseprofil pruefen (ADR 19).
+
+    Ohne Schluessel gibt es kein Tor — dann bleibt alles unbewertet und wird
+    gezeigt. Das ist der Zustand vor Ticket 12 und ausdruecklich erlaubt.
+    """
+    rater = build_rater()
+    if rater is None:
+        return deltas, gate.GateReport(unrated=len(deltas))
+    try:
+        _, version = load_rubric()
+    except RatingUnavailable as exc:
+        print(f"Bewertung übersprungen: {exc}", file=sys.stderr)
+        return deltas, gate.GateReport(unrated=len(deltas))
+
+    kept, report = gate.apply(
+        deltas,
+        store=store,
+        rater=rater,
+        rubric_version=version,
+        threshold=DEFAULT_THRESHOLD,
+        now=now,
+    )
+    if report.held_back:
+        # Sichtbar machen, was zurueckgehalten wurde: ein zu scharf gesetzter
+        # Schwellwert soll auffallen, nicht still wirken.
+        print(
+            f"Bewertungstor: {report.held_back} Vorschläge unter "
+            f"{DEFAULT_THRESHOLD} Sternen zurückgehalten "
+            f"({report.rated} bewertet, {report.reused} aus dem Speicher)",
+            file=sys.stderr,
+        )
+    return kept, report
 
 
 def _write_html(digest, generated_at: datetime) -> Path:
@@ -441,6 +477,11 @@ def _run(
     )
 
     store.append(run_id, profile.slug, observations, started_at)
+
+    # Das Tor sitzt hinter dem Snapshot: ein Ausfall kostet ein Urteil, nie
+    # Geschichte. Und hinter der Preisregel: ein Buch zu bewerten, das ohnehin
+    # niemand zu sehen bekommt, waere Verschwendung (ADR 19).
+    deltas, gate_report = _apply_gate(store, deltas, started_at)
     for source_name, interest_id in context.swept:
         store.mark_interest_seeded(interest_id, source_name, now=started_at)
 

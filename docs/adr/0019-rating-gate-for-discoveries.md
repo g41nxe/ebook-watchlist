@@ -83,7 +83,16 @@ nobody will be shown is waste.
 
 A discovered book is scored against `docs/leseprofil.md` on the 0-5 star scale
 that rubric defines (ADR 17). The stars, the justification and the rubric
-version live on the book row (ADR 18). Below a threshold the book never reaches
+version are kept in a table of their own.
+
+> **Nachtrag aus der Umsetzung (Ticket 12):** *Nicht* an der `book`-Zeile, wie
+> dieser Absatz zunaechst sagte. ADR 18 haelt fest, dass ein Buch nur entsteht,
+> wo die Leserin eine Beziehung hat; ein Urteil dorthin zu schreiben haette pro
+> Lauf dreihundert ungepruefte Buch-Zeilen erzwungen — genau das, was ADR 18
+> abgelehnt hat. Der Schluessel ist deshalb der Fund: die ISBN, wo es eine gibt,
+> sonst `(Quelle, Item-Id)`. Dasselbe Buch bei zwei Shops kostet damit ein
+> Urteil, nicht zwei, und ein Buch, das spaeter eine Beziehung bekommt, findet
+> sein Urteil ueber die ISBN wieder. Below a threshold the book never reaches
 the triage list.
 
 Rating is keyed to the book and its rubric version, so a Run re-rates nothing:
