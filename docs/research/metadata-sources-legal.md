@@ -26,6 +26,12 @@ the four questions came back with an answer that changes the recommendation.
 - **MARC21 series fields**: 245 `$n`/`$p`, then 490 `$v`/`$a`, 246 `$a`, 800
   `$v`/`$t`, 830 `$v`/`$a` — in that order, first complete pair wins. The order in
   the reference plugin is the reverse of what we assumed.
+- **Google Books works with a key, and still may not be our cover source.** All 30
+  keyed requests answered `200`; it finds 13 of 30 and returns a thumbnail for
+  every one of them. But its thumbnails come with `cache-control: private,
+  max-age=86400`, and Google's API terms permit cached copies only as long as the
+  cache header allows and forbid "permanent copies". A cover we keep is a permanent
+  copy. **Out for covers, and a poor trade for identity against the CC0 DNB.**
 - **No new cover source survives.** Wikidata has 273 German-language editions with
   a picture, in the whole database. Inventaire: 0 of 12. K10plus: 1 of 8, no
   covers. lobid: 2 of 6, no covers. DDB is digitised heritage, not the 2024 ebook
@@ -286,13 +292,84 @@ No public API is documented anywhere I could find, its text is editorial copyrig
 rather than open data, and its subject is literary criticism of mostly print
 editions. Not a metadata source in our sense. Out.
 
-**Google Books** — still the one genuinely unmeasured candidate, and still
-unmeasurable from here: a fresh probe on 2026-09-04 returned `HTTP 429 Too Many
-Requests` on the *first* request without a key, which confirms the earlier reading
-that the zero was a blocked measurement rather than a result. The block is on the
-unauthenticated quota, so a free API key would lift it. Whether Google's cover
-thumbnails may be cached locally is a separate question its terms would need to
-answer before we used one.
+**Google Books** — no longer unmeasured. A key was obtained and the probe run;
+the numbers are in [`metadata-sources.md`](metadata-sources.md) and the terms have
+a section of their own below, because the answer is more interesting than a bullet
+allows. Short version: it works, it is the only measured source that returns a
+picture, and its terms do not let us keep that picture.
+
+---
+
+## 5. Google Books, with a key — what its terms permit
+
+Measured 2026-09-04 with an API key read from `data/secrets.env`: 30 requests,
+one every 1.2 seconds, all `HTTP 200`. The `429` that blocked the earlier probe was
+the unauthenticated quota and nothing else. Coverage and per-field results are in
+[`metadata-sources.md`](metadata-sources.md); this section is only about permission.
+
+**Access and cost.** Proven: an API key is free, needs a Google Cloud project, and
+the anonymous path is unusable in practice — the earlier probe was refused on its
+*first* request. The key is what turns Google Books from unmeasurable into usable.
+
+**Quota.** Genuinely **open**, and I will not invent a figure. Neither
+[*Using the API*](https://developers.google.com/books/docs/v1/using) nor
+[*Getting started*](https://developers.google.com/books/docs/v1/getting_started)
+states a requests-per-day or requests-per-second limit anywhere; the only numeric
+limit either page carries is about paging — "The maximum number of results to
+return. The default is 10, and the maximum allowable value is 40." The per-project
+quota is a Cloud console figure, visible to whoever owns the project and adjustable
+on request. Widely repeated numbers of 1,000 or 10,000 requests a day circulate on
+blogs and forums; **none of them is on a Google page**, so treat them as hearsay.
+What is proven is our own measurement: 30 keyed requests at roughly one per second
+drew no throttling of any kind. A daily run over a few dozen ISBNs is very unlikely
+to be near any ceiling, but "unlikely" is the honest word.
+
+**Caching — this is the decisive clause.** The Google APIs Terms of Service forbid,
+in §5.e.1, attempting to "Scrape, build databases, or otherwise create permanent
+copies of such content", and permit cached copies only so long as you do not "keep
+cached copies longer than permitted by the cache header"
+([Google APIs Terms of Service](https://developers.google.com/terms)). §8.b closes
+the loop on termination: you must "delete any cached or stored content that was
+permitted by the cache header under Section 5."
+
+So the cache header is the licence, and it is measurable. One HEAD request on
+2026-09-04 against a thumbnail URL returned by the probe
+(`books.google.com/books/content?id=…&printsec=frontcover&img=1&zoom=1`) came back
+`HTTP/2 200`, `content-type: image/jpeg`, `content-length: 15035`, and:
+
+```
+cache-control: private, max-age=86400
+```
+
+**86,400 seconds is one day.** A cover we store and show for months is precisely the
+"permanent copy" §5.e.1 names, and it outlives its cache header by orders of
+magnitude. Under Google's own terms we would have to re-fetch every cover daily and
+hold it no longer — which is not storage, it is hotlinking with extra steps, and it
+hands Google a daily log of what the reader is looking at. That is the opposite of
+why we store covers locally. The same clause applies to the title, author and
+language fields, incidentally: they too are content under §5.e, and a metadata cache
+that persists between Runs is the database §5.e.1 says not to build.
+
+**Attribution, if we displayed it anyway.** The branding rules are not onerous but
+they are not nothing. Google's
+[branding guidelines](https://developers.google.com/books/branding) require that
+"Google attribution is required", that "the 'powered by Google' logo must appear
+adjacent to these results", that "Every book result displayed in your application
+must have a prominent link to either (1) a page on your site featuring Google
+Preview capabilities, or (2) the Google Books page for that book", and that "You
+may not alter results or content made available through the Google Books API
+Family" — so no resizing or re-cropping the thumbnail either. The Books API terms
+add that "You may not charge users any fee for the use of your application" (not our
+problem) and that content alleged to infringe third-party rights must be removed on
+request.
+
+**Verdict.** For **covers, out** — proven, on a quotable clause and a measured
+header, not on a judgement call. For **identity fields**, the same caching clause
+applies, so Google Books is only defensible as a *live lookup* whose answer is not
+retained, or not at all. Given it finds 13 of 30 where the CC0 DNB finds 21 of 30,
+paying that price for a four-book top-up is a poor trade. **The DNB's CC0 licence is
+worth more here than Google's coverage**, and that is the finding: the one source
+that had a picture for this corpus is the one source whose terms forbid keeping it.
 
 ---
 
@@ -306,8 +383,9 @@ answer before we used one.
 - **What the VLB would say** if asked what a private, non-commercial tool needs in
   order to display a cover. This is the only route to a licensed cover source, and
   it is a question for a human, not a script.
-- **Google Books with a key** — the measurement the previous document wanted, still
-  outstanding, plus its terms on caching thumbnails.
+- **Google Books' actual quota.** Not documented on any Google page; the numbers
+  repeated online are hearsay. If it ever matters, the project's own Cloud console
+  shows the figure that applies to our key.
 - **Whether the shop's own images carry any usage condition** we should read before
   storing them. We now depend on them entirely, which raises the stakes on a
   question nobody has asked yet.
