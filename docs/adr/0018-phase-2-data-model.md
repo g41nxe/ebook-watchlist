@@ -65,6 +65,16 @@ One of two. The ISBN is therefore a strong identifier where two sources happen
 to stock the same edition, not a general key across them; the matcher and its
 confidence gate carry the rest and will keep doing so.
 
+> **Nachtrag aus der Umsetzung (Ticket 04):** Beide Fälle landen korrekt auf
+> *einer* Buch-Zeile — der Matcher fängt den zweiten ab. Damit trägt
+> `book.isbn` aber die ISBN **einer** der beiden Ausgaben, nämlich der zuerst
+> beobachteten: *Der Knochenjäger* steht unter `9783837110951` (Onleihe),
+> obwohl beam ihn als `9783641157180` führt. Das ist hinnehmbar, solange die
+> ISBN als *Identität* dient und nicht als Behauptung darüber, welche Ausgabe
+> die Leserin bekommt — welche das ist, sagt `book_source`. Sobald eine
+> Metadatenquelle das Werk kennt (Ticket 13), gehört die Werkebene dorthin und
+> nicht auf die Ausgabe.
+
 > **Nachtrag:** Titel, Autor:in, Reihe und Cover auf der `book`-Zeile stammen
 > aus einer Metadatenquelle, nicht aus dem Shop, der das Buch zufällig zuerst
 > gelistet hat. Was ein Shop daraus macht — `Jo Nesbø`, `Jo Nesbo` und

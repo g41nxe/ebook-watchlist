@@ -337,6 +337,13 @@ def _run(
     failures = [*probe_failures, *failures]
     if sweep_extended and not failures:
         store.set_state(profile.slug, EXTENDED_SWEEP_KEY, started_at)
+    # Ein Watchlist-Eintrag kommt ohne ISBN aus der YAML; die Beobachtung
+    # bringt sie mit. Erst dadurch bekommt das Buch die Identitaet, an der zwei
+    # Quellen sich treffen koennen (ADR 18).
+    for observation in observations:
+        if observation.book_id and observation.isbn:
+            store.learn_isbn(observation.book_id, observation.isbn)
+
     previous = store.latest_observations(profile.slug, keys_of(observations))
     seeded = store.seeded_scopes(profile.slug)
     deltas = suppress_unseeded(compute_deltas(observations, previous, profile), seeded)

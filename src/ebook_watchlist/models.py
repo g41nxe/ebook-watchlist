@@ -23,6 +23,30 @@ class MatchReason(StrEnum):
     GENRE_CATEGORY = "genre_category"
 
 
+class LinkOutcome(StrEnum):
+    """What happened when a Source was asked where a book is (ADR 18).
+
+    The distinction the old "Braucht Aufmerksamkeit" list could not make:
+    NOT_FOUND is an answer and needs nobody, UNSURE is a question and needs a
+    human. Listing both together produced a task list with nothing to do in it.
+    """
+
+    #: Resolved on its own and trusted (ADR 8's confidence gate).
+    LINKED = "linked"
+    #: A human picked this one.
+    CONFIRMED = "confirmed"
+    #: Candidates existed, none good enough. A person has to look.
+    UNSURE = "unsure"
+    #: The catalogue does not have it. Nothing to do.
+    NOT_FOUND = "not_found"
+
+
+#: The only outcomes a stored link may carry. An unknown one is a bug in the
+#: writer, not a value to be tolerated: it would silently fall out of every
+#: query that asks "what still needs attention".
+LINK_OUTCOMES: frozenset[str] = frozenset(outcome.value for outcome in LinkOutcome)
+
+
 class DeltaKind(StrEnum):
     #: A discovered title we had never seen before. For a Watchlist Entry a
     #: first sighting is only a baseline, but for a discovery the appearing
@@ -44,6 +68,9 @@ class Observation:
     match_reason: MatchReason
     author: str | None = None
     watchlist_key: str | None = None
+    #: Das Buch, auf das sich diese Beobachtung bezieht. Gesetzt bei
+    #: Watchlist-Pruefungen, None bei Entdeckungen (ADR 18).
+    book_id: int | None = None
     price_cents: int | None = None
     original_price_cents: int | None = None
     availability: Availability | None = None

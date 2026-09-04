@@ -6,6 +6,7 @@ tables arrive in Phase 2 when the UI takes ownership of configuration (ADR 10).
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Sequence
 from datetime import datetime
 from pathlib import Path
@@ -16,15 +17,16 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
-    UniqueConstraint,
     create_engine,
     func,
     select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
+from .books import BookLike
+from .books import find as find_book
 from .migrations import migrate
-from .models import Availability, MatchReason, Observation
+from .models import LINK_OUTCOMES, Availability, MatchReason, Observation
 
 
 class Base(DeclarativeBase):
@@ -54,6 +56,9 @@ class ObservationRow(Base):
     source_item_id: Mapped[str] = mapped_column(String, index=True)
     match_reason: Mapped[str] = mapped_column(String)
     watchlist_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Gesetzt bei Watchlist-Pruefungen, NULL bei Entdeckungen. Ohne das haette
+    #: eine Verfuegbarkeitsmeldung der Bibliothek keinen Bezugspunkt (ADR 18).
+    book_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     title: Mapped[str] = mapped_column(String)
     author: Mapped[str | None] = mapped_column(String, nullable=True)
     price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -75,31 +80,58 @@ class ObservationRow(Base):
     )
 
 
-class ResolutionRow(Base):
-    """What a Source decided a Watchlist Entry refers to.
+class BookRow(Base):
+    """A book the reader has a relationship with (ADR 18).
 
-    Derived state, so it lives here rather than being written back into the
-    user's ``watchlist.yaml`` — that file stays hand-owned, comments and all.
-    Negative outcomes are cached too, so a title the library does not have is
-    not re-searched on every Run.
+    A row exists because something was said about this book — watched, owned,
+    liked, dismissed — never for a bare discovery. 243 items arrived on the
+    first real Run, most of them duplicates of each other across sources and
+    editions, and a table called ``book`` whose majority is unvetted duplicates
+    would not deserve the name.
+
+    Identity is the ISBN where there is one. It identifies an *edition*, not a
+    work, and it is not a general key across sources: of the two books this
+    watchlist has at both, one shares an ISBN and one does not. The matcher and
+    its confidence gate carry the rest (ADR 8, ADR 18).
     """
 
-    __tablename__ = "resolution"
+    __tablename__ = "book"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    profile_slug: Mapped[str] = mapped_column(String, index=True)
-    source: Mapped[str] = mapped_column(String, index=True)
-    watchlist_key: Mapped[str] = mapped_column(String, index=True)
-    url: Mapped[str | None] = mapped_column(String, nullable=True)
-    confidence: Mapped[str] = mapped_column(String)
-    reason: Mapped[str] = mapped_column(String, default="")
-    matched_title: Mapped[str | None] = mapped_column(String, nullable=True)
-    matched_author: Mapped[str | None] = mapped_column(String, nullable=True)
-    resolved_at: Mapped[datetime] = mapped_column(DateTime)
+    #: NULL for bundles, collections and single episodes, which carry no ISBN.
+    isbn: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    title: Mapped[str] = mapped_column(String)
+    author: Mapped[str | None] = mapped_column(String, nullable=True)
+    series: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
 
-    __table_args__ = (
-        UniqueConstraint("profile_slug", "source", "watchlist_key", name="uq_resolution_entry"),
-    )
+    __table_args__ = (Index("ix_book_title", "title"),)
+
+
+class BookSourceRow(Base):
+    """Where one Source keeps this book — including the answer "nowhere".
+
+    One row per Source: the Onleihe's title id and beam's product id are
+    different values for the same book, so they are different rows rather than
+    competing keys in one bag.
+
+    A row with no ``url`` is not a contradiction but an answer — "searched
+    here, not stocked". Eight of the reader's ten watchlist titles are in that
+    state at the Onleihe, and this row is what stops them being searched for
+    again every day.
+    """
+
+    __tablename__ = "book_source"
+
+    book_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String, primary_key=True)
+    source_item_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
+    resolved_at: Mapped[datetime] = mapped_column(DateTime)
+    #: outcome, reason, and the title and author *as that Source rendered
+    #: them* - the last two exist so a wrong automatic resolution stays visible
+    #: (ADR 9). JSON rather than columns: nothing filters or sorts on them.
+    details: Mapped[str] = mapped_column(String, default="{}")
 
 
 class SeededScopeRow(Base):
@@ -171,6 +203,7 @@ def _to_observation(row: ObservationRow) -> Observation:
         series=row.series,
         author=row.author,
         watchlist_key=row.watchlist_key,
+        book_id=row.book_id,
         price_cents=row.price_cents,
         original_price_cents=row.original_price_cents,
         availability=Availability(row.availability) if row.availability else None,
@@ -292,53 +325,6 @@ class Store:
                     found[key] = _to_observation(row)
         return found
 
-    def get_resolution(
-        self, profile_slug: str, source: str, watchlist_key: str
-    ) -> ResolutionRow | None:
-        with self.session() as session:
-            stmt = select(ResolutionRow).where(
-                ResolutionRow.profile_slug == profile_slug,
-                ResolutionRow.source == source,
-                ResolutionRow.watchlist_key == watchlist_key,
-            )
-            row = session.scalars(stmt).first()
-            if row is not None:
-                session.expunge(row)
-            return row
-
-    def put_resolution(
-        self,
-        profile_slug: str,
-        source: str,
-        watchlist_key: str,
-        *,
-        url: str | None,
-        confidence: str,
-        reason: str,
-        matched_title: str | None,
-        matched_author: str | None,
-        resolved_at: datetime,
-    ) -> None:
-        with self.session() as session:
-            stmt = select(ResolutionRow).where(
-                ResolutionRow.profile_slug == profile_slug,
-                ResolutionRow.source == source,
-                ResolutionRow.watchlist_key == watchlist_key,
-            )
-            row = session.scalars(stmt).first()
-            if row is None:
-                row = ResolutionRow(
-                    profile_slug=profile_slug, source=source, watchlist_key=watchlist_key
-                )
-                session.add(row)
-            row.url = url
-            row.confidence = confidence
-            row.reason = reason
-            row.matched_title = matched_title
-            row.matched_author = matched_author
-            row.resolved_at = resolved_at
-            session.commit()
-
     def get_state(self, profile_slug: str, key: str) -> datetime | None:
         with self.session() as session:
             row = session.get(StateRow, (profile_slug, key))
@@ -351,6 +337,164 @@ class Store:
                 row = StateRow(profile_slug=profile_slug, key=key)
                 session.add(row)
             row.value = value
+            session.commit()
+
+    # --- Bücher (Ticket 04) ------------------------------------------------
+
+    def _book_index(self, session: Session) -> list[BookLike]:
+        rows = session.execute(
+            select(BookRow.id, BookRow.isbn, BookRow.title, BookRow.author)
+        )
+        return [BookLike(id=r[0], isbn=r[1], title=r[2], author=r[3]) for r in rows]
+
+    def find_book(
+        self, *, isbn: str | None, title: str, author: str | None = None
+    ) -> BookRow | None:
+        """Das Buch zu diesem Fund, falls es schon eines gibt."""
+        with self.session() as session:
+            found = find_book(self._book_index(session), isbn=isbn, title=title, author=author)
+            if found is None:
+                return None
+            row = session.get(BookRow, found.book_id)
+            if row is not None:
+                session.expunge(row)
+            return row
+
+    def find_or_create_book(
+        self,
+        *,
+        isbn: str | None,
+        title: str,
+        author: str | None = None,
+        series: str | None = None,
+        now: datetime,
+    ) -> BookRow:
+        """Ein Buch anlegen — aber erst nachsehen, ob es schon da ist.
+
+        Jede Anlage sucht zuerst, weil sonst derselbe Titel unter zwei Quellen
+        zweimal in der Tabelle stünde und die Beziehungen der Leserin sich auf
+        zwei Zeilen verteilen würden.
+        """
+        with self.session() as session:
+            found = find_book(self._book_index(session), isbn=isbn, title=title, author=author)
+            if found is not None:
+                row = session.get(BookRow, found.book_id)
+                if row is not None:
+                    # Was wir noch nicht wussten, tragen wir nach; was schon
+                    # dasteht, wird nicht überschrieben - eine spätere Quelle
+                    # ist nicht automatisch die bessere.
+                    if row.isbn is None and isbn:
+                        row.isbn = isbn
+                    if row.series is None and series:
+                        row.series = series
+                    session.commit()
+                    session.refresh(row)
+                    session.expunge(row)
+                    return row
+
+            row = BookRow(
+                isbn=isbn or None,
+                title=title,
+                author=author,
+                series=series,
+                created_at=now,
+            )
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            session.expunge(row)
+            return row
+
+    def learn_isbn(self, book_id: int, isbn: str) -> bool:
+        """Die ISBN nachtragen, die ein Watchlist-Eintrag selbst nicht mitbrachte.
+
+        Ein Eintrag entsteht aus Titel und Autor:in; die ISBN erfaehrt erst die
+        Beobachtung. Eine vorhandene wird nicht ueberschrieben - eine zweite
+        ISBN bedeutet eine andere Ausgabe, und die stillschweigend zu
+        uebernehmen wuerde die Identitaet des Buchs verschieben (ADR 18).
+
+        Gibt zurueck, ob wirklich etwas gelernt wurde.
+        """
+        with self.session() as session:
+            row = session.get(BookRow, book_id)
+            if row is None or row.isbn or not isbn:
+                return False
+            # Eine andere Buch-Zeile kann dieselbe ISBN schon tragen: dann sind
+            # es zwei Zeilen fuer ein Buch, und das Zusammenfuehren ist eine
+            # eigene Entscheidung, keine Nebenwirkung eines Laufs.
+            taken = session.scalars(
+                select(BookRow.id).where(BookRow.isbn == isbn, BookRow.id != book_id)
+            ).first()
+            if taken is not None:
+                return False
+            row.isbn = isbn
+            session.commit()
+            return True
+
+    def book(self, book_id: int) -> BookRow | None:
+        with self.session() as session:
+            row = session.get(BookRow, book_id)
+            if row is not None:
+                session.expunge(row)
+            return row
+
+    def books(self) -> list[BookRow]:
+        with self.session() as session:
+            rows = list(session.scalars(select(BookRow).order_by(BookRow.title)))
+            for row in rows:
+                session.expunge(row)
+            return rows
+
+    def get_book_source(self, book_id: int, source: str) -> BookSourceRow | None:
+        with self.session() as session:
+            row = session.get(BookSourceRow, (book_id, source))
+            if row is not None:
+                session.expunge(row)
+            return row
+
+    def book_sources(self, book_id: int) -> list[BookSourceRow]:
+        with self.session() as session:
+            rows = list(
+                session.scalars(
+                    select(BookSourceRow)
+                    .where(BookSourceRow.book_id == book_id)
+                    .order_by(BookSourceRow.source)
+                )
+            )
+            for row in rows:
+                session.expunge(row)
+            return rows
+
+    def put_book_source(
+        self,
+        book_id: int,
+        source: str,
+        *,
+        outcome: str,
+        url: str | None = None,
+        source_item_id: str | None = None,
+        resolved_at: datetime,
+        **details: object,
+    ) -> None:
+        """Wo eine Quelle dieses Buch führt — oder dass sie es nicht führt.
+
+        ``outcome`` wird gegen die bekannten Werte geprüft und nicht geduldet,
+        wenn er unbekannt ist: ein Tippfehler fiele sonst still aus jeder
+        Abfrage heraus, die fragt, was noch Aufmerksamkeit braucht.
+        """
+        if outcome not in LINK_OUTCOMES:
+            raise ValueError(
+                f"unknown link outcome {outcome!r} (known: {', '.join(sorted(LINK_OUTCOMES))})"
+            )
+        with self.session() as session:
+            row = session.get(BookSourceRow, (book_id, source))
+            if row is None:
+                row = BookSourceRow(book_id=book_id, source=source)
+                session.add(row)
+            row.url = url
+            row.source_item_id = source_item_id
+            row.resolved_at = resolved_at
+            row.details = json.dumps({"outcome": outcome, **details}, ensure_ascii=False)
             session.commit()
 
     # --- Quellen-Zustand (Ticket 03) ---------------------------------------
@@ -470,6 +614,7 @@ class Store:
                     source_item_id=obs.source_item_id,
                     match_reason=str(obs.match_reason),
                     watchlist_key=obs.watchlist_key,
+                    book_id=obs.book_id,
                     title=obs.title,
                     author=obs.author,
                     price_cents=obs.price_cents,

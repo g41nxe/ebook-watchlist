@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 from ..config import Profile, WatchlistEntry
 from ..matching import Confidence, Resolution
-from ..models import Attention, Observation
+from ..models import Attention, LinkOutcome, Observation
 from ..store import Store
 
 #: How long a failed resolution is trusted before the Source tries again. Long
@@ -45,9 +45,29 @@ class RunContext:
     dismissed: Mapping[str, frozenset[str]] = field(default_factory=dict)
     #: Whether this Run also walks the weekly long tail of Reference Authors.
     sweep_extended: bool = False
+    #: Watchlist-Key -> Buch-Id, damit ein Eintrag nicht pro Quelle neu
+    #: gesucht wird.
+    _books: dict[str, int] = field(default_factory=dict)
 
     def is_dismissed(self, source: str, source_item_id: str) -> bool:
         return source_item_id in self.dismissed.get(source, frozenset())
+
+    def book_for(self, entry: WatchlistEntry) -> int:
+        """Die Buch-Zeile zu diesem Watchlist-Eintrag, angelegt falls noetig.
+
+        Der Eintrag kommt in diesem Schnitt noch aus der YAML und traegt keine
+        ISBN; die Identitaet entsteht also ueber Titel und Autor:in und wird
+        spaeter durch die ISBN geschaerft, sobald eine Beobachtung eine
+        mitbringt (ADR 18).
+        """
+        cached = self._books.get(entry.key)
+        if cached is not None:
+            return cached
+        row = self.store.find_or_create_book(
+            isbn=None, title=entry.title, author=entry.author, now=self.now
+        )
+        self._books[entry.key] = row.id
+        return row.id
 
     def remembered_link(self, source: str, entry: WatchlistEntry) -> tuple[str | None, bool]:
         """``(url, still_valid)`` for a previous resolution of this entry.
@@ -55,7 +75,7 @@ class RunContext:
         ``still_valid`` is False when there is nothing remembered, or when a
         failed attempt has aged out and deserves another try.
         """
-        row = self.store.get_resolution(self.profile_slug, source, entry.key)
+        row = self.store.get_book_source(self.book_for(entry), source)
         if row is None:
             return None, False
         if row.url:
@@ -65,49 +85,36 @@ class RunContext:
     def remember(self, source: str, entry: WatchlistEntry, resolution: Resolution) -> None:
         best = resolution.best
         accepted = resolution.accepted
-        self._store_resolution(
+        if accepted is not None:
+            outcome = LinkOutcome.LINKED
+        elif resolution.confidence is Confidence.PROVISIONAL:
+            outcome = LinkOutcome.UNSURE
+        else:
+            # Kandidaten gab es, aber keiner war es. Das ist eine Antwort, keine
+            # Frage — und es gehoert nicht auf eine Liste, die um Mithilfe bittet.
+            outcome = LinkOutcome.NOT_FOUND
+        self.store.put_book_source(
+            self.book_for(entry),
             source,
-            entry,
+            outcome=str(outcome),
             url=str(accepted.payload) if accepted else None,
-            confidence=str(resolution.confidence),
+            resolved_at=self.now,
             reason=resolution.reason,
+            # Titel und Autor:in *so, wie diese Quelle sie schreibt* — daran
+            # bleibt eine falsche automatische Zuordnung sichtbar (ADR 9).
             matched_title=best.candidate.title if best else None,
             matched_author=best.candidate.author if best else None,
         )
 
     def remember_absence(self, source: str, entry: WatchlistEntry, reason: str) -> None:
         """The catalogue simply does not have it — worth not asking again soon."""
-        self._store_resolution(
+        self.store.put_book_source(
+            self.book_for(entry),
             source,
-            entry,
+            outcome=str(LinkOutcome.NOT_FOUND),
             url=None,
-            confidence=str(Confidence.NO_MATCH),
-            reason=reason,
-            matched_title=None,
-            matched_author=None,
-        )
-
-    def _store_resolution(
-        self,
-        source: str,
-        entry: WatchlistEntry,
-        *,
-        url: str | None,
-        confidence: str,
-        reason: str,
-        matched_title: str | None,
-        matched_author: str | None,
-    ) -> None:
-        self.store.put_resolution(
-            self.profile_slug,
-            source,
-            entry.key,
-            url=url,
-            confidence=confidence,
-            reason=reason,
-            matched_title=matched_title,
-            matched_author=matched_author,
             resolved_at=self.now,
+            reason=reason,
         )
 
     def needs_attention(
@@ -179,7 +186,11 @@ class ResolvingSource(Source):
         context.remember(self.name, entry, resolution)
         accepted = resolution.accepted
         if accepted is None:
-            context.needs_attention(self.name, entry, resolution)
+            # Nur ein *plausibler* Treffer ist eine Frage an einen Menschen.
+            # "Nichts passt" auf dieselbe Liste zu setzen hat sie mit Zeilen
+            # gefuellt, bei denen es nichts zu entscheiden gab (Ticket 04).
+            if resolution.confidence is Confidence.PROVISIONAL:
+                context.needs_attention(self.name, entry, resolution)
             return None
 
         return dataclasses.replace(
@@ -205,7 +216,9 @@ class LibrarySource(ResolvingSource):
                 continue
             observation = self.check(linked)
             if observation is not None:
-                observations.append(observation)
+                observations.append(
+                    dataclasses.replace(observation, book_id=context.book_for(entry))
+                )
         return observations
 
 
@@ -235,7 +248,9 @@ class ShopSource(ResolvingSource):
                 continue
             observation = self.check(linked)
             if observation is not None:
-                observations.append(observation)
+                observations.append(
+                    dataclasses.replace(observation, book_id=context.book_for(entry))
+                )
 
         # Discoveries must not collide with what the Watchlist already covers:
         # two Observations of one item in a single Run would leave the diff with

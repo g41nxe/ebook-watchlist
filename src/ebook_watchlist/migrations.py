@@ -87,10 +87,39 @@ def _add_isbn_column(connection: Connection) -> None:
     add_column(connection, "observation", "isbn", "TEXT")
 
 
+def _add_book_id_column(connection: Connection) -> None:
+    """Der Bezugspunkt, der ``watchlist_key`` abloest (ADR 18).
+
+    Bestehende Zeilen bleiben NULL. Ein Backfill waere Ratearbeit: der alte
+    Schluessel ist ``titel|autor`` in Kleinschreibung und traegt keine ISBN,
+    also liesse er sich nur ueber denselben Matcher auf ein Buch abbilden, den
+    wir gerade erst einfuehren. Die Historie verliert dadurch nichts - sie
+    behaelt ihren ``watchlist_key``.
+    """
+    add_column(connection, "observation", "book_id", "INTEGER")
+
+
+def _drop_resolution_table(connection: Connection) -> None:
+    """``resolution`` geht in ``book_source`` auf (ADR 18, Ticket 04).
+
+    Die Zeilen werden bewusst *nicht* uebernommen. Ihr Schluessel ist
+    ``titel|autor`` in Kleinschreibung, und daraus ein Buch zu bauen haette
+    Buecher mit kleingeschriebenen Titeln erzeugt, die der Leserin dauerhaft so
+    angezeigt wuerden. Die Tabelle ist ein Cache: was hier verlorengeht, ist
+    ein Suchlauf je Eintrag und Quelle - bei 24 Zeilen und der Hoeflichkeitspause
+    gut eine Minute, einmalig. Ein dauerhaft haesslicher Titel waere teurer.
+
+    Beobachtungen sind davon nicht beruehrt; die Historie bleibt vollstaendig.
+    """
+    connection.exec_driver_sql("DROP TABLE IF EXISTS resolution")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
     _add_isbn_column,
+    _add_book_id_column,
+    _drop_resolution_table,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)
