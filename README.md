@@ -78,7 +78,10 @@ mkdir -p data && cp examples/*.yaml data/
 
 - `data/profile.yaml` — Referenzautor:innen, Genre-Kategorien, Deal-Schwellen
 - `data/watchlist.yaml` — die beobachteten Titel
-- `data/dismissed.yaml` — dauerhaft ausgeblendete Vorschläge (ab Ticket 07)
+- `data/dismissed.yaml` — Altbestand: dauerhaft ausgeblendete Vorschläge als
+  Produktnummer je Shop. Der Lauf liest die Datei nicht mehr; ausgeblendet wird
+  über die Beziehung `dismissed` am Buch, und die gilt an jeder Quelle
+  (ADR 18). `ebw dismissals` löst übrig gebliebene Nummern einmalig auf.
 
 Daneben legt der Run dort `snapshots.db` und `digests/` an. Der Datenpfad lässt
 sich über `EBW_DATA_DIR` umbiegen.

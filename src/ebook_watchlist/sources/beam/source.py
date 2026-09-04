@@ -13,7 +13,7 @@ from ...config import WatchlistEntry
 from ...http import HttpClient, NotFound
 from ...matching import Candidate, Query, Resolution, author_matches, match
 from ...models import MatchReason, Observation
-from ..base import ShopSource, SourceStructureError
+from ..base import Item, ShopSource, SourceStructureError
 from . import parse
 from . import selectors as sel
 
@@ -230,6 +230,32 @@ class BeamSource(ShopSource):
             # the Deal tier can only ever fire on an observed drop (ADR 5).
             original_price_cents=None,
             url=url,
+        )
+
+    def item(self, source_item_id: str) -> Item | None:
+        """The product page behind a bare product number (Ticket 17).
+
+        One request, no search: the number is exact, so there is nothing to
+        match and nothing to be unsure about. A number the shop has delisted
+        answers 404, and that is an answer worth reporting rather than a
+        failure.
+        """
+        url = urljoin(self.base, sel.DETAIL_PATH.format(product_id=source_item_id))
+        try:
+            detail = parse.parse_detail(self.client.get(url))
+        except NotFound:
+            return None
+        if not detail.title:
+            return None
+        return Item(
+            source_item_id=source_item_id,
+            title=detail.title,
+            author=detail.author,
+            isbn=detail.isbn,
+            # Die sprechende Adresse, die die Seite selbst nennt — die
+            # Nummernadresse ist nur der Weg dorthin und gehoert nicht in die
+            # Datenbank, wo sie spaeter jemand als Link zu lesen bekommt.
+            url=detail.url or url,
         )
 
     def probe(self) -> None:

@@ -15,7 +15,7 @@ import yaml
 
 from ..config import Profile, WatchlistEntry
 from ..models import Availability, MatchReason, Observation
-from .base import RunContext, Source, SourceStructureError
+from .base import Item, RunContext, Source, SourceStructureError
 
 
 class FakeSource(Source):
@@ -77,6 +77,25 @@ class FakeSource(Source):
                 )
             )
         return observations
+
+    def item(self, source_item_id: str) -> Item | None:
+        """Which book one of the fixture's ids means (Ticket 17).
+
+        Here too the point is that the whole path can be walked without a
+        website — resolving an old dismissal is otherwise the one step that
+        could only ever be tried against the live shop.
+        """
+        for row in self._rows():
+            if not isinstance(row, dict) or str(row.get("id")) != source_item_id:
+                continue
+            return Item(
+                source_item_id=source_item_id,
+                title=str(row.get("title", "")),
+                author=row.get("author"),
+                isbn=row.get("isbn"),
+                url=row.get("url"),
+            )
+        return None
 
     def probe(self) -> None:
         self._rows()

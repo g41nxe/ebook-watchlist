@@ -25,6 +25,8 @@ from .configuration import load as load_configuration
 from .covers import CoverStore
 from .diff import compute_deltas, keys_of, suppress_unseeded_interests
 from .digest import GateNote, build_digest
+from .dismissals import dismissed_books
+from .dismissals import resolve as resolve_dismissals
 from .http import HttpClient, RateLimited, build_user_agent
 from .models import Observation, SourceFailure
 from .rating import DEFAULT_THRESHOLD, RatingUnavailable, build_rater, load_rubric
@@ -67,11 +69,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "command",
         nargs="?",
         default="run",
-        choices=["run", "doctor", "sources", "seed"],
+        choices=["run", "doctor", "sources", "seed", "dismissals"],
         help=(
             "'run' checks everything; 'doctor' only asks each Source whether it still "
             "parses; 'sources' lists them and can pause one; 'seed' imports the YAML "
-            "files into the database once"
+            "files into the database once; 'dismissals' resolves the leftover product "
+            "numbers from dismissed.yaml into Book Relations"
         ),
     )
     parser.add_argument("--enable", metavar="QUELLE", help="eine pausierte Quelle wieder aufnehmen")
@@ -250,7 +253,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         profile = load_profile()
-        dismissed = load_dismissals()
         # Die Watchlist-Datei ist Saatgut (ADR 10) und wird nur noch fuer den
         # Import gebraucht. Sie weiterhin bei jedem Lauf zu verlangen hiesse,
         # dass "nur noch Saatgut" nicht stimmt: wer sie nach dem Import
@@ -276,13 +278,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "sources":
             return _sources(sources, enable=args.enable, disable=args.disable)
         if args.command == "seed":
-            return _seed(profile, watchlist, dismissed)
+            return _seed(profile, watchlist)
+        if args.command == "dismissals":
+            return _dismissals(profile, sources)
         try:
             return _run(
                 profile,
                 watchlist,
                 sources,
-                dismissed,
                 client=client,
                 trigger=args.trigger,
                 skip_probes=args.skip_probes,
@@ -296,14 +299,46 @@ def main(argv: Sequence[str] | None = None) -> int:
         lock.release()
 
 
-def _seed(profile, watchlist, dismissed) -> int:
+def _dismissals(profile, sources) -> int:
+    """Die übrig gebliebenen Produktnummern zu Beziehungen machen (Ticket 17).
+
+    Bewusst ein eigener Unterbefehl und kein Lauf: eine Handvoll Nummern einmal
+    aufzulösen rechtfertigt kein Fegen aller Regale, und ein Lauf würde die
+    Arbeit bei jedem Aufruf wiederholen.
+    """
+    store = Store(paths.db_path())
+    report = resolve_dismissals(
+        store,
+        sources,
+        load_dismissals(),
+        profile_slug=profile.slug,
+        now=datetime.now(),
+    )
+
+    for row in report.resolved:
+        mark = "schon aufgelöst" if row.already_known else "aufgelöst      "
+        author = f" — {row.author}" if row.author else ""
+        print(f"  {mark}  {row.source}:{row.source_item_id}  {row.title}{author}")
+    print(f"\n  {report.requests} Anfrage(n) gestellt, {len(report.resolved)} Nummer(n) zugeordnet")
+
+    if report.needs_attention:
+        print(f"\n  {len(report.unresolved)} Nummer(n) ließen sich nicht auflösen:")
+        for line in report.unresolved:
+            print(f"    - {line}")
+        # Ein Rückgabewert ungleich null, damit ein Cron-Job nicht "fertig"
+        # meldet, während eine Ablehnung unter den Tisch gefallen ist.
+        return EXIT_SOURCE_FAILURE
+    return EXIT_OK
+
+
+def _seed(profile, watchlist) -> int:
     """Die YAML-Dateien in die Datenbank überführen (Ticket 05).
 
     Wiederholbar: ein zweiter Aufruf legt nichts doppelt an und setzt nichts
     zurück, was inzwischen woanders geändert wurde.
     """
     store = Store(paths.db_path())
-    report = seed(store, profile, watchlist, dismissed)
+    report = seed(store, profile, watchlist)
 
     print(f"  {report.books:>4}  Bücher neu angelegt")
     print(f"  {report.relations:>4}  Beziehungen")
@@ -413,7 +448,6 @@ def _run(
     profile,
     watchlist,
     sources,
-    dismissed,
     *,
     client: HttpClient,
     trigger: str,
@@ -444,7 +478,9 @@ def _run(
         profile_slug=profile.slug,
         store=store,
         now=started_at,
-        dismissed=dismissed,
+        # Aus den Beziehungen, nicht aus der YAML: eine Ablehnung gilt dem Buch
+        # und damit jeder Quelle, nicht der Nummer eines Shops (Ticket 17).
+        dismissed=dismissed_books(store, profile.slug),
         sweep_extended=sweep_extended,
         interests={
             (row.key, row.value): row.id
