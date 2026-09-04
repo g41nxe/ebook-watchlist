@@ -66,11 +66,57 @@ def _store_for(path: Path) -> Store:
     return Store(path)
 
 
+@dataclass(frozen=True, slots=True)
+class SourceHealth:
+    """One Source as the Dashboard shows it (Ticket 03)."""
+
+    name: str
+    enabled: bool
+    ok: bool | None
+    last_probe_at: datetime | None
+    error: str | None
+    consecutive_failures: int
+
+    @property
+    def state(self) -> str:
+        if not self.enabled:
+            return "pausiert"
+        if self.ok is None:
+            return "ungeprüft"
+        return "ok" if self.ok else "Fehler"
+
+    @property
+    def note(self) -> str | None:
+        """A Source failing for days is a different problem from one that just
+        broke: the first needs a human, the second may be a redesign in flight."""
+        if self.consecutive_failures > 1:
+            return f"seit {self.consecutive_failures} Prüfungen"
+        return None
+
+    @property
+    def seen(self) -> str:
+        return f"{self.last_probe_at:%d.%m. %H:%M}" if self.last_probe_at else "nie"
+
+
+def source_health(store: Store) -> list[SourceHealth]:
+    return [
+        SourceHealth(
+            name=row.name,
+            enabled=row.enabled,
+            ok=row.last_probe_ok,
+            last_probe_at=row.last_probe_at,
+            error=row.last_error,
+            consecutive_failures=row.consecutive_failures or 0,
+        )
+        for row in store.sources()
+    ]
+
+
 def source_trouble(runs: list[RunRow]) -> list[str]:
     """What the most recent Run complained about.
 
-    A placeholder until Sources record their own health (ticket 03) — until
-    then the Run journal is the only place failures are written down.
+    Kept alongside the per-Source health: a Source can parse fine and still
+    fail mid-collect, and that failure is recorded only on the Run.
     """
     for run in runs:
         if run.finished_at is None:
@@ -107,6 +153,7 @@ def create_app() -> FastAPI:
                 "profile": profile,
                 "runs": runs,
                 "digests": digest_files(),
+                "sources": source_health(store),
                 "trouble": source_trouble(runs),
             },
         )

@@ -63,7 +63,68 @@ def test_doctor_exits_non_zero_and_names_the_broken_source(
 def test_doctor_writes_no_digest_and_records_no_run(two_sources: Path) -> None:
     main(["doctor"])
     assert not (two_sources / "digests").exists()
-    assert not (two_sources / "snapshots.db").exists()
+
+    # Die Datenbank entsteht jetzt doch - aber nur fuer den Befund je Quelle
+    # (Ticket 03). Ein Lauf ist das nicht.
+    store = Store(two_sources / "snapshots.db")
+    assert store.recent_runs("test") == []
+    assert {row.name for row in store.sources()}
+
+
+def test_doctor_records_what_it_found(two_sources: Path) -> None:
+    """Der Befund wurde bisher gedruckt und weggeworfen."""
+    main(["doctor"])
+    store = Store(two_sources / "snapshots.db")
+    by_name = {row.name: row for row in store.sources()}
+
+    broken = by_name["kaputt"]
+    assert broken.last_probe_ok is False
+    assert broken.consecutive_failures == 1
+    assert broken.last_error and "Selbsttest" in broken.last_error
+    assert broken.last_probe_at is not None
+
+    healthy = by_name["gut"]
+    assert healthy.last_probe_ok is True
+    assert healthy.last_error is None
+    assert healthy.consecutive_failures == 0
+
+
+def test_a_source_broken_for_days_is_distinguishable_from_one_that_just_broke(
+    two_sources: Path,
+) -> None:
+    for _ in range(3):
+        main(["doctor"])
+    store = Store(two_sources / "snapshots.db")
+    by_name = {row.name: row for row in store.sources()}
+
+    assert by_name["kaputt"].consecutive_failures == 3
+    assert by_name["gut"].consecutive_failures == 0
+
+
+def test_one_success_clears_the_streak(two_sources: Path) -> None:
+    store = Store(two_sources / "snapshots.db")
+    now = datetime.now()
+    store.record_probe("kaputt", ok=False, error="kaputt", now=now)
+    store.record_probe("kaputt", ok=False, error="kaputt", now=now)
+    assert store.source("kaputt").consecutive_failures == 2
+
+    store.record_probe("kaputt", ok=True, error=None, now=now)
+    row = store.source("kaputt")
+    assert row.consecutive_failures == 0
+    assert row.last_error is None
+
+
+def test_a_paused_source_is_skipped_and_said_so(
+    two_sources: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Stillschweigend uebergehen saehe aus wie ein ruhiger Tag beim Shop."""
+    store = Store(two_sources / "snapshots.db")
+    store.set_enabled("kaputt", False, now=datetime.now())
+
+    assert main(["doctor"]) == EXIT_OK  # die kaputte Quelle wird nicht geprueft
+    out = capsys.readouterr().out
+    assert "pausiert" in out
+    assert store.source("kaputt").last_probe_ok is None
 
 
 # --- probes guarding a Run ------------------------------------------------

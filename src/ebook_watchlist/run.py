@@ -68,9 +68,14 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "command",
         nargs="?",
         default="run",
-        choices=["run", "doctor"],
-        help="'run' checks everything; 'doctor' only asks each Source whether it still parses",
+        choices=["run", "doctor", "sources"],
+        help=(
+            "'run' checks everything; 'doctor' only asks each Source whether it still "
+            "parses; 'sources' lists them and can pause one"
+        ),
     )
+    parser.add_argument("--enable", metavar="QUELLE", help="eine pausierte Quelle wieder aufnehmen")
+    parser.add_argument("--disable", metavar="QUELLE", help="eine Quelle pausieren")
     parser.add_argument(
         "--skip-probes",
         action="store_true",
@@ -91,27 +96,48 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _probe(sources) -> tuple[list, list[SourceFailure]]:
+def _probe(
+    sources, store: Store | None = None, now: datetime | None = None
+) -> tuple[list, list[SourceFailure]]:
     """Ask every Source whether its parsers still recognise a known-good page.
 
     A Source that fails here is sat out for the Run: half-reading a redesigned
     site would write nonsense into the Snapshot and quietly poison every future
     diff (ADR 7).
+
+    The outcome is recorded rather than printed and forgotten (Ticket 03), so
+    the Dashboard can tell a Source that just broke from one that has been
+    broken for a week.
     """
     healthy, failures = [], []
+    at = now or datetime.now()
     for source in sources:
+        message = None
         try:
             source.probe()
         except Exception as exc:  # noqa: BLE001 - deliberate: isolate one Source
-            failures.append(
-                SourceFailure(
-                    source=source.name,
-                    message=f"Selbsttest fehlgeschlagen — {type(exc).__name__}: {exc}",
-                )
-            )
+            message = f"Selbsttest fehlgeschlagen — {type(exc).__name__}: {exc}"
+            failures.append(SourceFailure(source=source.name, message=message))
         else:
             healthy.append(source)
+        if store is not None:
+            store.record_probe(source.name, ok=message is None, error=message, now=at)
     return healthy, failures
+
+
+def _partition_enabled(sources, store: Store) -> tuple[list, list[str]]:
+    """Sources the reader has paused are sat out — and named for it.
+
+    Silently skipping one would look exactly like a quiet day at that shop,
+    which is the failure mode this tool exists to avoid (ADR 15).
+    """
+    active, paused = [], []
+    for source in sources:
+        if store.is_enabled(source.name):
+            active.append(source)
+        else:
+            paused.append(source.name)
+    return active, paused
 
 
 def _collect(
@@ -178,6 +204,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "doctor":
             return _doctor(sources)
+        if args.command == "sources":
+            return _sources(sources, enable=args.enable, disable=args.disable)
         return _run(
             profile,
             watchlist,
@@ -190,12 +218,76 @@ def main(argv: Sequence[str] | None = None) -> int:
         lock.release()
 
 
+def _sources(sources, *, enable: str | None, disable: str | None) -> int:
+    """List the Sources with their health, and pause or resume one.
+
+    The switch exists so a Source that has broken can be stopped without
+    editing a file and without commenting out configuration — which is how a
+    pause becomes permanent by forgetting.
+    """
+    store = Store(paths.db_path())
+    known = {source.name for source in sources}
+    now = datetime.now()
+
+    for name, wanted in ((enable, True), (disable, False)):
+        if name is None:
+            continue
+        if name not in known:
+            print(
+                f"unbekannte Quelle {name!r} (bekannt: {', '.join(sorted(known))})",
+                file=sys.stderr,
+            )
+            return EXIT_CONFIG_ERROR
+        store.set_enabled(name, wanted, now=now)
+        print(f"{name}: {'aufgenommen' if wanted else 'pausiert'}")
+
+    for source in sources:
+        row = store.source(source.name)
+        if row is None:
+            print(f"  ?         {source.name}  (noch nie gelaufen)")
+            continue
+        if not row.enabled:
+            state = "pausiert"
+        elif row.last_probe_ok is None:
+            state = "?       "
+        else:
+            state = "ok      " if row.last_probe_ok else "FEHLER  "
+        seen = f"{row.last_probe_at:%d.%m. %H:%M}" if row.last_probe_at else "nie"
+        streak = (
+            f"  seit {row.consecutive_failures} Prüfungen"
+            if row.consecutive_failures > 1
+            else ""
+        )
+        print(f"  {state}  {source.name}  zuletzt {seen}{streak}")
+        if row.last_error:
+            print(f"            {row.last_error}")
+    return EXIT_OK
+
+
 def _doctor(sources) -> int:
-    """Say, per Source, whether its parsers still recognise a known-good page."""
-    _, failures = _probe(sources)
+    """Say, per Source, whether its parsers still recognise a known-good page.
+
+    The verdict is written down as well as printed (Ticket 03): a doctor run is
+    the same evidence as a Run's probe, and throwing it away is why the
+    Dashboard had to infer health from Run failures.
+    """
+    store = Store(paths.db_path())
+    active, paused = _partition_enabled(sources, store)
+    _, failures = _probe(active, store, datetime.now())
+
     broken = {failure.source for failure in failures}
     for source in sources:
-        print(f"  {'FEHLER' if source.name in broken else 'ok    '}  {source.name}")
+        if source.name in paused:
+            state = "pausiert"
+        elif source.name in broken:
+            state = "FEHLER  "
+        else:
+            state = "ok      "
+        row = store.source(source.name)
+        streak = ""
+        if row is not None and row.consecutive_failures > 1:
+            streak = f"  (seit {row.consecutive_failures} Prüfungen)"
+        print(f"  {state}  {source.name}{streak}")
     for failure in failures:
         print(f"\n{failure.source}: {failure.message}", file=sys.stderr)
     return EXIT_SOURCE_FAILURE if failures else EXIT_OK
@@ -225,9 +317,13 @@ def _run(
     started_at = datetime.now()
     run_id = store.start_run(profile.slug, trigger, started_at)
 
+    sources, paused = _partition_enabled(sources, store)
+    for name in paused:
+        print(f"{name}: pausiert — übersprungen", file=sys.stderr)
+
     probe_failures: list[SourceFailure] = []
     if not skip_probes:
-        sources, probe_failures = _probe(sources)
+        sources, probe_failures = _probe(sources, store, started_at)
 
     sweep_extended = _should_sweep_extended(profile, store, started_at)
     context = RunContext(

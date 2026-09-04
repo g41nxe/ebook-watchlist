@@ -19,6 +19,37 @@
 {% endif %}
 
 <h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
+  <svg class="i"><use href="#ic-plug"/></svg>Quellen
+</h2>
+{% if sources %}
+<ul class="divide-y divide-hair">
+  {% for source in sources %}
+  <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5">
+    {# Der Zustand steht vorn und ausgeschrieben - eine Farbe allein waere fuer
+       jemanden mit Farbsehschwaeche keine Information. #}
+    <span class="w-20 shrink-0 text-sm font-medium
+      {% if not source.enabled %}text-soft
+      {% elif source.ok %}text-accent
+      {% elif source.ok is none %}text-soft
+      {% else %}text-danger{% endif %}">{{ source.state }}</span>
+    <span class="font-medium">{{ source.name }}</span>
+    <span class="text-sm text-soft">zuletzt geprüft {{ source.seen }}</span>
+    {% if source.note %}
+    <span class="rounded bg-danger/10 px-1.5 py-0.5 text-xs text-danger">{{ source.note }}</span>
+    {% endif %}
+    {% if source.error %}
+    <p class="w-full text-sm text-soft">{{ source.error }}</p>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="py-3 text-sm text-soft italic">
+  Noch keine Quelle geprüft — eine Zeile entsteht beim ersten Lauf.
+</p>
+{% endif %}
+
+<h2 class="mt-10 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
   <svg class="i"><use href="#ic-doc"/></svg>Digests
 </h2>
 {% if digests %}

@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from ebook_watchlist import paths
 from ebook_watchlist.run import main as run_main
+from ebook_watchlist.store import Store
 from ebook_watchlist.web import create_app
 
 
@@ -107,3 +108,44 @@ def test_the_web_process_never_takes_the_run_lock(client: TestClient) -> None:
         assert client.get("/").status_code == 200
     finally:
         held.release()
+
+
+# --- Quellen-Zustand (Ticket 03) -------------------------------------------
+
+
+def test_each_source_gets_a_line_of_its_own(client: TestClient) -> None:
+    """Bisher musste die Seite Gesundheit aus Laufergebnissen erraten."""
+    run_main([])
+
+    body = client.get("/").text
+
+    assert "Quellen" in body
+    assert "zuletzt geprüft" in body
+
+
+def test_a_paused_source_says_so_rather_than_vanishing(
+    client: TestClient, data_dir: Path
+) -> None:
+    run_main([])
+    store = Store(data_dir / "snapshots.db")
+    name = store.sources()[0].name
+    store.set_enabled(name, False, now=datetime.now())
+
+    body = client.get("/").text
+
+    assert "pausiert" in body
+    assert name in body
+
+
+def test_a_source_broken_for_days_is_marked_as_such(
+    client: TestClient, data_dir: Path
+) -> None:
+    run_main([])
+    store = Store(data_dir / "snapshots.db")
+    name = store.sources()[0].name
+    for _ in range(3):
+        store.record_probe(name, ok=False, error="kaputt", now=datetime.now())
+
+    body = client.get("/").text
+
+    assert "seit 3 Prüfungen" in body

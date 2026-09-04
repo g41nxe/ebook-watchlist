@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Index,
     Integer,
@@ -117,6 +118,35 @@ class SeededScopeRow(Base):
     match_reason: Mapped[str] = mapped_column(String, primary_key=True)
     #: Empty string rather than NULL — it is part of the primary key.
     category: Mapped[str] = mapped_column(String, primary_key=True, default="")
+
+
+class SourceRow(Base):
+    """How a Source is faring — not what it is (ADR 18).
+
+    Selectors, paths and base URLs stay with the parser they are versioned and
+    tested with; a selector in a database would let someone break the parser
+    without touching code. What lives here is what *running* produces: the
+    probe result, which used to be printed and thrown away, and a switch to
+    pause a Source without editing a file.
+
+    Not keyed by profile: a Source is a shop or a library, and whether
+    beam-shop's markup still parses is not a fact about a reader.
+
+    Rows are never entered by hand; one appears when a Source first runs.
+    """
+
+    __tablename__ = "source"
+
+    name: Mapped[str] = mapped_column(String, primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_probe_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_probe_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Zero after any success. Distinguishes a Source that just broke from one
+    #: that has been broken for a week — the second needs a human, the first
+    #: might be a redesign in progress.
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
 
 
 class StateRow(Base):
@@ -321,6 +351,64 @@ class Store:
                 row = StateRow(profile_slug=profile_slug, key=key)
                 session.add(row)
             row.value = value
+            session.commit()
+
+    # --- Quellen-Zustand (Ticket 03) ---------------------------------------
+
+    def sources(self) -> list[SourceRow]:
+        """Alle bekannten Quellen, alphabetisch — was das Dashboard zeigt."""
+        with self.session() as session:
+            rows = list(session.scalars(select(SourceRow).order_by(SourceRow.name)))
+            for row in rows:
+                session.expunge(row)
+            return rows
+
+    def source(self, name: str) -> SourceRow | None:
+        with self.session() as session:
+            row = session.get(SourceRow, name)
+            if row is not None:
+                session.expunge(row)
+            return row
+
+    def is_enabled(self, name: str) -> bool:
+        """Eine unbekannte Quelle ist eingeschaltet.
+
+        Die Zeile entsteht erst beim ersten Lauf; bis dahin wäre ein
+        vorenthaltenes Ja gleichbedeutend damit, dass eine frisch
+        konfigurierte Quelle stillschweigend nichts tut.
+        """
+        row = self.source(name)
+        return True if row is None else row.enabled
+
+    def set_enabled(self, name: str, enabled: bool, *, now: datetime) -> None:
+        with self.session() as session:
+            row = session.get(SourceRow, name)
+            if row is None:
+                row = SourceRow(name=name, enabled=True, consecutive_failures=0)
+                session.add(row)
+            row.enabled = enabled
+            row.updated_at = now
+            session.commit()
+
+    def record_probe(
+        self, name: str, *, ok: bool, error: str | None, now: datetime
+    ) -> None:
+        """Das Ergebnis eines Selbsttests festhalten statt es auszudrucken.
+
+        ``consecutive_failures`` zählt hoch und wird bei jedem Erfolg auf null
+        gesetzt: erst daran ist zu erkennen, ob eine Quelle gerade kaputtging
+        oder seit Tagen kaputt ist.
+        """
+        with self.session() as session:
+            row = session.get(SourceRow, name)
+            if row is None:
+                row = SourceRow(name=name, enabled=True, consecutive_failures=0)
+                session.add(row)
+            row.last_probe_at = now
+            row.last_probe_ok = ok
+            row.last_error = None if ok else error
+            row.consecutive_failures = 0 if ok else (row.consecutive_failures or 0) + 1
+            row.updated_at = now
             session.commit()
 
     def seeded_scopes(self, profile_slug: str) -> set[tuple[str, str, str]]:
