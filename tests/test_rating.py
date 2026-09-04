@@ -7,7 +7,6 @@ Methode — genau damit ein Stub genügt.
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
@@ -24,11 +23,6 @@ from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 22, 0)
 RUBRIC = "Maßstabsversion: 1\n\nHier stünde der Maßstab."
-
-
-@pytest.fixture
-def store(tmp_path: Path) -> Store:
-    return Store(tmp_path / "snapshots.db")
 
 
 def discovery(**overrides) -> Observation:

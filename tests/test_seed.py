@@ -6,7 +6,6 @@ Alle Beispiele stammen aus der echten Konfiguration.
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
@@ -23,11 +22,6 @@ from ebook_watchlist.seed import seed, split_free_text
 from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 20, 0)
-
-
-@pytest.fixture
-def store(tmp_path: Path) -> Store:
-    return Store(tmp_path / "snapshots.db")
 
 
 def profile(**overrides) -> Profile:

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import beam_fixture, beam_tiles, voebb_detail
 from ebook_watchlist.config import WatchlistEntry
 from ebook_watchlist.sources.beam import parse as beam_parse
 from ebook_watchlist.sources.voebb import parse as voebb_parse
@@ -24,7 +25,7 @@ VOEBB = Path(__file__).parent / "fixtures" / "voebb"
 
 
 def test_the_order_number_carries_the_isbn() -> None:
-    tiles = beam_parse.parse_tiles((BEAM / "search-hits.html").read_text(encoding="utf-8"))
+    tiles = beam_tiles("search-hits.html")
     krieg = next(tile for tile in tiles if tile.product_id == "606983")
 
     assert krieg.order_number == "SW9783104911854450914"
@@ -33,7 +34,7 @@ def test_the_order_number_carries_the_isbn() -> None:
 
 def test_most_but_not_all_tiles_carry_one() -> None:
     """Bündel und Sammelausgaben haben Bestellnummern ohne ISBN-Form."""
-    tiles = beam_parse.parse_tiles((BEAM / "search-hits.html").read_text(encoding="utf-8"))
+    tiles = beam_tiles("search-hits.html")
     with_isbn = [tile for tile in tiles if tile.isbn]
 
     assert len(tiles) == 48
@@ -68,16 +69,12 @@ def test_only_a_real_isbn13_is_accepted(order_number: str, expected: str | None)
 
 
 def test_the_onleihe_states_the_isbn_outright() -> None:
-    detail = voebb_parse.parse_detail(
-        (VOEBB / "detail-unavailable.html").read_text(encoding="utf-8")
-    )
+    detail = voebb_detail("detail-unavailable.html")
     assert detail.isbn == "9783641117009"
 
 
 def test_a_second_title_too() -> None:
-    detail = voebb_parse.parse_detail(
-        (VOEBB / "detail-available.html").read_text(encoding="utf-8")
-    )
+    detail = voebb_detail("detail-available.html")
     assert detail.isbn == "9783104912769"
 
 
@@ -123,9 +120,7 @@ def test_the_isbn_reaches_the_observation() -> None:
 
 def test_both_sources_agree_on_the_same_book() -> None:
     """Der empirische Befund, auf dem ADR 18 die Identität aufbaut."""
-    voebb = voebb_parse.parse_detail(
-        (VOEBB / "detail-unavailable.html").read_text(encoding="utf-8")
-    )
+    voebb = voebb_detail("detail-unavailable.html")
     # beam führt dasselbe Buch unter Produkt 395021; live geprüft am 2026-09-04.
     assert voebb.isbn == "9783641117009"
 
@@ -136,13 +131,13 @@ def test_both_sources_agree_on_the_same_book() -> None:
 def test_the_beam_detail_page_yields_the_isbn_too() -> None:
     """Watchlist-Titel werden über die Detailseite geprüft, nicht über die
     Kachel — ohne das blieben ausgerechnet sie ohne Identität."""
-    detail = beam_parse.parse_detail((BEAM / "product-detail.html").read_text(encoding="utf-8"))
+    detail = beam_parse.parse_detail(beam_fixture("product-detail.html"))
     assert detail.isbn == "9783104911854"
 
 
 def test_the_isbn_comes_from_the_product_block_not_a_recommendation() -> None:
     """Die Seite trägt 63 Bestellnummern; genau eine gehört zum Produkt."""
-    html = (BEAM / "product-detail.html").read_text(encoding="utf-8")
+    html = beam_fixture("product-detail.html")
     assert html.count("SW9783") > 10
     assert beam_parse.parse_detail(html).isbn == "9783104911854"
 

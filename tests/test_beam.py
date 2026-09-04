@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import beam_detail, beam_fixture, beam_tiles
 from ebook_watchlist.config import WatchlistEntry
 from ebook_watchlist.matching import Confidence
 from ebook_watchlist.models import MatchReason
@@ -18,7 +19,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "beam"
 
 
 def fixture(name: str) -> str:
-    return (FIXTURES / name).read_text(encoding="utf-8")
+    return beam_fixture(name)
 
 
 class ScriptedClient:
@@ -58,7 +59,7 @@ def test_parse_price(text: str, cents: int | None) -> None:
 
 
 def test_search_results_parse_into_tiles() -> None:
-    tiles = parse.parse_tiles(fixture("search-hits.html"))
+    tiles = beam_tiles("search-hits.html")
     assert len(tiles) == 48
 
     first = tiles[0]
@@ -72,27 +73,27 @@ def test_search_results_parse_into_tiles() -> None:
 
 def test_the_title_excludes_the_subtitle() -> None:
     """The link's own text runs title and subtitle together."""
-    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    tiles = beam_tiles("category-new-arrivals.html")
     starwars = next(tile for tile in tiles if tile.product_id == "1278797")
     assert starwars.title == "Star Wars™ - Die Verschollenen"
     assert starwars.subtitle and "Jubiläum" in starwars.subtitle
 
 
 def test_the_leading_von_is_stripped_from_the_author() -> None:
-    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    tiles = beam_tiles("category-new-arrivals.html")
     starwars = next(tile for tile in tiles if tile.product_id == "1278797")
     assert starwars.author == "Zahn, Timothy"
 
 
 def test_the_product_url_drops_the_category_context_param() -> None:
-    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    tiles = beam_tiles("category-new-arrivals.html")
     assert all("?" not in tile.url for tile in tiles)
     assert all(tile.url.startswith("https://www.beam-shop.de/") for tile in tiles)
 
 
 def test_badges_are_deduplicated_across_layout_slots() -> None:
     """A tile repeats its badge markup once per slot; the set must not."""
-    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    tiles = beam_tiles("category-new-arrivals.html")
     starwars = next(tile for tile in tiles if tile.product_id == "1278797")
     assert starwars.badges == {sel.BADGE_PREORDER, sel.BADGE_NEW}
     assert starwars.is_preorder
@@ -100,7 +101,7 @@ def test_badges_are_deduplicated_across_layout_slots() -> None:
 
 
 def test_no_results_is_an_answer_not_a_failure() -> None:
-    assert parse.parse_tiles(fixture("search-no-results.html")) == []
+    assert beam_tiles("search-no-results.html") == []
 
 
 def test_a_page_with_neither_tiles_nor_the_message_raises() -> None:
@@ -119,7 +120,7 @@ def test_total_pages_is_read_off_the_listing() -> None:
 
 def test_detail_price_comes_from_the_main_product_not_a_recommendation() -> None:
     """The page carries well over a hundred cross-sell tiles with the same classes."""
-    detail = parse.parse_detail(fixture("product-detail.html"))
+    detail = beam_detail("product-detail.html")
     assert detail.title == "Krieg der Klone"
     assert detail.price_cents == 499
 
@@ -199,7 +200,7 @@ def test_the_struck_price_is_always_absent_here() -> None:
 def test_the_blurb_is_captured_from_the_listing_page() -> None:
     """Vier von sieben Achsen des Maßstabs hängen daran, und er kostet keinen
     eigenen Request — er liegt im HTML, das der Run ohnehin holt."""
-    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+    tiles = beam_tiles("category-new-arrivals.html")
 
     assert all(tile.blurb for tile in tiles)
     starwars = next(tile for tile in tiles if tile.product_id == "1278797")

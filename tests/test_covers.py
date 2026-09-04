@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import beam_fixture, beam_tiles
 from ebook_watchlist.covers import MIN_BYTES, CoverStore, file_name
 from ebook_watchlist.http import FetchError, NotFound, RateLimited
 from ebook_watchlist.sources.beam import parse as beam_parse
@@ -36,7 +37,7 @@ class StubClient:
 
 
 def test_every_tile_carries_a_cover() -> None:
-    tiles = beam_parse.parse_tiles((BEAM / "search-hits.html").read_text(encoding="utf-8"))
+    tiles = beam_tiles("search-hits.html")
     with_cover = [tile for tile in tiles if tile.cover_url]
 
     assert len(with_cover) == len(tiles) == 48
@@ -45,7 +46,7 @@ def test_every_tile_carries_a_cover() -> None:
 
 def test_the_address_comes_from_the_srcset_not_the_placeholder_pixel() -> None:
     """Das Theme laedt die Bilder nach; im ``src`` steht nur ein Pixel."""
-    tiles = beam_parse.parse_tiles((BEAM / "search-hits.html").read_text(encoding="utf-8"))
+    tiles = beam_tiles("search-hits.html")
     krieg = next(tile for tile in tiles if tile.product_id == "606983")
 
     assert krieg.cover_url == (
@@ -55,7 +56,7 @@ def test_the_address_comes_from_the_srcset_not_the_placeholder_pixel() -> None:
 
 
 def test_the_detail_page_offers_the_larger_one() -> None:
-    detail = beam_parse.parse_detail((BEAM / "product-detail.html").read_text(encoding="utf-8"))
+    detail = beam_parse.parse_detail(beam_fixture("product-detail.html"))
     assert detail.cover_url is not None
     assert "600x600" in detail.cover_url
 

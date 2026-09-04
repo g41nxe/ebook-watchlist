@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import beam_fixture
 from ebook_watchlist.config import ConfigError, Profile, load_dismissals
 from ebook_watchlist.diff import compute_deltas, suppress_unseeded_interests
 from ebook_watchlist.digest import SECTION_GENRE, build_digest
@@ -24,7 +25,7 @@ PROFILE = Profile(slug="t", name="T")
 
 
 def fixture(name: str) -> str:
-    return (FIXTURES / name).read_text(encoding="utf-8")
+    return beam_fixture(name)
 
 
 class RecordingClient:

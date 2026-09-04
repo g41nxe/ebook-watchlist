@@ -21,11 +21,6 @@ NOW = datetime(2026, 9, 4, 21, 0)
 SETTINGS = Profile(slug="t", name="Test", strong_deal_max_cents=400)
 
 
-@pytest.fixture
-def store(tmp_path: Path) -> Store:
-    return Store(tmp_path / "snapshots.db")
-
-
 def test_an_empty_database_says_so_rather_than_falling_back(store: Store) -> None:
     """Ein stiller Rückfall auf YAML hieße, monatelang gegen eine Datei zu
     laufen, von der alle annehmen, sie sei abgelöst."""

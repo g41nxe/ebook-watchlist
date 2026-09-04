@@ -6,7 +6,6 @@ Die ISBNs unten sind echt und stammen aus einem Lauf vom 2026-09-04.
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
@@ -15,11 +14,6 @@ from ebook_watchlist.models import LinkOutcome
 from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 18, 0)
-
-
-@pytest.fixture
-def store(tmp_path: Path) -> Store:
-    return Store(tmp_path / "snapshots.db")
 
 
 # --- die Suche für sich -----------------------------------------------------

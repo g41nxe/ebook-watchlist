@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 
+from conftest import beam_fixture, beam_tiles
 from ebook_watchlist.config import Profile, WatchlistEntry
 from ebook_watchlist.http import NotFound
 from ebook_watchlist.matching import author_matches
 from ebook_watchlist.models import MatchReason
 from ebook_watchlist.sources.base import RunContext
-from ebook_watchlist.sources.beam import parse
 from ebook_watchlist.sources.beam.source import BeamSource, author_slug
 from ebook_watchlist.store import Store
 
@@ -21,7 +21,7 @@ NOW = datetime(2026, 9, 4, 6, 0)
 
 
 def fixture(name: str) -> str:
-    return (FIXTURES / name).read_text(encoding="utf-8")
+    return beam_fixture(name)
 
 
 class RoutingClient:
@@ -130,7 +130,7 @@ def test_a_member_of_an_anthology_still_counts() -> None:
 
 def test_the_search_fallback_discards_the_noise() -> None:
     """Measured against a real 94-tile result page for the query "Scalzi"."""
-    tiles = parse.parse_tiles(fixture("search-author-noise.html"))
+    tiles = beam_tiles("search-author-noise.html")
     kept = [tile for tile in tiles if author_matches("John Scalzi", tile.author)]
 
     assert len(tiles) == 94
