@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}eBook-Watchlist{% endblock %}</title>
+<style>
+:root { color-scheme: light dark; }
+body { font: 16px/1.5 system-ui, sans-serif; margin: 0; color: #1a1a1a;
+       background: #fdfdfc; }
+main { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+header { border-bottom: 1px solid #e4e4e0; background: #fff; }
+header div { max-width: 52rem; margin: 0 auto; padding: 1rem 1.25rem;
+             display: flex; align-items: baseline; gap: 1rem; }
+header strong { font-size: 1.05rem; }
+header span { color: #666; font-size: 0.9rem; }
+h1 { font-size: 1.3rem; margin: 1.5rem 0 0.25rem; }
+h2 { font-size: 1rem; margin: 2.25rem 0 0.6rem; border-bottom: 1px solid #e4e4e0;
+     padding-bottom: 0.3rem; }
+/* Fehlermeldungen sind lang; auf einem Telefon muss die Tabelle scrollen
+   duerfen, statt die Seite breit zu ziehen. */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.94rem; }
+td.error { max-width: 24rem; }
+th { text-align: left; font-weight: 600; color: #555; padding: 0.35rem 0.6rem 0.35rem 0;
+     border-bottom: 1px solid #e4e4e0; }
+td { padding: 0.4rem 0.6rem 0.4rem 0; border-bottom: 1px solid #f2f2ef;
+     vertical-align: top; }
+a { color: #1a4d8f; }
+.muted { color: #777; }
+.ok { color: #1a6b3c; }
+.bad { color: #a3242b; }
+.empty { color: #777; font-style: italic; padding: 0.75rem 0; }
+.pill { display: inline-block; border-radius: 3px; padding: 0 0.4rem;
+        font-size: 0.8rem; background: #ececea; color: #444; }
+.trouble { background: #fdf3f3; border: 1px solid #eccdcd; border-radius: 4px;
+           padding: 0.75rem 1rem; margin: 1rem 0; }
+@media (prefers-color-scheme: dark) {
+  body { background: #16161a; color: #e8e8e6; }
+  header { background: #1c1c21; border-color: #2e2e36; }
+  h2, th { border-color: #2e2e36; }
+  td { border-color: #24242b; }
+  a { color: #7aa9e6; }
+  .muted, .empty, header span, th { color: #9a9aa2; }
+  .pill { background: #2a2a32; color: #c8c8d0; }
+  .trouble { background: #2a1d1e; border-color: #4d2d30; }
+}
+</style>
+</head>
+<body>
+<header><div>
+  <strong>eBook-Watchlist</strong>
+  <span>{% block subtitle %}{% endblock %}</span>
+</div></header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -112,6 +112,24 @@ setzt diesen Run aus und taucht im Digest unter „⚠️ Fehler" auf — eine
 halb gelesene, umgebaute Seite würde sonst Unsinn in den Snapshot schreiben und
 jeden künftigen Vergleich vergiften. Mit `--skip-probes` lässt er sich abschalten.
 
+## Oberfläche
+
+Ein zweiter, unabhängiger Prozess zeigt Läufe und Digests im Browser:
+
+```bash
+uv run python -m ebook_watchlist.web
+```
+
+Danach unter `http://<rechner>:8437/` erreichbar, auch vom Telefon im selben
+Netz. Port und Bindung über `--port` / `--host` oder `EBW_WEB_PORT` /
+`EBW_WEB_HOST`; `--host 127.0.0.1` beschränkt den Zugriff auf diesen Rechner.
+
+**Es gibt keine Anmeldung** (ADR 3) — die Oberfläche gehört ins vertraute
+Heimnetz, nicht ins offene Internet.
+
+Der Webprozess **scrapt nichts** und hält nie die Run-Sperre. Ihn zu beenden
+oder neu zu starten stört einen laufenden Run nicht, und umgekehrt.
+
 Tests und Linter:
 
 ```bash

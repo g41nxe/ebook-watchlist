@@ -193,6 +193,20 @@ class Store:
             run.error = error
             session.commit()
 
+    def recent_runs(self, profile_slug: str, limit: int = 20) -> list[RunRow]:
+        """The Run journal, newest first — what the Dashboard shows."""
+        with self.session() as session:
+            stmt = (
+                select(RunRow)
+                .where(RunRow.profile_slug == profile_slug)
+                .order_by(RunRow.id.desc())
+                .limit(limit)
+            )
+            rows = list(session.scalars(stmt))
+            for row in rows:
+                session.expunge(row)
+            return rows
+
     def last_finished_run(self, profile_slug: str, before_run_id: int) -> RunRow | None:
         """The previous completed Run — what the Digest means by 'last check'."""
         with self.session() as session:

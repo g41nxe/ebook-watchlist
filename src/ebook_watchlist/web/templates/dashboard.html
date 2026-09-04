@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block subtitle %}{{ profile.name }}{% endblock %}
+
+{% block content %}
+<h1>Übersicht</h1>
+
+{% if trouble %}
+<div class="trouble">
+  <strong>Beim letzten Lauf ist etwas schiefgegangen:</strong>
+  <ul>{% for problem in trouble %}<li>{{ problem }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<h2>Digests</h2>
+{% if digests %}
+<div class="scroll"><table>
+  <tr><th>Geschrieben</th><th>Datei</th></tr>
+  {% for digest in digests %}
+  <tr>
+    <td>{{ digest.label }}</td>
+    <td><a href="/digest/{{ digest.name }}">{{ digest.name }}</a></td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% else %}
+<p class="empty">Noch kein Digest — es hat sich seit dem ersten Lauf nichts geändert.</p>
+{% endif %}
+
+<h2>Läufe</h2>
+{% if runs %}
+<div class="scroll"><table>
+  <tr>
+    <th>Start</th><th>Auslöser</th><th>Status</th><th>Änderungen</th><th>Fehler</th>
+  </tr>
+  {% for run in runs %}
+  <tr>
+    <td>{{ run.started_at.strftime("%d.%m. %H:%M") }}</td>
+    <td><span class="pill">{{ run.trigger }}</span></td>
+    <td class="{{ 'ok' if run.status == 'ok' else 'bad' }}">{{ run.status }}</td>
+    <td>{{ run.delta_count if run.delta_count else "—" }}</td>
+    <td class="muted error">{{ run.error or "" }}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% else %}
+<p class="empty">Noch kein Lauf verzeichnet.</p>
+{% endif %}
+{% endblock %}

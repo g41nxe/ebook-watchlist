@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block subtitle %}Konfigurationsfehler{% endblock %}
+
+{% block content %}
+<h1>Die Konfiguration lässt sich nicht laden</h1>
+<div class="trouble">{{ message }}</div>
+<p class="muted">
+  Die Oberfläche zeigt nichts an, solange sie nicht weiß, wessen Profil sie
+  zeigen soll — ein halb gefülltes Dashboard wäre irreführender als gar keines.
+</p>
+{% endblock %}
