@@ -32,8 +32,8 @@ FAKE_SOURCE_YAML = """
 
 
 @pytest.fixture
-def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """An isolated data directory, wired up like a fresh install."""
+def unseeded_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Die YAML-Dateien, aber noch kein Import — eine frische Installation."""
     directory = tmp_path / "data"
     directory.mkdir()
     monkeypatch.setenv("EBW_DATA_DIR", str(directory))
@@ -44,3 +44,17 @@ def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     ):
         (directory / name).write_text(textwrap.dedent(body).lstrip(), encoding="utf-8")
     return directory
+
+
+@pytest.fixture
+def data_dir(unseeded_data_dir: Path) -> Path:
+    """Wie oben, plus der einmalige Import.
+
+    Seit Ticket 05 liest der Lauf seine Konfiguration aus der Datenbank; YAML
+    ist Saatgut. Eine Installation ohne Import ist damit ein eigener Zustand,
+    und den prüft ``unseeded_data_dir``.
+    """
+    from ebook_watchlist.run import main
+
+    main(["seed"])
+    return unseeded_data_dir

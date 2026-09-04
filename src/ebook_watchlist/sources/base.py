@@ -48,6 +48,18 @@ class RunContext:
     #: Watchlist-Key -> Buch-Id, damit ein Eintrag nicht pro Quelle neu
     #: gesucht wird.
     _books: dict[str, int] = field(default_factory=dict)
+    #: Welches Interesse einen Fund hervorgebracht hat. Ohne das liesse sich
+    #: die Aussaat nicht pro Interesse fuehren — genau der Fehler, den der
+    #: alte gemeinsame Scope hatte (Ticket 05).
+    origin: dict[tuple[str, str], int] = field(default_factory=dict)
+    #: Interessen dieses Profils, nach Schluessel und Wert.
+    interests: dict[tuple[str, str], int] = field(default_factory=dict)
+    #: ``(Quelle, Interesse-Id)`` fuer alles, was in diesem Lauf wirklich
+    #: gefegt wurde — unabhaengig davon, ob etwas dabei herauskam. Nur an
+    #: den Funden zu erkennen, was gefegt wurde, hiesse: eine Autor:in,
+    #: deren Titel alle schon auf der Watchlist stehen, saet nie an und
+    #: flutet beim naechsten Mal erneut.
+    swept: set[tuple[str, int]] = field(default_factory=set)
 
     def is_dismissed(self, source: str, source_item_id: str) -> bool:
         return source_item_id in self.dismissed.get(source, frozenset())
@@ -257,16 +269,24 @@ class ShopSource(ResolvingSource):
         # no single "latest" to compare against next time.
         seen = {observation.source_item_id for observation in observations}
 
-        def take(discovered: list[Observation]) -> None:
+        def take(discovered: list[Observation], interest_id: int | None) -> None:
             for observation in discovered:
                 item_id = observation.source_item_id
                 if item_id in seen or context.is_dismissed(self.name, item_id):
                     continue
                 seen.add(item_id)
                 observations.append(observation)
+                if interest_id is not None:
+                    context.origin[(self.name, item_id)] = interest_id
 
         for author in profile.authors_to_sweep(context.sweep_extended):
-            take(self.by_author(author))
+            interest_id = context.interests.get(("author", author))
+            if interest_id is not None:
+                context.swept.add((self.name, interest_id))
+            take(self.by_author(author), interest_id)
         for category in profile.genre_categories:
-            take(self.by_category(category))
+            interest_id = context.interests.get(("thema", category))
+            if interest_id is not None:
+                context.swept.add((self.name, interest_id))
+            take(self.by_category(category), interest_id)
         return observations

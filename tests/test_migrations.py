@@ -118,36 +118,33 @@ def test_add_column_is_safe_to_run_twice(tmp_path: Path) -> None:
 # --- the real migration: backfilling seeded scopes ------------------------
 
 
-def test_an_upgraded_database_remembers_the_shelves_it_already_saw(tmp_path: Path) -> None:
-    """Without the backfill, the first Run after the upgrade would treat every
-    shelf as brand new and swallow a day of genuine arrivals."""
+def test_an_old_database_upgrades_all_the_way(tmp_path: Path) -> None:
+    """Die Kette laeuft bis zum Ende durch, auch von Version 0 aus.
+
+    ``seeded_scope`` ist unterwegs erst befuellt und dann fallengelassen worden
+    (Ticket 05): eine Migration beschreibt die Welt, in der sie geschrieben
+    wurde, und muss das weiter tun, auch wenn eine spaetere sie ueberholt.
+    """
     path = tmp_path / "s.db"
     Store(path)
 
     with sqlite3.connect(path) as connection:
-        for reason, category in [
-            ("genre_category", "belletristik/science-fiction/space-opera"),
-            ("profile_author", None),
-            ("watchlist", None),
-        ]:
-            connection.execute(
-                "INSERT INTO observation (run_id, profile_slug, source, source_item_id, "
-                "match_reason, title, category, observed_at) "
-                "VALUES (1, 'default', 'beam', '1', ?, 'Titel', ?, '2026-09-04')",
-                (reason, category),
-            )
-        # Pretend this file predates the seeded_scope table.
-        connection.execute("DELETE FROM seeded_scope")
+        connection.execute(
+            "INSERT INTO observation (run_id, profile_slug, source, source_item_id, "
+            "match_reason, title, category, observed_at) "
+            "VALUES (1, 'default', 'beam', '1', 'genre_category', 'Titel', 'krimi', "
+            "'2026-09-04')"
+        )
         connection.execute("PRAGMA user_version = 0")
 
-    assert Store(path).seeded_scopes("default") == {
-        ("beam", "genre_category", "belletristik/science-fiction/space-opera"),
-        ("beam", "profile_author", ""),
-    }
+    Store(path)  # darf nicht scheitern
+    tables = inspect(create_engine(f"sqlite:///{path}")).get_table_names()
+    assert "seeded_scope" not in tables
+    assert "interest_seeded" in tables
 
 
-def test_the_backfill_leaves_watchlist_rows_alone(tmp_path: Path) -> None:
-    """Watchlist entries are not a discovery scope; seeding them would be wrong."""
+def test_the_observations_survive_the_upgrade(tmp_path: Path) -> None:
+    """Die Aussaat war ein Cache; die Historie ist es nicht."""
     path = tmp_path / "s.db"
     Store(path)
     with sqlite3.connect(path) as connection:
@@ -158,13 +155,6 @@ def test_the_backfill_leaves_watchlist_rows_alone(tmp_path: Path) -> None:
         )
         connection.execute("PRAGMA user_version = 0")
 
-    assert Store(path).seeded_scopes("default") == set()
-
-
-def test_opening_an_already_migrated_database_changes_nothing(tmp_path: Path) -> None:
-    path = tmp_path / "s.db"
-    store = Store(path)
-    store.mark_seeded("default", {("beam", "genre_category", "krimi")})
-
-    assert Store(path).seeded_scopes("default") == {("beam", "genre_category", "krimi")}
-    assert "seeded_scope" in inspect(create_engine(f"sqlite:///{path}")).get_table_names()
+    Store(path)
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT count(*) FROM observation").fetchone()[0] == 1

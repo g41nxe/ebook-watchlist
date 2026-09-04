@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from ebook_watchlist.config import ConfigError, Profile, load_dismissals
-from ebook_watchlist.diff import compute_deltas, discovery_scope, suppress_unseeded
+from ebook_watchlist.diff import compute_deltas, suppress_unseeded_interests
 from ebook_watchlist.digest import SECTION_GENRE, build_digest
 from ebook_watchlist.junk import is_junk
 from ebook_watchlist.models import MatchReason, Observation
@@ -110,11 +110,10 @@ def test_a_shelf_being_followed_for_the_first_time_is_seeded_quietly() -> None:
     """Everything on a fresh shelf is technically new; none of it is news."""
     observations = _bargains(source().by_category(SPACE_OPERA))
     deltas = compute_deltas(observations, {}, PROFILE)
+    origin = {observation.key: 7 for observation in observations}
 
-    assert suppress_unseeded(deltas, known_scopes=set()) == []
-
-    scope = discovery_scope(observations[0])
-    assert suppress_unseeded(deltas, known_scopes={scope}) == deltas
+    assert suppress_unseeded_interests(deltas, origin, seeded=set()) == []
+    assert suppress_unseeded_interests(deltas, origin, seeded={7}) == deltas
 
 
 def test_seeding_only_silences_first_sightings_not_real_changes() -> None:
@@ -129,16 +128,19 @@ def test_seeding_only_silences_first_sightings_not_real_changes() -> None:
     before = replace(dropped, price_cents=1299)
     deltas = compute_deltas([dropped], {dropped.key: before})
 
-    assert suppress_unseeded(deltas, known_scopes=set()) == deltas
+    assert suppress_unseeded_interests(deltas, {dropped.key: 7}, seeded=set()) == deltas
 
 
-def test_each_shelf_is_seeded_on_its_own() -> None:
+def test_each_interest_is_seeded_on_its_own() -> None:
+    """Der behobene Fehler: vorher teilten sich alle Autor:innen eine Aussaat,
+    weil der Schlüssel bei ihnen leer blieb (Ticket 05)."""
     observations = _bargains(source().by_category(SPACE_OPERA))
     deltas = compute_deltas(observations, {}, PROFILE)
     assert deltas
-    other_shelf = ("beam", str(MatchReason.GENRE_CATEGORY), "belletristik/krimi-thriller")
+    origin = {observation.key: 7 for observation in observations}
 
-    assert suppress_unseeded(deltas, known_scopes={other_shelf}) == []
+    # Ein *anderes* Interesse ist angesät — dieses hier nicht.
+    assert suppress_unseeded_interests(deltas, origin, seeded={8}) == []
 
 
 def test_suggestions_land_in_their_own_section_never_among_real_hits() -> None:

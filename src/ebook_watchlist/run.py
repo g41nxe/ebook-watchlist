@@ -20,14 +20,10 @@ from filelock import FileLock, Timeout
 from . import paths
 from .cleaning import clean_blurb
 from .config import ConfigError, load_dismissals, load_profile, load_watchlist
+from .configuration import NotSeeded
+from .configuration import load as load_configuration
 from .covers import CoverStore
-from .diff import (
-    DISCOVERY_REASONS,
-    compute_deltas,
-    discovery_scope,
-    keys_of,
-    suppress_unseeded,
-)
+from .diff import compute_deltas, keys_of, suppress_unseeded_interests
 from .digest import build_digest
 from .http import HttpClient, RateLimited, build_user_agent
 from .models import Observation, SourceFailure
@@ -217,8 +213,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         profile = load_profile()
-        watchlist = load_watchlist()
         dismissed = load_dismissals()
+        # Die Watchlist-Datei ist Saatgut (ADR 10) und wird nur noch fuer den
+        # Import gebraucht. Sie weiterhin bei jedem Lauf zu verlangen hiesse,
+        # dass "nur noch Saatgut" nicht stimmt: wer sie nach dem Import
+        # loescht, koennte gar nicht mehr laufen.
+        watchlist = load_watchlist() if args.command == "seed" else []
         client = HttpClient(user_agent=build_user_agent(profile.contact))
         sources = build_sources(profile, client)
     except ConfigError as exc:
@@ -240,15 +240,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _sources(sources, enable=args.enable, disable=args.disable)
         if args.command == "seed":
             return _seed(profile, watchlist, dismissed)
-        return _run(
-            profile,
-            watchlist,
-            sources,
-            dismissed,
-            client=client,
-            trigger=args.trigger,
-            skip_probes=args.skip_probes,
-        )
+        try:
+            return _run(
+                profile,
+                watchlist,
+                sources,
+                dismissed,
+                client=client,
+                trigger=args.trigger,
+                skip_probes=args.skip_probes,
+            )
+        except NotSeeded as exc:
+            # Kein stiller Rückfall auf YAML: sonst liefe der Lauf monatelang
+            # gegen eine Datei, von der alle annehmen, sie sei abgelöst.
+            print(f"{exc}", file=sys.stderr)
+            return EXIT_CONFIG_ERROR
     finally:
         lock.release()
 
@@ -378,6 +384,14 @@ def _run(
 ) -> int:
     store = Store(paths.db_path())
     started_at = datetime.now()
+
+    # Die Konfiguration kommt aus der Datenbank; YAML ist Saatgut (ADR 10).
+    # Kein stiller Rueckfall: eine leere Datenbank heisst "noch nicht
+    # importiert", und das gehoert gesagt.
+    configured = load_configuration(store, profile)
+    profile = configured.profile
+    watchlist = configured.watchlist
+
     run_id = store.start_run(profile.slug, trigger, started_at)
 
     sources, paused = _partition_enabled(sources, store)
@@ -395,6 +409,11 @@ def _run(
         now=started_at,
         dismissed=dismissed,
         sweep_extended=sweep_extended,
+        interests={
+            (row.key, row.value): row.id
+            for table in (configured.author_interests, configured.thema_interests)
+            for row in table.values()
+        },
     )
     observations, failures = _collect(sources, profile, watchlist, context)
     failures = [*probe_failures, *failures]
@@ -409,18 +428,21 @@ def _run(
     _fetch_covers(store, client, observations)
 
     previous = store.latest_observations(profile.slug, keys_of(observations))
-    seeded = store.seeded_scopes(profile.slug)
-    deltas = suppress_unseeded(compute_deltas(observations, previous, profile), seeded)
+    # Angesaet ist je *Quelle*: ein Interesse, das beam kennt, ist der Onleihe
+    # deswegen nicht vertraut. Vorher genuegte "irgendeine Quelle", und die
+    # zweite Quelle haette dieselbe Backlist noch einmal gemeldet.
+    seeded = {
+        interest_id
+        for source_name, interest_id in context.swept
+        if store.is_interest_seeded(interest_id, source_name)
+    }
+    deltas = suppress_unseeded_interests(
+        compute_deltas(observations, previous, profile), context.origin, seeded
+    )
 
     store.append(run_id, profile.slug, observations, started_at)
-    store.mark_seeded(
-        profile.slug,
-        {
-            discovery_scope(observation)
-            for observation in observations
-            if observation.match_reason in DISCOVERY_REASONS
-        },
-    )
+    for source_name, interest_id in context.swept:
+        store.mark_interest_seeded(interest_id, source_name, now=started_at)
 
     last_run = store.last_finished_run(profile.slug, run_id)
     digest = build_digest(

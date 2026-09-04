@@ -29,6 +29,19 @@ class SchemaTooNew(Exception):
     """The file was written by a newer version of this program."""
 
 
+def _has_table(connection: Connection, table: str) -> bool:
+    """Ob es die Tabelle ueberhaupt (noch) gibt.
+
+    Eine Migration beschreibt die Welt, in der sie geschrieben wurde. Wird ihre
+    Tabelle spaeter fallengelassen, muss sie wirkungslos werden statt zu
+    scheitern — entfernen darf man sie nicht, das verschoebe die Indizes.
+    """
+    rows = connection.exec_driver_sql(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    )
+    return rows.first() is not None
+
+
 def _columns(connection: Connection, table: str) -> set[str]:
     return {row[1] for row in connection.exec_driver_sql(f"PRAGMA table_info({table})")}
 
@@ -53,6 +66,16 @@ def _backfill_seeded_scopes(connection: Connection) -> None:
     what the world looked like when it was written, and must keep doing the same
     thing however the enum grows later.
     """
+    # Die Tabelle gibt es seit Ticket 05 nicht mehr — ``interest_seeded`` hat
+    # sie abgeloest. Diese Migration bleibt trotzdem in der Kette stehen und
+    # wird nur wirkungslos, wenn ihre Tabelle fehlt: die Indizes duerfen sich
+    # nicht verschieben, sonst wuerde ein Datenbestand mittlerer Version die
+    # falschen Schritte ueberspringen.
+    #
+    # Ohne diese Pruefung scheiterte jedes Upgrade von Version 0 an einer
+    # Tabelle, die ``create_all`` nicht mehr anlegt.
+    if not _has_table(connection, "seeded_scope"):
+        return
     connection.exec_driver_sql(
         """
         INSERT OR IGNORE INTO seeded_scope (profile_slug, source, match_reason, category)
@@ -119,6 +142,22 @@ def _add_cover_column(connection: Connection) -> None:
     add_column(connection, "book", "cover_file", "TEXT")
 
 
+def _drop_seeded_scope_table(connection: Connection) -> None:
+    """``seeded_scope`` geht in ``interest_seeded`` auf (Ticket 05).
+
+    Nicht uebernommen: der alte Schluessel liess ``category`` bei Autor:innen
+    leer, so dass *alle* Autor:innen sich eine Zeile teilten. Aus einer Zeile,
+    die nichts unterscheidet, laesst sich nicht rekonstruieren, welche
+    Autor:in schon einmal gefegt wurde — das ist genau der Fehler, den die
+    neue Tabelle behebt.
+
+    Die Folge ist einmalig sichtbar: nach dem Umstieg saeen alle Interessen
+    neu an, also bleibt genau ein Lauf still. Ein geratener Backfill haette
+    stattdessen dauerhaft falsche Aussaat behauptet.
+    """
+    connection.exec_driver_sql("DROP TABLE IF EXISTS seeded_scope")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -126,6 +165,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _add_book_id_column,
     _drop_resolution_table,
     _add_cover_column,
+    _drop_seeded_scope_table,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -105,24 +105,28 @@ def keys_of(observations: Iterable[Observation]) -> list[tuple[str, str]]:
     return [observation.key for observation in observations]
 
 
-def discovery_scope(observation: Observation) -> tuple[str, str, str]:
-    """What a discovery belongs to: a Source, a kind of discovery, and a shelf."""
-    return (observation.source, str(observation.match_reason), observation.category or "")
-
-
-def suppress_unseeded(
-    deltas: Sequence[Delta], known_scopes: Container[tuple[str, str, str]]
+def suppress_unseeded_interests(
+    deltas: Sequence[Delta],
+    origin: Mapping[tuple[str, str], int],
+    seeded: Container[int],
 ) -> list[Delta]:
-    """Drop first sightings from a shelf we have never looked at before.
+    """Erstsichtungen aus einem Interesse verschlucken, das noch nie gefegt wurde.
 
-    The first time a category is followed, its entire front page is technically
-    new — a hundred entries, none of them news. Seeding a scope silently means
-    the next Run reports what genuinely arrived since.
+    Loest :func:`suppress_unseeded` ab. Der alte Schluessel war
+    ``(source, match_reason, category)``, und ``category`` blieb bei
+    Autor:innen leer — **alle** Autor:innen teilten sich also eine Aussaat: die
+    erste saete still an, jede weitere meldete ihre ganze Backlist als
+    Neuzugaenge. Pro Interesse gefuehrt verhalten sich Autor:in und Thema
+    gleich (Ticket 05).
+
+    Ein Fund ohne bekannte Herkunft wird durchgelassen: das ist ein
+    Watchlist-Treffer, und der hat keine Aussaat.
     """
     return [
         delta
         for delta in deltas
         if delta.kind is not DeltaKind.FIRST_SEEN
         or delta.current.match_reason not in DISCOVERY_REASONS
-        or discovery_scope(delta.current) in known_scopes
+        or origin.get(delta.current.key) is None
+        or origin[delta.current.key] in seeded
     ]

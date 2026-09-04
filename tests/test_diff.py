@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from ebook_watchlist.config import Profile
-from ebook_watchlist.diff import compare, compute_deltas, suppress_unseeded
+from ebook_watchlist.diff import compare, compute_deltas, suppress_unseeded_interests
 from ebook_watchlist.models import Availability, DeltaKind, MatchReason, Observation
 
 
@@ -129,10 +129,10 @@ def test_a_discovery_with_no_price_is_not_a_bargain() -> None:
 
 
 def test_seeding_never_swallows_a_watchlist_bargain() -> None:
-    """Discovery scopes are seeded quietly; a Watchlist Entry has no scope and
-    must not be silenced by that mechanism."""
+    """Interessen werden still angesät; ein Watchlist-Eintrag hat keines und
+    darf davon nicht verschluckt werden."""
     deltas = compute_deltas([observation(price_cents=399)], {}, PROFILE)
-    assert suppress_unseeded(deltas, known_scopes=set()) == deltas
+    assert suppress_unseeded_interests(deltas, origin={}, seeded=set()) == deltas
 
 
 def test_a_price_drop_on_a_shelf_find_needs_the_same_bar() -> None:
