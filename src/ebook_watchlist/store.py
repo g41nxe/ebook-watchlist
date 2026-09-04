@@ -416,6 +416,34 @@ class Store:
                     found[key] = _to_observation(row)
         return found
 
+    def latest_by_book(
+        self, profile_slug: str, book_ids: Iterable[int]
+    ) -> dict[int, Observation]:
+        """Die zuletzt gesehene Beobachtung je Buch — was die Watchlist zeigt.
+
+        Dieselbe max-id-Unterabfrage wie :meth:`latest_observations`, nur ueber
+        ``book_id`` statt ueber das Quellen-Paar: die Kosten haengen an der Zahl
+        der beobachteten Buecher, nicht an der Laenge der Historie.
+        """
+        wanted = set(book_ids)
+        if not wanted:
+            return {}
+        latest_ids = (
+            select(func.max(ObservationRow.id))
+            .where(
+                ObservationRow.profile_slug == profile_slug,
+                ObservationRow.book_id.in_(wanted),
+            )
+            .group_by(ObservationRow.book_id)
+        )
+        found: dict[int, Observation] = {}
+        with self.session() as session:
+            stmt = select(ObservationRow).where(ObservationRow.id.in_(latest_ids))
+            for row in session.scalars(stmt):
+                if row.book_id is not None:
+                    found[row.book_id] = _to_observation(row)
+        return found
+
     def get_state(self, profile_slug: str, key: str) -> datetime | None:
         with self.session() as session:
             row = session.get(StateRow, (profile_slug, key))
@@ -667,6 +695,35 @@ class Store:
             row.active = active
             if details:
                 row.details = json.dumps(details, ensure_ascii=False)
+            session.commit()
+
+    def set_relation_details(
+        self, profile_slug: str, book_id: int, kind: str, details: dict, *, now: datetime
+    ) -> None:
+        """Den Beutel *ersetzen*, auch wenn er leer wird.
+
+        ``put_relation`` laesst vorhandene Angaben in Ruhe, wenn der Aufrufer
+        keine mitgibt — sonst loeschte jedes Pausieren die Notizen. Wer etwas
+        wegnehmen will, braucht deshalb diesen Weg: sonst liesse sich eine
+        Einschraenkung setzen, aber nie wieder aufheben.
+        """
+        check_relation_kind(kind)
+        check_details(kind, details)
+        with self.session() as session:
+            row = session.scalars(
+                select(BookRelationRow).where(
+                    BookRelationRow.profile_slug == profile_slug,
+                    BookRelationRow.book_id == book_id,
+                    BookRelationRow.kind == kind,
+                )
+            ).first()
+            if row is None:
+                row = BookRelationRow(
+                    profile_slug=profile_slug, book_id=book_id, kind=kind, created_at=now
+                )
+                session.add(row)
+                row.active = True
+            row.details = json.dumps(details, ensure_ascii=False)
             session.commit()
 
     def relations(

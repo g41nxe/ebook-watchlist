@@ -17,16 +17,32 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import paths
 from ..config import ConfigError, load_profile
+from ..models import LinkOutcome
+from ..relations import RelationKind
 from ..store import RunRow, Store
+from . import watchlist
 
 STATIC = Path(__file__).parent / "static"
+
+
+def asset_version() -> str:
+    """Der Zeitstempel des gebauten Stylesheets.
+
+    Haengt an der Adresse, damit ein Browser nach einem Neubau nicht seine
+    alte Kopie behaelt. Ohne das sieht jede CSS-Aenderung kaputt aus, und
+    zwar so ueberzeugend, dass man den Fehler im Template sucht.
+    """
+    try:
+        return str(int((STATIC / "app.css").stat().st_mtime))
+    except OSError:  # pragma: no cover - fehlt nur ohne Build
+        return "0"
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 #: Digest files are named by the Run that wrote them. Serving anything else
@@ -134,6 +150,12 @@ def create_app() -> FastAPI:
             "web assets are missing — run: uv run python -m ebook_watchlist.web.build"
         )
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+    # Titelbilder liegen im Datenverzeichnis, nicht im Paket (Ticket 15).
+    # StaticFiles verweigert Pfade ausserhalb des Wurzelordners, also kann
+    # ein Dateiname von aussen nicht in das Datenverzeichnis greifen.
+    covers = paths.covers_dir()
+    covers.mkdir(parents=True, exist_ok=True)
+    app.mount("/covers", StaticFiles(directory=covers), name="covers")
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request) -> HTMLResponse:
@@ -141,7 +163,10 @@ def create_app() -> FastAPI:
             profile = load_profile()
         except ConfigError as exc:
             return TEMPLATES.TemplateResponse(
-                request, "error.html", {"message": str(exc)}, status_code=500
+                request,
+                "error.html",
+                {"message": str(exc), "asset_version": asset_version()},
+                status_code=500,
             )
 
         store = _store_for(paths.db_path())
@@ -151,12 +176,109 @@ def create_app() -> FastAPI:
             "dashboard.html",
             {
                 "profile": profile,
+                "asset_version": asset_version(),
                 "runs": runs,
                 "digests": digest_files(),
                 "sources": source_health(store),
                 "trouble": source_trouble(runs),
             },
         )
+
+    # --- Watchlist (Ticket 06) ---------------------------------------------
+
+    def _watchlist_page(request: Request, message: str | None = None) -> HTMLResponse:
+        profile = load_profile()
+        store = _store_for(paths.db_path())
+        return TEMPLATES.TemplateResponse(
+            request,
+            "watchlist.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "entries": watchlist.entries(store, profile.slug),
+                "restrictions": watchlist.RESTRICTIONS,
+                "message": message,
+            },
+        )
+
+    @app.get("/watchlist", response_class=HTMLResponse)
+    def watchlist_page(request: Request) -> HTMLResponse:
+        try:
+            return _watchlist_page(request)
+        except ConfigError as exc:
+            return TEMPLATES.TemplateResponse(
+                request,
+                "error.html",
+                {"message": str(exc), "asset_version": asset_version()},
+                status_code=500,
+            )
+
+    @app.post("/watchlist/add")
+    def watchlist_add(title: str = Form(...), author: str = Form("")) -> RedirectResponse:
+        # Aufgeloest wird hier nicht: die Oberflaeche scrapt nie (ADR 3). Der
+        # Eintrag steht als "noch nicht gesucht" da, bis ein Lauf ihn ansieht.
+        if not title.strip():
+            return RedirectResponse("/watchlist", status_code=303)
+        profile = load_profile()
+        watchlist.add(
+            _store_for(paths.db_path()),
+            profile.slug,
+            title=title,
+            author=author,
+            now=datetime.now(),
+        )
+        return RedirectResponse("/watchlist", status_code=303)
+
+    @app.post("/watchlist/{book_id}/active")
+    def watchlist_active(book_id: int, active: str = Form("")) -> RedirectResponse:
+        """Pausieren und fortsetzen — nie loeschen (ADR 18)."""
+        profile = load_profile()
+        store = _store_for(paths.db_path())
+        wanted = active == "1"
+        if wanted:
+            store.put_relation(
+                profile.slug, book_id, str(RelationKind.WATCHING), now=datetime.now()
+            )
+        else:
+            store.deactivate_relation(
+                profile.slug, book_id, str(RelationKind.WATCHING), now=datetime.now()
+            )
+        return RedirectResponse("/watchlist", status_code=303)
+
+    @app.post("/watchlist/{book_id}/restrict")
+    def watchlist_restrict(book_id: int, restrict: str = Form("")) -> RedirectResponse:
+        profile = load_profile()
+        # Leer heisst "alle eingeschalteten Quellen", nicht "keine". Ein
+        # unbekannter Wert scheitert in der Validierung des Ladens (Ticket 05).
+        watchlist.set_restriction(
+            _store_for(paths.db_path()),
+            profile.slug,
+            book_id,
+            restrict or None,
+            now=datetime.now(),
+        )
+        return RedirectResponse("/watchlist", status_code=303)
+
+    @app.post("/watchlist/{book_id}/confirm")
+    def watchlist_confirm(
+        book_id: int, source: str = Form(...), url: str = Form(...)
+    ) -> RedirectResponse:
+        """Eine unklare Zuordnung von Hand festmachen.
+
+        Das ist der Vorgang, der im Texteditor und im Gespraech gleichermassen
+        schlecht ist: eine URL suchen und in eine YAML kleben. Hier ist es ein
+        Klick, und das Ergebnis heisst ``confirmed`` statt ``linked`` — ein
+        Mensch hat entschieden, keine Heuristik.
+        """
+        _store_for(paths.db_path()).put_book_source(
+            book_id,
+            source,
+            outcome=str(LinkOutcome.CONFIRMED),
+            url=url,
+            resolved_at=datetime.now(),
+            reason="von Hand bestätigt",
+        )
+        return RedirectResponse("/watchlist", status_code=303)
 
     @app.get("/digest/{name}", response_class=HTMLResponse)
     def digest(name: str) -> HTMLResponse:
