@@ -4,56 +4,34 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}eBook-Watchlist{% endblock %}</title>
-<style>
-:root { color-scheme: light dark; }
-body { font: 16px/1.5 system-ui, sans-serif; margin: 0; color: #1a1a1a;
-       background: #fdfdfc; }
-main { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
-header { border-bottom: 1px solid #e4e4e0; background: #fff; }
-header div { max-width: 52rem; margin: 0 auto; padding: 1rem 1.25rem;
-             display: flex; align-items: baseline; gap: 1rem; }
-header strong { font-size: 1.05rem; }
-header span { color: #666; font-size: 0.9rem; }
-h1 { font-size: 1.3rem; margin: 1.5rem 0 0.25rem; }
-h2 { font-size: 1rem; margin: 2.25rem 0 0.6rem; border-bottom: 1px solid #e4e4e0;
-     padding-bottom: 0.3rem; }
-/* Fehlermeldungen sind lang; auf einem Telefon muss die Tabelle scrollen
-   duerfen, statt die Seite breit zu ziehen. */
-.scroll { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; font-size: 0.94rem; }
-td.error { max-width: 24rem; }
-th { text-align: left; font-weight: 600; color: #555; padding: 0.35rem 0.6rem 0.35rem 0;
-     border-bottom: 1px solid #e4e4e0; }
-td { padding: 0.4rem 0.6rem 0.4rem 0; border-bottom: 1px solid #f2f2ef;
-     vertical-align: top; }
-a { color: #1a4d8f; }
-.muted { color: #777; }
-.ok { color: #1a6b3c; }
-.bad { color: #a3242b; }
-.empty { color: #777; font-style: italic; padding: 0.75rem 0; }
-.pill { display: inline-block; border-radius: 3px; padding: 0 0.4rem;
-        font-size: 0.8rem; background: #ececea; color: #444; }
-.trouble { background: #fdf3f3; border: 1px solid #eccdcd; border-radius: 4px;
-           padding: 0.75rem 1rem; margin: 1rem 0; }
-@media (prefers-color-scheme: dark) {
-  body { background: #16161a; color: #e8e8e6; }
-  header { background: #1c1c21; border-color: #2e2e36; }
-  h2, th { border-color: #2e2e36; }
-  td { border-color: #24242b; }
-  a { color: #7aa9e6; }
-  .muted, .empty, header span, th { color: #9a9aa2; }
-  .pill { background: #2a2a32; color: #c8c8d0; }
-  .trouble { background: #2a1d1e; border-color: #4d2d30; }
-}
-</style>
+<link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
 </head>
-<body>
-<header><div>
-  <strong>eBook-Watchlist</strong>
-  <span>{% block subtitle %}{% endblock %}</span>
-</div></header>
-<main>
+<body class="m-0 font-sans text-[15px]/[1.55] antialiased">
+
+{# Ein Sprite statt einer Icon-Schrift: keine Fremdanfrage, kein Nachladen,
+   und die Icons erben Farbe und Groesse vom Text (ADR 20). #}
+<svg class="hidden" aria-hidden="true">
+  <symbol id="ic-book" viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></symbol>
+  <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2"/></symbol>
+  <symbol id="ic-doc" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4M9 13h6M9 17h4"/></symbol>
+  <symbol id="ic-warn" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5h.01"/></symbol>
+  <symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></symbol>
+  <symbol id="ic-tag" viewBox="0 0 24 24"><path d="M3 11V4a1 1 0 0 1 1-1h7l9 9-8 8z"/><circle cx="7.5" cy="7.5" r="1.2"/></symbol>
+</svg>
+
+<header class="sticky top-0 z-20 border-b border-rule bg-card/85 backdrop-blur">
+  <div class="mx-auto flex max-w-3xl items-center gap-3 px-6 py-3">
+    <svg class="i text-[19px] text-accent"><use href="#ic-book"/></svg>
+    <div>
+      <div class="font-semibold tracking-tight">eBook-Watchlist</div>
+      {% block subtitle %}{% endblock %}
+    </div>
+  </div>
+</header>
+
+<main class="mx-auto max-w-3xl px-6 pt-8 pb-24">
 {% block content %}{% endblock %}
 </main>
+
 </body>
 </html>

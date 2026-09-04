@@ -32,7 +32,7 @@ def test_the_run_journal_is_shown(client: TestClient) -> None:
 
     body = client.get("/").text
 
-    assert body.count("<tr>") >= 3  # header plus two runs
+    assert body.count("<tr") >= 3  # header plus two runs
     assert "cli" in body
     assert "ok" in body
 

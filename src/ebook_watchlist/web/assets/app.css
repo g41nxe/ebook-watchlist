@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* Tailwind v4 konfiguriert sich in CSS. Die Vorlagen sind die einzige Quelle,
+   aus der Klassen gelesen werden - der Prototyp unter .scratch/ ist Wegwerfcode
+   und darf das Stylesheet nicht aufblaehen. */
+@source "../templates";
+
+/* Die Tokens des Projekts. Ein einziges System (ADR 20): was hier nicht steht,
+   wird nicht als Custom Property danebengelegt. */
+@theme {
+  --color-paper: oklch(0.98 0.006 85);
+  --color-card: oklch(0.995 0.004 85);
+  --color-ink: oklch(0.26 0.012 60);
+  --color-soft: oklch(0.52 0.012 60);
+  --color-rule: oklch(0.91 0.012 80);
+  --color-hair: oklch(0.95 0.008 80);
+
+  /* Autor:in - der Kanal, den die Leserin selbst gewaehlt hat. */
+  --color-accent: oklch(0.45 0.06 185);
+  --color-accent-bg: oklch(0.95 0.02 185);
+  /* Thema - das Regal, dem noch niemand zugestimmt hat. */
+  --color-amber: oklch(0.52 0.09 75);
+  --color-amber-bg: oklch(0.95 0.03 80);
+
+  --color-danger: oklch(0.45 0.13 25);
+  --color-gold: oklch(0.68 0.11 85);
+
+  --font-serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+
+  --shadow-sheet: 0 1px 2px oklch(0.26 0.012 60 / 0.05),
+                  0 10px 30px -14px oklch(0.26 0.012 60 / 0.28);
+}
+
+/* Dunkelmodus ueber die Medienabfrage, wie bisher (ADR 20). Nur die Rollen
+   tauschen; keine Farbe ist ausschliesslich hier definiert. */
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-paper: oklch(0.17 0.008 285);
+    --color-card: oklch(0.21 0.008 285);
+    --color-ink: oklch(0.92 0.006 85);
+    --color-soft: oklch(0.65 0.008 85);
+    --color-rule: oklch(0.30 0.008 285);
+    --color-hair: oklch(0.25 0.008 285);
+
+    --color-accent: oklch(0.75 0.06 185);
+    --color-accent-bg: oklch(0.27 0.03 185);
+    --color-amber: oklch(0.76 0.08 80);
+    --color-amber-bg: oklch(0.27 0.03 80);
+
+    --color-danger: oklch(0.72 0.09 25);
+    --color-gold: oklch(0.78 0.10 85);
+
+    --shadow-sheet: 0 1px 2px oklch(0 0 0 / 0.5), 0 10px 30px -14px oklch(0 0 0 / 0.8);
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+  }
+  /* Icons erben Groesse und Farbe vom Text; das Sprite liefert nur die Pfade. */
+  svg.i {
+    width: 1em;
+    height: 1em;
+    flex: none;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: -0.13em;
+  }
+}

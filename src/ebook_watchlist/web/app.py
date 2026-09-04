@@ -19,12 +19,14 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import paths
 from ..config import ConfigError, load_profile
 from ..store import RunRow, Store
 
+STATIC = Path(__file__).parent / "static"
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 #: Digest files are named by the Run that wrote them. Serving anything else
@@ -79,6 +81,9 @@ def source_trouble(runs: list[RunRow]) -> list[str]:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="eBook-Watchlist", docs_url=None, redoc_url=None)
+    # Built by `uv run tailwindcss` and committed, so a checkout serves without
+    # a toolchain — the Pi never builds anything (ADR 20).
+    app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request) -> HTMLResponse:

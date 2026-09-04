@@ -1,10 +1,19 @@
 {% extends "base.html" %}
-{% block subtitle %}Konfigurationsfehler{% endblock %}
+{% block subtitle %}
+<div class="mt-0.5 text-[11px] tracking-[0.05em] text-soft uppercase">Konfigurationsfehler</div>
+{% endblock %}
 
 {% block content %}
-<h1>Die Konfiguration lässt sich nicht laden</h1>
-<div class="trouble">{{ message }}</div>
-<p class="muted">
+<h1 class="mb-4 font-serif text-2xl font-semibold tracking-tight">
+  Die Konfiguration lässt sich nicht laden
+</h1>
+<div class="rounded-lg border border-danger/30 bg-danger/5 px-4 py-3 text-danger">
+  <div class="flex items-start gap-2">
+    <svg class="i mt-1"><use href="#ic-warn"/></svg>
+    <span>{{ message }}</span>
+  </div>
+</div>
+<p class="mt-4 max-w-lg text-sm text-soft">
   Die Oberfläche zeigt nichts an, solange sie nicht weiß, wessen Profil sie
   zeigen soll — ein halb gefülltes Dashboard wäre irreführender als gar keines.
 </p>
