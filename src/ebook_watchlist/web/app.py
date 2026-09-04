@@ -27,7 +27,7 @@ from ..config import ConfigError, load_profile
 from ..models import LinkOutcome
 from ..relations import RelationKind
 from ..store import RunRow, Store
-from . import book, triage, watchlist
+from . import book, profile_page, triage, watchlist
 
 STATIC = Path(__file__).parent / "static"
 
@@ -390,6 +390,35 @@ def create_app() -> FastAPI:
         )
         target = f"/vorschlaege?anlass={anlass}" if anlass else "/vorschlaege"
         return RedirectResponse(target, status_code=303)
+
+    # --- Profiluebersicht (Ticket 09) ---------------------------------------
+
+    @app.get("/profil", response_class=HTMLResponse)
+    def profile_overview(request: Request) -> HTMLResponse:
+        """Nur lesend, und das ist die Entscheidung.
+
+        Der Massstab hat ein eigenes Aenderungsverfahren mit asymmetrischer
+        Beweislast (ADR 17). Ein Formular hier wuerde es umgehen — deshalb gibt
+        es zu dieser Seite keine schreibende Route.
+        """
+        try:
+            profile = load_profile()
+        except ConfigError as exc:
+            return TEMPLATES.TemplateResponse(
+                request,
+                "error.html",
+                {"message": str(exc), "asset_version": asset_version()},
+                status_code=500,
+            )
+        return TEMPLATES.TemplateResponse(
+            request,
+            "profile.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "view": profile_page.build(_store_for(paths.db_path()), profile),
+            },
+        )
 
     @app.get("/digest/{name}", response_class=HTMLResponse)
     def digest(name: str) -> HTMLResponse:
