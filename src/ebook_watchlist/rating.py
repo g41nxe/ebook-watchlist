@@ -31,7 +31,10 @@ from .models import Observation
 from .reasons import THEMA, thema_name
 
 RUBRIC_PATH = Path(__file__).resolve().parents[2] / "docs" / "leseprofil.md"
-_VERSION = re.compile(r"Maßstabsversion:\s*(\d+)", re.IGNORECASE)
+#: Das Verfahren, getrennt vom Profil (ADR 21). Nicht versioniert: eine
+#: Änderung hier entwertet keine gespeicherte Bewertung.
+SCHEME_PATH = Path(__file__).resolve().parents[2] / "docs" / "bewertungsschema.md"
+_VERSION = re.compile(r"(?:Profilversion|Maßstabsversion):\s*(\d+)", re.IGNORECASE)
 
 #: Voreinstellung. Ein beschränktes Urteil gegen einen mitgelieferten Maßstab —
 #: dafür ist das kleinste Modell das richtige.
@@ -50,6 +53,10 @@ KEY_ENV = "ANTHROPIC_API_KEY"
 #: gesetzt, nicht vorsichtig: wenige gut passende Vorschläge schlagen viele
 #: unpassende, und ein leerer Stapel ist ein gutes Ergebnis (ADR 19).
 DEFAULT_THRESHOLD = 3
+
+#: Worauf ein Urteil ruht. ``vermutet`` heisst nicht "nicht nachgesehen",
+#: sondern "nachgesehen und es steht nirgends" (bewertungsschema.md, 3).
+BELEGT, TEILS, VERMUTET = "belegt", "teils", "vermutet"
 
 # Die Herkunft steht in ``ratings`` — der Store braucht sie und darf
 # dieses Modul nicht importieren.
@@ -72,6 +79,17 @@ class Rating:
     def passes(self, threshold: int) -> bool:
         return self.stars >= threshold
 
+    def withholds(self, threshold: int) -> bool:
+        """Ob dieses Urteil ein Buch aus dem Digest nehmen darf.
+
+        Ein **vermutetes** Urteil darf das nicht (bewertungsschema.md, 3): ein
+        Buch durchzulassen darf auf Ableitung ruhen, eines zu verschweigen
+        nicht. Die Asymmetrie ist der Grund — ein zu Unrecht gezeigtes Buch
+        kostet eine Zeile, ein zu Unrecht verschwiegenes ist unsichtbar, und
+        die Leserin kann den Fehler nie bemerken.
+        """
+        return not self.passes(threshold) and self.confidence != VERMUTET
+
 
 def rubric_version(text: str) -> int:
     match = _VERSION.search(text)
@@ -87,6 +105,19 @@ def load_rubric(path: Path | None = None) -> tuple[str, int]:
     except OSError as exc:
         raise RatingUnavailable(f"Maßstab nicht lesbar: {exc}") from exc
     return text, rubric_version(text)
+
+
+def load_rating_scheme(path: Path | None = None) -> str:
+    """Das Bewertungsverfahren — für jedes Profil dasselbe (ADR 21).
+
+    Ohne Version: eine Änderung am Verfahren ist kein Grund, ein Urteil über
+    ein Buch für ungültig zu erklären.
+    """
+    target = path or SCHEME_PATH
+    try:
+        return target.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RatingUnavailable(f"Bewertungsschema nicht lesbar: {exc}") from exc
 
 
 #: Wieviele Bücher höchstens in einen Aufruf gehen. Der Maßstab ist der weitaus
@@ -127,7 +158,7 @@ def _facts(observation: Observation) -> list[str]:
     return facts
 
 
-def prompt_for(observation: Observation, rubric: str) -> str:
+def prompt_for(observation: Observation, rubric: str, scheme: str) -> str:
     """Was das Modell zu einem einzelnen Buch zu sehen bekommt.
 
     Dass der Klappentext abgeschnitten ist, wird ausdrücklich gesagt. Ein Modell,
@@ -136,22 +167,25 @@ def prompt_for(observation: Observation, rubric: str) -> str:
     facts = _facts(observation)
 
     return (
-        "Du bewertest ein Buch gegen den folgenden Maßstab. Halte dich strikt "
-        "daran, auch an die Regeln für Begründungen.\n\n"
-        f"--- MASSSTAB ---\n{rubric}\n--- ENDE MASSSTAB ---\n\n"
+        "Du bewertest ein Buch. Das VERFAHREN sagt, wie zu urteilen ist; das "
+        "LESEPROFIL sagt, wonach. Halte dich an beides.\n\n"
+        f"--- VERFAHREN ---\n{scheme}\n--- ENDE VERFAHREN ---\n\n"
+        f"--- LESEPROFIL ---\n{rubric}\n--- ENDE LESEPROFIL ---\n\n"
         f"--- BUCH ---\n" + "\n".join(facts) + "\n--- ENDE BUCH ---\n\n"
         "Antworte ausschließlich mit JSON in genau dieser Form:\n"
         '{"stars": <0-5>, "confidence": "belegt|teils|vermutet", '
-        '"reason": "<ein Satz, der eine Achse benennt und einen Beleg nennt>"}\n\n'
+        '"reason": "<ein Satz, der einen Teil des Profils benennt und einen Beleg nennt>"}\n\n'
         + _HOW_TO_ANSWER
     )
 
 
-def prompt_for_many(observations: Sequence[Observation], rubric: str) -> str:
+def prompt_for_many(
+    observations: Sequence[Observation], rubric: str, scheme: str
+) -> str:
     """Ein Aufruf für mehrere Bücher.
 
-    Der Maßstab geht einmal raus statt einmal je Buch — er ist der weitaus
-    größte Teil des Prompts. Jedes Buch bekommt eine Nummer, und die Antwort
+    Verfahren und Profil gehen einmal raus statt einmal je Buch — sie sind der
+    weitaus größte Teil des Prompts. Jedes Buch bekommt eine Nummer, und die Antwort
     wird darüber zugeordnet: ohne Kennung liesse sich eine Antwort, die ein Buch
     auslässt oder umsortiert, nicht mehr sicher zuordnen.
     """
@@ -161,16 +195,18 @@ def prompt_for_many(observations: Sequence[Observation], rubric: str) -> str:
     ]
 
     return (
-        f"Du bewertest {len(observations)} Bücher gegen den folgenden Maßstab. "
-        "Halte dich strikt daran, auch an die Regeln für Begründungen. Beurteile "
-        "jedes Buch für sich; die Reihenfolge sagt nichts über seine Passung.\n\n"
-        f"--- MASSSTAB ---\n{rubric}\n--- ENDE MASSSTAB ---\n\n"
+        f"Du bewertest {len(observations)} Bücher. Das VERFAHREN sagt, wie zu "
+        "urteilen ist; das LESEPROFIL sagt, wonach. Halte dich an beides. "
+        "Beurteile jedes Buch für sich; die Reihenfolge sagt nichts über seine "
+        "Passung.\n\n"
+        f"--- VERFAHREN ---\n{scheme}\n--- ENDE VERFAHREN ---\n\n"
+        f"--- LESEPROFIL ---\n{rubric}\n--- ENDE LESEPROFIL ---\n\n"
         + "\n\n".join(blocks)
         + "\n--- ENDE BÜCHER ---\n\n"
         "Antworte ausschließlich mit JSON in genau dieser Form, mit der Nummer "
         "des Buches als Schlüssel:\n"
         '{"1": {"stars": <0-5>, "confidence": "belegt|teils|vermutet", '
-        '"reason": "<ein Satz, der eine Achse benennt und einen Beleg nennt>"}, '
+        '"reason": "<ein Satz, der einen Teil des Profils benennt und einen Beleg nennt>"}, '
         '"2": {…}}\n\n'
         + _HOW_TO_ANSWER
     )
@@ -288,12 +324,15 @@ class ModelRater:
     model: str = DEFAULT_MODEL
     timeout: float = 30.0
     rubric: str = ""
+    scheme: str = ""
     version: int = 0
     session: requests.Session | None = None
 
     def __post_init__(self) -> None:
         if not self.rubric:
             self.rubric, self.version = load_rubric()
+        if not self.scheme:
+            self.scheme = load_rating_scheme()
         if self.session is None:
             self.session = requests.Session()
 
@@ -301,7 +340,9 @@ class ModelRater:
         payload = {
             "model": self.model,
             "max_tokens": 300,
-            "messages": [{"role": "user", "content": prompt_for(observation, self.rubric)}],
+            "messages": [
+                {"role": "user", "content": prompt_for(observation, self.rubric, self.scheme)}
+            ],
         }
         headers = {
             "x-api-key": self.api_key,
@@ -361,14 +402,18 @@ class ClaudeCodeRater:
     executable: str = CLI_NAME
     timeout: float = CLI_TIMEOUT
     rubric: str = ""
+    scheme: str = ""
     version: int = 0
 
     def __post_init__(self) -> None:
         if not self.rubric:
             self.rubric, self.version = load_rubric()
+        if not self.scheme:
+            self.scheme = load_rating_scheme()
 
     def rate(self, observation: Observation) -> Rating:
-        return parse_answer(self._ask(prompt_for(observation, self.rubric)), self.version)
+        prompt = prompt_for(observation, self.rubric, self.scheme)
+        return parse_answer(self._ask(prompt), self.version)
 
     def rate_many(
         self, observations: Sequence[Observation]
@@ -382,7 +427,7 @@ class ClaudeCodeRater:
         """
         if not observations:
             return {}
-        answer = self._ask(prompt_for_many(observations, self.rubric))
+        answer = self._ask(prompt_for_many(observations, self.rubric, self.scheme))
         return parse_many(answer, observations, self.version)
 
     def _ask(self, prompt: str) -> str:
@@ -446,16 +491,23 @@ def build_rater(model: str | None = None) -> Rater | None:
     """
     try:
         rubric, version = load_rubric()
+        scheme = load_rating_scheme()
     except RatingUnavailable:
         return None
 
     key = os.environ.get(KEY_ENV)
     if key:
         return ModelRater(
-            api_key=key, model=model or DEFAULT_MODEL, rubric=rubric, version=version
+            api_key=key,
+            model=model or DEFAULT_MODEL,
+            rubric=rubric,
+            scheme=scheme,
+            version=version,
         )
 
     executable = shutil.which(CLI_NAME)
     if executable:
-        return ClaudeCodeRater(executable=executable, rubric=rubric, version=version)
+        return ClaudeCodeRater(
+            executable=executable, rubric=rubric, scheme=scheme, version=version
+        )
     return None

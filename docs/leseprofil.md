@@ -1,20 +1,26 @@
-# Leseprofil — der Maßstab für Buchbewertungen
+# Leseprofil — was für Bücher ich mag
 
-**Maßstabsversion: 1**
+**Profilversion: 1**
 
-Diese Zahl wird bei jeder Änderung an den Achsen, ihrer Gewichtung, den
-Gegenanzeigen oder der Sternedefinition erhöht. Jede Bewertung schreibt mit,
-gegen welche Version sie entstand — sonst stehen irgendwann Sterne aus drei
-Fassungen nebeneinander und die Liste ist nicht mehr sortierbar. Nachbewertet
-wird **nicht** automatisch (ADR 17).
+Diese Datei beschreibt einen Geschmack. Sie ist die Grundlage der Entscheidung,
+ob eine Beobachtung interessant ist — und sie ist das einzige Dokument in diesem
+Projekt, von dem die Leserin sagen können muss: *ja, das bin ich.*
 
-Dies ist der **standardisierte Teil** des Profile (siehe `CONTEXT.md`): woran sich
-entscheidet, ob ein Buch passt, und was ein Stern bedeutet. Versioniert, damit
-zwei Bewertungen desselben Buches zum selben Ergebnis kommen.
+Die Versionsnummer bedeutet genau eine Sache: **den Stand dieses Geschmacks.**
+Sie steigt, wenn sich am Inhalt hier etwas ändert, und jede Bewertung schreibt
+mit, gegen welche Fassung sie entstand. Nachbewertet wird **nicht** automatisch
+(ADR 17). Geändert wird ausschließlich über den Skill `leseprofil-schaerfen`,
+mit Beleg und Zustimmung je Änderung.
 
-Die **persönlichen Listen** liegen bewusst nicht hier, sondern lokal in `data/`
-(gitignored): `profile.yaml` (Reference Authors, Genre Categories, `no_gos`,
-`liked_books`) und `owned.yaml`. Der Maßstab gehört ins Repo, die Lesedaten nicht.
+Wie geurteilt wird, steht **nicht** hier, sondern in
+[`bewertungsschema.md`](bewertungsschema.md): Sterne, Begründungspflicht,
+`confidence`, Gegenprobe. Das ist Verfahren und gilt für jedes Profil; eine
+Änderung dort entwertet keine Bewertung (ADR 21).
+
+Abgeleitet aus dieser Beschreibung, aber nicht selbst Teil von ihr, sind die
+**Reference Authors** und die **Genre Categories** in `data/profile.yaml` — das,
+wonach ein Shop tatsächlich gefragt werden kann. Sie liegen lokal, zusammen mit
+`owned.yaml`: die Beschreibung gehört ins Repo, die Lesedaten nicht.
 
 ---
 
@@ -25,7 +31,7 @@ Fantasy, Dystopie und schwarzhumoriger Krimi sind alle zulässig, solange die
 Achsen tragen.
 
 > **Maschinell lesbar?** Hinter jeder Achse steht, woraus sie sich ohne Menschen
-> ableiten ließe. Das ist keine Spitzfindigkeit: derselbe Maßstab soll später
+> ableiten ließe. Das ist keine Spitzfindigkeit: dieselbe Beschreibung soll später
 > jeden gefundenen Titel vorsortieren, und was in keinen Daten steht, kann er
 > nicht bewerten.
 
@@ -96,97 +102,7 @@ Beklemmend, plotgetrieben, zügig. Ein Buch darf langsam brennen (*Cry Baby*,
 
 ---
 
-## 3. Sterne
-
-| Sterne | Bedeutung |
-|---|---|
-| **5** | Trägt mindestens drei Kernachsen, darunter zwingend **A und B**. |
-| **4** | Trägt zwei bis drei Achsen, mit einer klar benennbaren Lücke — typisch: starker Einzelband ohne Reihe. |
-| **3** | Trägt genau eine Achse überzeugend, sonst nur Genre-Nähe. |
-| **2** | Nur Genre-Nähe, keine Achse trägt. |
-| **1** | Kaum Berührung mit dem Profil. |
-| **0** | Gegenanzeige (siehe 2). |
-
-Bewertet wird die **Passung zum Profil, nicht die Qualität des Buches.** Ein
-hervorragender Cozy-Krimi bekommt null Sterne.
-
-Es gibt **eine** Skala. Auch der automatische Vorfilter vergibt Sterne, nicht
-eine zweite Größe — sonst bedeuten Zahlen je nach Herkunft etwas anderes.
-
-### Wie belastbar ist eine Bewertung? — `confidence`
-
-Weil Achse B maschinell unzuverlässig bleibt, trägt jede Bewertung dazu, worauf
-sie ruht:
-
-| Wert | Bedeutung |
-|---|---|
-| `belegt` | Jede tragende Achse ist aus Daten oder geprüfter Quelle nachgewiesen. |
-| `teils` | Mindestens eine tragende Achse ist erschlossen — die Begründung sagt welche. |
-| `vermutet` | Ruht überwiegend auf Ableitung. |
-
-`vermutet` ist für den automatischen Vorfilter zulässig — bei hundert Funden pro
-Lauf kann er nicht hundertmal recherchieren. Für eine Bewertung von Hand ist es
-**ein Fehler**: dort wird recherchiert, bis mindestens `teils` erreicht ist.
-
-Das ist der Unterschied, an dem es schon einmal gescheitert ist: `low` hieß
-damals „ich habe nicht nachgesehen", was etwas ganz anderes ist als „ich habe
-nachgesehen und es steht nirgends".
-
----
-
-## 3b. Die Gegenprobe
-
-Der Maßstab war anfangs **ausschließlich aus Zustimmung gebaut** — neun Bücher,
-die gefielen, keines, das enttäuschte. Entsprechend lagen alle dreizehn
-bewerteten Bücher zwischen drei und fünf Sternen. Eine Skala, an deren unterem
-Ende nie etwas landet, unterscheidet nicht, sie bestätigt.
-
-Deshalb sammelt `data/profile.yaml` auch `disliked_books`, jeweils mit dem
-Grund. Am wertvollsten ist dabei nicht der Cozy-Krimi, den der Maßstab ohnehin
-aussortiert, sondern **ein Buch, das auf dem Papier perfekt passte und trotzdem
-verloren hat**. Genau das trennt einen Maßstab von einem Genre-Filter.
-
-Ein hoch bewertetes Buch auf dieser Liste ist ein Befund über den Maßstab,
-nicht über den Leser.
-
----
-
-## 4. Wie eine Begründung auszusehen hat
-
-Eine Begründung muss vier Dinge leisten. Fehlt eines, ist sie unbrauchbar.
-
-1. **Welche Achse** getroffen oder verfehlt wird — benannt, nicht angedeutet.
-2. **Woran im Buch** das festzumachen ist: die konkrete Figur, Konstellation oder
-   Situation. Nicht das Etikett.
-3. **Warum das für diesen Leser zählt** — nach Möglichkeit die Brücke zu einem
-   Buch von der Positivliste.
-4. **Was den Stern kostet**, bei allem unter fünf. Ausdrücklich.
-
-### Verboten
-
-| Untugend | Beispiel |
-|---|---|
-| Tatsache statt Grund | „Band 1 einer Reihe um Margarete von Brühl." |
-| Zirkelschluss | „Trifft den Kern." / „Passt gut zum Profil." |
-| Genre-Etikett allein | „Cyberpunk-Dystopie." |
-| Verstecktes Nichtwissen | „Zur Erzählstimme kann ich nichts sagen." → **nachschlagen** |
-
-### Gut
-
-> **1942 – Das Labor · Paul Schüler — ★★★**
-> Eine Physikerin sabotiert die Uranmaschine, an der sie selbst gebaut hat,
-> während die Gestapo ihr im Nacken sitzt — Katz-und-Maus (C) mit vertauschten
-> Rollen, gejagt statt jagend. Margarete von Brühl trägt die Reihe über mehrere
-> Bände (A). Zwei Sterne kostet, dass die Stimme (B) nicht die Bruchstelle hat,
-> die Harry Hole oder Camille Preaker tragen, und dass das historische Setting
-> keine der isolierten Konstellationen (D) aufbaut.
-
-Der Unterschied zum Verbotenen: es steht da, *was passiert* und *welche Achse*
-das bedient — und der fehlende Stern ist begründet, nicht bloß vergeben.
-
----
-
-## 5. Notizen — Beobachtungen ohne Regelkraft
+## 3. Notizen — Beobachtungen ohne Regelkraft
 
 Einzelne Belege, die eine Achse betreffen, aber noch keine Änderung
 rechtfertigen. Stufe-3-Änderungen brauchen **zwei unabhängige** Bücher (ADR 17);
@@ -213,11 +129,3 @@ ausdrücklich **nicht** auf Bewertungen.
   *(Eintrag 2026-09-04, ein Beleg)*
 
 ---
-
-## 6. Nichts erfinden
-
-Wenn Reihe, Erzählperspektive oder Zielgruppe eines Buches unklar sind, wird
-**nachgeschlagen**, bevor bewertet wird. Unsicherheit zu etikettieren statt sie
-aufzulösen hat sich als teurer Fehler erwiesen: bei der ersten Bewertung des
-Bestands waren drei von vier so markierten Büchern zu niedrig eingestuft, und in
-einem Fall war die Autorin schlicht nicht ermittelt worden.

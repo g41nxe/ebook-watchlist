@@ -68,10 +68,15 @@ class GateNote:
     #: **das muss dastehen**: ein Tor, das für jedes Buch scheitert, sieht sonst
     #: aus wie ein Tag ohne Rückhalt statt wie ein Defekt.
     unrated: int = 0
+    #: Unter dem Schwellwert, aber nur vermutet — und deshalb gezeigt. Ein
+    #: vermutetes Urteil darf nichts zurückhalten (bewertungsschema.md, 3).
+    shown_unsure: int = 0
 
     @property
     def is_worth_saying(self) -> bool:
-        return bool(self.held_back or self.over_budget or self.unrated)
+        return bool(
+            self.held_back or self.over_budget or self.unrated or self.shown_unsure
+        )
 
     @property
     def text(self) -> str:
@@ -91,6 +96,11 @@ class GateNote:
             parts.append(
                 f"{self.unrated} konnten nicht bewertet werden und werden "
                 "ungeprüft gezeigt"
+            )
+        if self.shown_unsure:
+            parts.append(
+                f"{self.shown_unsure} lagen darunter, ruhten aber nur auf "
+                "Vermutung und werden deshalb gezeigt"
             )
         return "Bewertungstor: " + ", ".join(parts)
 

@@ -31,7 +31,8 @@ from ebook_watchlist.ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_s
 from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 22, 0)
-RUBRIC = "Maßstabsversion: 1\n\nHier stünde der Maßstab."
+RUBRIC = "Profilversion: 1\n\nHier stünde das Leseprofil."
+SCHEMA = "Hier stünde das Bewertungsschema."
 
 
 def discovery(**overrides) -> Observation:
@@ -84,21 +85,24 @@ def test_a_rubric_without_a_version_is_refused() -> None:
 
 def test_the_prompt_carries_only_public_facts() -> None:
     """Kein Watchlist-Inhalt, kein Besitz, keine Identität der Leserin (ADR 19)."""
-    text = prompt_for(discovery(author="Max Barry", blurb="Ein Schiff, allein."), RUBRIC)
+    text = prompt_for(
+        discovery(author="Max Barry", blurb="Ein Schiff, allein."), RUBRIC, SCHEMA
+    )
 
     assert "Max Barry" in text
     assert "Ein Schiff, allein." in text
-    assert "Maßstabsversion" in text
+    assert "Profilversion" in text
+    assert "Bewertungsschema" in text
 
 
 def test_a_truncated_blurb_says_so() -> None:
     """Ein Modell, das nicht weiß, wie dünn seine Grundlage ist, urteilt zu sicher."""
-    text = prompt_for(discovery(blurb="Sydney wollte nur Geld verdienen..."), RUBRIC)
+    text = prompt_for(discovery(blurb="Sydney wollte nur Geld verdienen..."), RUBRIC, SCHEMA)
     assert "abgeschnitten" in text
 
 
 def test_a_whole_blurb_is_not_flagged() -> None:
-    text = prompt_for(discovery(blurb="Ein vollständiger Satz."), RUBRIC)
+    text = prompt_for(discovery(blurb="Ein vollständiger Satz."), RUBRIC, SCHEMA)
     assert "abgeschnitten" not in text
 
 
@@ -657,11 +661,12 @@ def _entry(stars: int) -> dict:
 
 
 def test_the_rubric_goes_out_once_not_once_per_book() -> None:
-    """Der eigentliche Gewinn: der Maßstab ist der weitaus größte Teil des
-    Prompts, das Buch selbst sind ein paar Zeilen."""
-    prompt = prompt_for_many(_books(5), RUBRIC)
+    """Der eigentliche Gewinn: Verfahren und Profil sind der weitaus größte Teil
+    des Prompts, das Buch selbst sind ein paar Zeilen."""
+    prompt = prompt_for_many(_books(5), RUBRIC, SCHEMA)
 
-    assert prompt.count("Maßstabsversion: 1") == 1
+    assert prompt.count("Profilversion: 1") == 1
+    assert prompt.count(SCHEMA) == 1
     for number in range(1, 6):
         assert f"--- BUCH {number} ---" in prompt
 
@@ -772,3 +777,90 @@ def test_an_empty_batch_asks_nobody(monkeypatch) -> None:
 
     monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", boom)
     assert ClaudeCodeRater(rubric=RUBRIC, version=1).rate_many([]) == {}
+
+
+# --- was ein vermutetes Urteil darf (Ticket 24) -----------------------------
+
+
+def unsure(stars: int) -> Rating:
+    return Rating(stars=stars, reason="Ruht auf Ableitung.", confidence="vermutet",
+                  rubric_version=1)
+
+
+def test_a_merely_suspected_judgement_never_withholds_a_book(store: Store) -> None:
+    """Ein zu Unrecht gezeigtes Buch kostet eine Zeile. Ein zu Unrecht
+    verschwiegenes ist unsichtbar — die Leserin erfährt nie, dass es das Buch
+    gab (bewertungsschema.md, 3)."""
+    deltas = [first_seen(discovery(isbn="9783104911854"))]
+
+    kept, report = gate.apply(
+        deltas, store=store, rater=StubRater(unsure(1)), rubric_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+
+    assert kept == deltas
+    assert report.held_back == 0
+    assert report.shown_unsure == 1
+
+
+def test_a_well_founded_judgement_still_withholds(store: Store) -> None:
+    """Die Regel weicht das Tor nicht auf — sie betrifft nur das Raten."""
+    deltas = [first_seen(discovery(isbn="9783104911854"))]
+
+    kept, report = gate.apply(
+        deltas, store=store, rater=StubRater(rating(1)), rubric_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+
+    assert kept == []
+    assert (report.held_back, report.shown_unsure) == (1, 0)
+
+
+def test_a_suspected_judgement_does_not_withhold_on_a_price_drop_either(
+    store: Store,
+) -> None:
+    """Sonst wäre die Regel an der Vordertür scharf und an der Hintertür nicht."""
+    store.put_rating("isbn:9783104911854", stars=1, confidence="vermutet",
+                     reason="Ableitung.", rubric_version=1, now=NOW, origin=BY_MODEL)
+    found = discovery(isbn="9783104911854", price_cents=399)
+
+    kept, report = gate.apply(
+        [Delta(DeltaKind.PRICE_DROP, discovery(isbn="9783104911854", price_cents=299), found)],
+        store=store, rater=StubRater(rating(4)), rubric_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+
+    assert len(kept) == 1
+    assert report.held_back == 0
+
+
+def test_a_passing_judgement_is_never_counted_as_unsure(store: Store) -> None:
+    kept, report = gate.apply(
+        [first_seen(discovery(isbn="9783104911854"))],
+        store=store, rater=StubRater(unsure(5)), rubric_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+
+    assert len(kept) == 1
+    assert report.shown_unsure == 0
+
+
+def test_the_scheme_is_not_versioned(tmp_path) -> None:
+    """Eine Änderung am Verfahren entwertet keine Bewertung (ADR 21)."""
+    from ebook_watchlist.rating import load_rating_scheme
+
+    scheme = tmp_path / "schema.md"
+    scheme.write_text("Ein Verfahren ohne jede Versionsangabe.", encoding="utf-8")
+
+    assert load_rating_scheme(scheme) == "Ein Verfahren ohne jede Versionsangabe."
+
+
+def test_the_scheme_names_no_axis() -> None:
+    """Das Verfahren muss für jedes Profil taugen. Nennt es eine inhaltliche
+    Achse, ist es keins mehr."""
+    from ebook_watchlist.rating import load_rating_scheme
+
+    text = load_rating_scheme().lower()
+
+    for verboten in ("achse a", "achse b", "achse c", "achse d", "achse e", "kernachse"):
+        assert verboten not in text, f"{verboten!r} steht im Bewertungsschema"

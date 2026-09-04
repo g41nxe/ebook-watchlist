@@ -564,6 +564,7 @@ def _run(
             threshold=DEFAULT_THRESHOLD,
             over_budget=gate_report.over_budget,
             unrated=gate_report.unrated,
+            shown_unsure=gate_report.shown_unsure,
         ),
     )
 

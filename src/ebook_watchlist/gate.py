@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from .models import Delta, DeltaKind, MatchReason, Observation
-from .rating import BATCH_SIZE, Rater, Rating, rate_in_batches
+from .rating import BATCH_SIZE, VERMUTET, Rater, Rating, rate_in_batches
 from .ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject, subject_of
 from .store import Store
 
@@ -50,6 +50,9 @@ class GateReport:
     #: Über dem Budget und deshalb ungefragt durchgelassen — unbewertet und
     #: gezeigt, nie verworfen.
     over_budget: int = 0
+    #: Unter dem Schwellwert, aber nur vermutet — und deshalb gezeigt statt
+    #: zurückgehalten (bewertungsschema.md, 3).
+    shown_unsure: int = 0
     #: Das Urteil zu jedem durchgelassenen Fund, am Schlüssel der Beobachtung.
     #: Der Digest zeigt es: die Begründung ist der Grund, den ein Vorschlag
     #: mitbringt (ADR 19, Ticket 14).
@@ -130,7 +133,7 @@ def apply(
             stored = _judgement(store, delta.current, subject, rubric_version)
             if stored is None:
                 kept.append(delta)
-            elif stored.stars < threshold:
+            elif stored.stars < threshold and stored.confidence != VERMUTET:
                 report.held_back += 1
             else:
                 report.reused += 1
@@ -183,11 +186,15 @@ def apply(
                 origin=BY_MODEL,
             )
 
-        if rating.passes(threshold):
+        if rating.withholds(threshold):
+            report.held_back += 1
+        else:
+            if not rating.passes(threshold):
+                # Zu schwach, aber nur vermutet: gezeigt und mitgezählt, damit
+                # es im Digest steht statt still zu wirken.
+                report.shown_unsure += 1
             report.judgements[delta.current.key] = rating
             kept.append(delta)
-        else:
-            report.held_back += 1
     return kept, report
 
 
