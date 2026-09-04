@@ -27,7 +27,7 @@ from ..config import ConfigError, load_profile
 from ..models import LinkOutcome
 from ..relations import RelationKind
 from ..store import RunRow, Store
-from . import book, watchlist
+from . import book, triage, watchlist
 
 STATIC = Path(__file__).parent / "static"
 
@@ -60,6 +60,10 @@ TEMPLATES.env.filters["sum_chars"] = _sum_chars
 #: Digest files are named by the Run that wrote them. Serving anything else
 #: from the data directory would turn a read-only page into a file browser.
 DIGEST_NAME = re.compile(r"^digest-\d{4}-\d{2}-\d{2}(?:-\d{4})?\.html$")
+
+#: FastAPI liest Formularfelder ueber diese Marker. Als Modulkonstante,
+#: damit im Funktionskopf kein Aufruf steht (ruff B008).
+_SELECTED = Form(default=[])
 
 
 @dataclass(frozen=True, slots=True)
@@ -338,6 +342,54 @@ def create_app() -> FastAPI:
             now=datetime.now(),
         )
         return RedirectResponse(f"/book/{book_id}", status_code=303)
+
+    # --- Triage (Ticket 08) -------------------------------------------------
+
+    @app.get("/vorschlaege", response_class=HTMLResponse)
+    def triage_page(request: Request, anlass: str = "") -> HTMLResponse:
+        try:
+            profile = load_profile()
+        except ConfigError as exc:
+            return TEMPLATES.TemplateResponse(
+                request,
+                "error.html",
+                {"message": str(exc), "asset_version": asset_version()},
+                status_code=500,
+            )
+        pile = triage.pending(
+            _store_for(paths.db_path()), profile, reason=anlass or None
+        )
+        return TEMPLATES.TemplateResponse(
+            request,
+            "triage.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "pile": pile,
+                "actions": triage.ACTIONS,
+                "anlass": anlass,
+            },
+        )
+
+    @app.post("/vorschlaege/entscheiden")
+    def triage_decide(
+        kind: str = Form(...), keys: list[str] = _SELECTED, anlass: str = Form("")
+    ) -> RedirectResponse:
+        """Eine Entscheidung auf die Auswahl anwenden.
+
+        Alle drei schreiben eine Beziehung auf Buchebene — "verworfen" ist
+        keine Loeschung, sondern eine Aussage ueber das Buch, und sie gilt
+        dadurch bei *jeder* Quelle statt nur fuer eine Produktnummer (ADR 18).
+        """
+        triage.decide(
+            _store_for(paths.db_path()),
+            load_profile(),
+            keys,
+            kind,
+            now=datetime.now(),
+        )
+        target = f"/vorschlaege?anlass={anlass}" if anlass else "/vorschlaege"
+        return RedirectResponse(target, status_code=303)
 
     @app.get("/digest/{name}", response_class=HTMLResponse)
     def digest(name: str) -> HTMLResponse:

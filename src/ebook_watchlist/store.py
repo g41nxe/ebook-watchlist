@@ -465,6 +465,71 @@ class Store:
             )
             return [_to_observation(row) for row in session.scalars(stmt)]
 
+    def latest_discoveries(
+        self, profile_slug: str, limit: int = 500
+    ) -> list[Observation]:
+        """Die zuletzt gesehene Fassung jeder Entdeckung.
+
+        Der Snapshot ist anhaengend, also steht dasselbe Buch dort einmal je
+        Lauf. Fuer die Triage zaehlt nur der letzte Stand — dieselbe
+        max-id-je-Element-Unterabfrage wie ueberall sonst, damit die Kosten an
+        der Zahl der Funde haengen und nicht an der Laenge der Geschichte.
+        """
+        latest_ids = (
+            select(func.max(ObservationRow.id))
+            .where(
+                ObservationRow.profile_slug == profile_slug,
+                ObservationRow.match_reason.in_(
+                    [str(MatchReason.PROFILE_AUTHOR), str(MatchReason.GENRE_CATEGORY)]
+                ),
+            )
+            .group_by(ObservationRow.source, ObservationRow.source_item_id)
+        )
+        with self.session() as session:
+            stmt = (
+                select(ObservationRow)
+                .where(ObservationRow.id.in_(latest_ids))
+                .order_by(ObservationRow.id.desc())
+                .limit(limit)
+            )
+            return [_to_observation(row) for row in session.scalars(stmt)]
+
+    def decided_items(self, profile_slug: str) -> set[tuple[str, str]]:
+        """``(Quelle, Item-Id)``, zu denen es schon ein Buch mit Beziehung gibt.
+
+        Ueber ``book_source``, weil dort steht, unter welcher Nummer eine
+        Quelle ein Buch fuehrt. Das ist der Weg, auf dem eine Entscheidung
+        *buchweit* wirkt statt nur fuer eine Produktnummer (ADR 18).
+        """
+        with self.session() as session:
+            stmt = (
+                select(BookSourceRow.source, BookSourceRow.source_item_id)
+                .join(BookRelationRow, BookRelationRow.book_id == BookSourceRow.book_id)
+                .where(
+                    BookRelationRow.profile_slug == profile_slug,
+                    BookSourceRow.source_item_id.is_not(None),
+                )
+            )
+            return {(row[0], row[1]) for row in session.execute(stmt)}
+
+    def books_with_relations(self, profile_slug: str) -> dict[str, int]:
+        """ISBN -> Buch-Id, aber nur fuer Buecher, zu denen etwas gesagt wurde.
+
+        So verschwindet ein Fund auch dann aus dem Stapel, wenn eine *andere*
+        Quelle dasselbe Buch unter einer anderen Nummer fuehrt — die ISBN ist
+        der Schluessel, an dem sich beide treffen (ADR 18).
+        """
+        with self.session() as session:
+            stmt = (
+                select(BookRow.isbn, BookRow.id)
+                .join(BookRelationRow, BookRelationRow.book_id == BookRow.id)
+                .where(
+                    BookRelationRow.profile_slug == profile_slug,
+                    BookRow.isbn.is_not(None),
+                )
+            )
+            return {row[0]: row[1] for row in session.execute(stmt)}
+
     def get_state(self, profile_slug: str, key: str) -> datetime | None:
         with self.session() as session:
             row = session.get(StateRow, (profile_slug, key))
