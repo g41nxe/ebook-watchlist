@@ -6,6 +6,8 @@
 {% block content %}
 <h1 class="mb-4 font-serif text-2xl font-semibold tracking-tight">Übersicht</h1>
 
+{% include "_run_panel.html" %}
+
 {% if trouble %}
 <div class="mb-6 rounded-lg border border-danger/30 bg-danger/5 px-4 py-3">
   <div class="flex items-center gap-2 font-medium text-danger">
@@ -32,7 +34,7 @@
       {% elif source.ok %}text-accent
       {% elif source.ok is none %}text-soft
       {% else %}text-danger{% endif %}">{{ source.state }}</span>
-    <span class="font-medium">{{ source.name }}</span>
+    <span class="font-medium">{{ source.display }}</span>
     <span class="text-sm text-soft">zuletzt geprüft {{ source.seen }}</span>
     {% if source.note %}
     <span class="rounded bg-danger/10 px-1.5 py-0.5 text-xs text-danger">{{ source.note }}</span>
@@ -92,8 +94,14 @@
         {{ run.started_at.strftime("%d.%m. %H:%M") }}</td>
       <td class="py-2 pr-3">
         <span class="rounded bg-hair px-1.5 py-0.5 text-xs text-soft">{{ run.trigger }}</span></td>
-      <td class="py-2 pr-3 font-medium {{ 'text-accent' if run.status == 'ok' else 'text-danger' }}">
-        {{ run.status }}</td>
+      {# Nicht run.status: ein abgeschossener Lauf steht dort fuer immer als
+         "running", weil der Prozess, der das haette richtigstellen sollen,
+         eben weg ist. #}
+      {% set state = run_status[run.id] %}
+      <td class="py-2 pr-3 font-medium
+        {% if state == 'ok' %}text-accent
+        {% elif state == 'läuft' %}text-soft
+        {% else %}text-danger{% endif %}">{{ state }}</td>
       <td class="py-2 pr-3 tabular-nums">{{ run.delta_count if run.delta_count else "—" }}</td>
       <td class="max-w-sm py-2 text-soft">{{ run.error or "" }}</td>
     </tr>

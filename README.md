@@ -133,6 +133,16 @@ Heimnetz, nicht ins offene Internet.
 Der Webprozess **scrapt nichts** und hält nie die Run-Sperre. Ihn zu beenden
 oder neu zu starten stört einen laufenden Run nicht, und umgekehrt.
 
+„Jetzt prüfen" auf der Übersicht startet einen Run — als **eigenen Prozess**
+(`--trigger ui`), nicht im Webprozess. Die Seite fragt danach im
+Zwei-Sekunden-Takt nach dem Stand und hört von selbst auf, sobald der Run
+vorbei ist; es gibt keinen Websocket. Läuft schon einer, sagt die Seite das und
+startet keinen zweiten — abgesichert nicht durch den ausgegrauten Knopf,
+sondern durch die Dateisperre, an der der zweite Prozess abprallt. Was der
+angestoßene Run auf die Konsole schreibt, landet in `data/run-ui.log`, damit
+ein Run, der es nicht bis ins Journal geschafft hat, trotzdem etwas
+hinterlässt.
+
 Tests und Linter:
 
 ```bash

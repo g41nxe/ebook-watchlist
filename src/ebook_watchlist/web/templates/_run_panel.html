@@ -1,0 +1,61 @@
+{# Der Lauf-Knopf und was er ausgeloest hat.
+
+   Beide Routen - POST /run und GET /run/status - liefern genau dieses
+   Fragment, damit Knopf und Statusanzeige nicht auseinanderlaufen koennen.
+
+   Das Nachfragen haengt an hx-trigger, und das steht nur dran, solange ein
+   Lauf laeuft: sobald der Server ein Fragment ohne Trigger zurueckgibt, hoert
+   die Seite von selbst auf zu fragen. Kein Websocket (ADR 3), kein Timer im
+   Browser, der weiterlaeuft, nachdem der Lauf fertig ist. #}
+<section id="run-panel"
+         class="mb-8 rounded-lg border px-4 py-3
+           {% if run_state.trouble %}border-danger/30 bg-danger/5
+           {% elif run_state.busy %}border-accent/30 bg-accent-bg/40
+           {% else %}border-rule bg-card{% endif %}"
+         {% if run_state.busy %}
+         hx-get="/run/status"
+         hx-trigger="every 2s"
+         hx-target="#run-panel"
+         hx-swap="outerHTML"
+         {% endif %}>
+
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <svg class="i text-[17px]
+      {% if run_state.trouble %}text-danger
+      {% elif run_state.busy %}animate-spin text-accent
+      {% else %}text-soft{% endif %}">
+      <use href="{% if run_state.trouble %}#ic-warn{% elif run_state.busy %}#ic-spin{% else %}#ic-play{% endif %}"/>
+    </svg>
+
+    <span class="font-medium {% if run_state.trouble %}text-danger{% endif %}">
+      {{ run_state.headline }}</span>
+
+    {% if run_state.started_label %}
+    <span class="text-sm tabular-nums text-soft">seit {{ run_state.started_label }}</span>
+    {% endif %}
+
+    <div class="ml-auto">
+      {% if run_state.busy %}
+      {# Kein zweiter Lauf: der Knopf ist weg, solange einer laeuft. Die
+         Dateisperre ist die eigentliche Absicherung - das hier erspart nur
+         den Klick, der ohnehin abprallen wuerde. #}
+      <span class="text-sm text-soft italic">Läuft schon – bitte warten</span>
+      {% else %}
+      <button type="button"
+              hx-post="/run"
+              hx-target="#run-panel"
+              hx-swap="outerHTML"
+              class="rounded-md border border-accent/40 bg-accent-bg px-3 py-1.5 text-sm
+                     font-medium text-accent hover:border-accent
+                     focus-visible:outline-2 focus-visible:outline-offset-2
+                     focus-visible:outline-accent">
+        Jetzt prüfen
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if run_state.detail %}
+  <p class="mt-2 text-sm whitespace-pre-wrap text-soft">{{ run_state.detail }}</p>
+  {% endif %}
+</section>

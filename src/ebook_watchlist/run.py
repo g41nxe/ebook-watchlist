@@ -463,7 +463,10 @@ def _run(
     profile = configured.profile
     watchlist = configured.watchlist
 
-    run_id = store.start_run(profile.slug, trigger, started_at)
+    # Signing the row with our pid is what lets anyone else — the Dashboard's
+    # "Run now" panel, above all — tell a Run still working from one that was
+    # killed before it could write an ending (Ticket 10).
+    run_id = store.start_run(profile.slug, trigger, started_at, pid=os.getpid())
 
     sources, paused = _partition_enabled(sources, store)
     for name in paused:

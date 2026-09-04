@@ -46,6 +46,10 @@ class RunRow(Base):
     status: Mapped[str] = mapped_column(String, default="running")
     delta_count: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: The OS process doing the work. An unfinished row says nothing on its own
+    #: — a killed Run never gets to write ``finished_at`` — so whoever asks
+    #: "is a Run still going?" needs something it can check (Ticket 10).
+    pid: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ObservationRow(Base):
@@ -318,13 +322,20 @@ class Store:
     def session(self) -> Session:
         return Session(self._engine)
 
-    def start_run(self, profile_slug: str, trigger: str, started_at: datetime) -> int:
+    def start_run(
+        self,
+        profile_slug: str,
+        trigger: str,
+        started_at: datetime,
+        pid: int | None = None,
+    ) -> int:
         with self.session() as session:
             run = RunRow(
                 profile_slug=profile_slug,
                 trigger=trigger,
                 started_at=started_at,
                 status="running",
+                pid=pid,
             )
             session.add(run)
             session.commit()
@@ -362,6 +373,11 @@ class Store:
             for row in rows:
                 session.expunge(row)
             return rows
+
+    def latest_run(self, profile_slug: str) -> RunRow | None:
+        """The most recent Run, finished or not — what "Run now" reports on."""
+        runs = self.recent_runs(profile_slug, limit=1)
+        return runs[0] if runs else None
 
     def last_finished_run(self, profile_slug: str, before_run_id: int) -> RunRow | None:
         """The previous completed Run — what the Digest means by 'last check'."""

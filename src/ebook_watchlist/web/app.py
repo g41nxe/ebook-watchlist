@@ -26,8 +26,10 @@ from .. import paths
 from ..config import ConfigError, load_profile
 from ..models import LinkOutcome
 from ..relations import RelationKind
+from ..sources import registry
 from ..store import RunRow, Store
 from . import book, profile_page, triage, watchlist
+from .runs import RunLauncher, journal_status
 
 STATIC = Path(__file__).parent / "static"
 
@@ -103,6 +105,10 @@ class SourceHealth:
     """One Source as the Dashboard shows it (Ticket 03)."""
 
     name: str
+    #: Wie die Quelle der Leserin gegenueber heisst. "voebb" war nie ein Wort
+    #: fuer sie (Ticket 14) — und welche Quelle eine Bibliothek ist, sagt die
+    #: Registry, nicht eine Liste in der Vorlage.
+    display: str
     enabled: bool
     ok: bool | None
     last_probe_at: datetime | None
@@ -130,10 +136,11 @@ class SourceHealth:
         return f"{self.last_probe_at:%d.%m. %H:%M}" if self.last_probe_at else "nie"
 
 
-def source_health(store: Store) -> list[SourceHealth]:
+def source_health(store: Store, profile) -> list[SourceHealth]:
     return [
         SourceHealth(
             name=row.name,
+            display=registry.label(profile, row.name),
             enabled=row.enabled,
             ok=row.last_probe_ok,
             last_probe_at=row.last_probe_at,
@@ -173,6 +180,11 @@ def create_app() -> FastAPI:
     covers.mkdir(parents=True, exist_ok=True)
     app.mount("/covers", StaticFiles(directory=covers), name="covers")
 
+    # Ein Starter je Anwendung. Er haelt nur, was ein Neustart vergessen darf:
+    # das Kind, das wir gestartet und noch nicht im Journal gesehen haben
+    # (Ticket 10).
+    launcher = RunLauncher()
+
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request) -> HTMLResponse:
         try:
@@ -194,8 +206,13 @@ def create_app() -> FastAPI:
                 "profile": profile,
                 "asset_version": asset_version(),
                 "runs": runs,
+                "run_state": launcher.state(store, profile.slug),
+                # Nicht run.status: ein abgeschossener Lauf steht dort fuer
+                # immer als "running", weil der Prozess, der das haette
+                # richtigstellen sollen, eben weg ist (Ticket 10).
+                "run_status": journal_status(runs),
                 "digests": digest_files(),
-                "sources": source_health(store),
+                "sources": source_health(store, profile),
                 "trouble": source_trouble(runs),
             },
         )
@@ -418,6 +435,48 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "view": profile_page.build(_store_for(paths.db_path()), profile),
             },
+        )
+
+    # --- Jetzt laufen (Ticket 10) -------------------------------------------
+
+    def _run_panel(request: Request, decide, refresh_when_over: bool = False) -> HTMLResponse:
+        try:
+            profile = load_profile()
+        except ConfigError as exc:
+            return TEMPLATES.TemplateResponse(
+                request,
+                "error.html",
+                {"message": str(exc), "asset_version": asset_version()},
+                status_code=500,
+            )
+        store = _store_for(paths.db_path())
+        state = decide(store, profile.slug)
+        headers = {"HX-Refresh": "true"} if refresh_when_over and not state.busy else None
+        return TEMPLATES.TemplateResponse(
+            request, "_run_panel.html", {"run_state": state}, headers=headers
+        )
+
+    @app.post("/run", response_class=HTMLResponse)
+    def start_run(request: Request) -> HTMLResponse:
+        """Einen Lauf starten — als eigener Prozess, nie hier drin (ADR 3).
+
+        Antwortet mit demselben Bruchstueck, das auch die Abfrage liefert: so
+        koennen der Knopf und der Zustand, den er erzeugt, sich nicht
+        widersprechen.
+        """
+        return _run_panel(request, lambda store, slug: launcher.start(store, slug))
+
+    @app.get("/run/status", response_class=HTMLResponse)
+    def run_status(request: Request) -> HTMLResponse:
+        """Was der laufende Lauf gerade tut. Abgefragt, nicht geschoben (ADR 3).
+
+        Nur ein Panel, das abfragt, fragt hier — und es fragt nur, solange ein
+        Lauf laeuft. Eine Antwort "laeuft nicht mehr" heisst also: dieser Lauf
+        ist eben zu Ende, und der Rest der Seite ist veraltet. Einmal neu zu
+        laden ist billiger, als vier Abschnitten das Abfragen beizubringen.
+        """
+        return _run_panel(
+            request, lambda store, slug: launcher.state(store, slug), refresh_when_over=True
         )
 
     @app.get("/digest/{name}", response_class=HTMLResponse)

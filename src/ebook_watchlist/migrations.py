@@ -158,6 +158,17 @@ def _drop_seeded_scope_table(connection: Connection) -> None:
     connection.exec_driver_sql("DROP TABLE IF EXISTS seeded_scope")
 
 
+def _add_run_pid_column(connection: Connection) -> None:
+    """Which process is doing a Run, so an abandoned one can be told from a live one.
+
+    An unfinished run row means "started and never wrote an ending", which a
+    killed process and a Run still working produce alike. Existing rows stay
+    NULL and are therefore judged by their age instead — the pid of a process
+    that ended before this column existed cannot be recovered (Ticket 10).
+    """
+    add_column(connection, "run", "pid", "INTEGER")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -166,6 +177,10 @@ MIGRATIONS: tuple[Migration, ...] = (
     _drop_resolution_table,
     _add_cover_column,
     _drop_seeded_scope_table,
+    # Angehaengt, nie eingeschoben: der Zaehler ist die Version einer
+    # bestehenden Datei, und eine verschobene Reihenfolge liesse einen
+    # Datenbestand mittlerer Version die falschen Schritte ueberspringen.
+    _add_run_pid_column,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

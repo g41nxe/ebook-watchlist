@@ -134,7 +134,9 @@ def test_a_paused_source_says_so_rather_than_vanishing(
     body = client.get("/").text
 
     assert "pausiert" in body
-    assert name in body
+    # Der interne Name steht bewusst nicht mehr da — die Leserin liest die Art
+    # der Quelle (Ticket 14). Dass es *diese* ist, sagt der Zustand.
+    assert name not in body
 
 
 def test_a_source_broken_for_days_is_marked_as_such(
