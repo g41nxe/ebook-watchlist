@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ebook_watchlist import paths
+from ebook_watchlist.config import load_profile
 from ebook_watchlist.models import LinkOutcome
 from ebook_watchlist.relations import RelationKind
 from ebook_watchlist.store import Store
@@ -232,7 +233,7 @@ def test_entries_put_the_questions_first(db: Store) -> None:
     db.put_relation("test", asking.id, str(RelationKind.WATCHING), now=NOW)
     db.put_book_source(asking.id, "beam", outcome=str(LinkOutcome.UNSURE), resolved_at=NOW)
 
-    rows = view.entries(db, "test")
+    rows = view.entries(db, load_profile())
 
     assert rows[0].book_id == asking.id
     assert rows[0].needs_attention
@@ -240,7 +241,7 @@ def test_entries_put_the_questions_first(db: Store) -> None:
 
 
 def test_an_entry_shows_the_last_price_it_was_seen_at(db: Store) -> None:
-    rows = {row.title: row for row in view.entries(db, "test")}
+    rows = {row.title: row for row in view.entries(db, load_profile())}
     schwarm = rows.get("Der Schwarm")
     if schwarm is not None and schwarm.latest is not None:
         assert schwarm.price is not None

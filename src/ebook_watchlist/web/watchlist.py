@@ -10,6 +10,8 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 
+from ..config import Profile
+from ..deals import is_strong_deal
 from ..models import Availability, LinkOutcome, Observation
 from ..relations import RelationKind
 from ..store import Store
@@ -69,6 +71,9 @@ class Entry:
     cover_file: str | None
     sources: tuple[SourceState, ...]
     latest: Observation | None
+    #: Unter der Schnaeppchen-Grenze. Faerbt den Preis und setzt das
+    #: Abzeichen aufs Cover — dieselbe Farbe bedeutet ueberall dasselbe.
+    deal: bool = False
 
     @property
     def needs_attention(self) -> bool:
@@ -91,6 +96,10 @@ class Entry:
         }.get(self.latest.availability)
 
     @property
+    def borrowable(self) -> bool:
+        return self.latest is not None and self.latest.availability is Availability.AVAILABLE
+
+    @property
     def seen(self) -> str | None:
         if self.latest is None or self.latest.observed_at is None:
             return None
@@ -106,8 +115,11 @@ class Entry:
         return not self.sources
 
 
-def entries(store: Store, profile_slug: str, *, include_paused: bool = True) -> list[Entry]:
+def entries(
+    store: Store, profile: Profile, *, include_paused: bool = True
+) -> list[Entry]:
     """Die Watchlist, wie die Seite sie zeigt."""
+    profile_slug = profile.slug
     relations = store.relations(
         profile_slug, kind=str(RelationKind.WATCHING), active_only=not include_paused
     )
@@ -142,6 +154,9 @@ def entries(store: Store, profile_slug: str, *, include_paused: bool = True) -> 
                 cover_file=book.cover_file,
                 sources=states,
                 latest=latest.get(book.id),
+                deal=is_strong_deal(
+                    getattr(latest.get(book.id), "price_cents", None), profile
+                ),
             )
         )
     rows.sort(key=lambda entry: (not entry.needs_attention, entry.title.casefold()))

@@ -45,6 +45,18 @@ def asset_version() -> str:
         return "0"
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
+
+def _sum_chars(text: str) -> int:
+    """Quersumme eines Titels — der Farbton des Platzhalter-Covers.
+
+    Deterministisch, damit dasselbe Buch immer gleich aussieht und zwei
+    nebeneinander sich unterscheiden.
+    """
+    return sum(ord(char) for char in text or "")
+
+
+TEMPLATES.env.filters["sum_chars"] = _sum_chars
+
 #: Digest files are named by the Run that wrote them. Serving anything else
 #: from the data directory would turn a read-only page into a file browser.
 DIGEST_NAME = re.compile(r"^digest-\d{4}-\d{2}-\d{2}(?:-\d{4})?\.html$")
@@ -195,7 +207,7 @@ def create_app() -> FastAPI:
             {
                 "profile": profile,
                 "asset_version": asset_version(),
-                "entries": watchlist.entries(store, profile.slug),
+                "entries": watchlist.entries(store, profile),
                 "restrictions": watchlist.RESTRICTIONS,
                 "message": message,
             },
