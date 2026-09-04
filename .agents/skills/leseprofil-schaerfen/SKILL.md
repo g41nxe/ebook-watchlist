@@ -34,7 +34,12 @@ selbst und misst nichts mehr.
    |---|---|---|
    | 1 | `liked_books` / `disliked_books` ergänzen, Reference Author vorschlagen | keine |
    | 2 | Gegenanzeige streichen oder abschwächen | **ein** Widerspruch |
-   | 3 | Achse hinzufügen, entfernen, umgewichten; Sternedefinition ändern | **zwei unabhängige** Bücher |
+   | 3 | Achse hinzufügen, entfernen, umgewichten; **neue Gegenanzeige aufnehmen**; Sternedefinition ändern | **zwei unabhängige** Bücher |
+
+   Beachte die Richtung: **Streichen** ist Stufe 2, **Aufnehmen** ist Stufe 3.
+   Eine neue Gegenanzeige beginnt sofort, Bücher auszusortieren, von denen der
+   Benutzer nie erfährt — sie trägt also dasselbe Risiko wie eine falsch
+   gewichtete Achse und braucht dieselbe Beweislast.
 
    Der Grund für die Asymmetrie: Eine falsche Gegenanzeige richtet sofort und
    unsichtbar Schaden an — sie sortiert Bücher aus, von denen der Benutzer nie

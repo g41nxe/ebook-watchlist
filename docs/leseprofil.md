@@ -200,6 +200,18 @@ ausdrücklich **nicht** auf Bewertungen.
   Achsen zerfallen sollte, entscheidet der zweite Beleg.
   *(Eintrag 2026-09-04, ein Beleg)*
 
+- **Nicht Fantasy stört, sondern der mythische Ton.** *Herr der Ringe* steht auf
+  `disliked_books` — „klassische Fantasy ist nicht meins". Dem stehen *Yendi*
+  und *Otherland* auf der Positivliste gegenüber, beide Fantasy, beide mit
+  ausgiebigem Weltenbau. Das Genre trennt die Fälle also nicht. Was sie trennt,
+  sind A und B: Vlad Taltos ist ein Auftragsmörder mit loser Zunge in der
+  Ich-Form, Tolkien erzählt ein Ensemble in erhabenem Ton. Insoweit bestätigt
+  der Fall die bestehenden Achsen.
+
+  Offen bleibt, ob „mythisch-archaischer Erzählmodus" eine eigene Gegenanzeige
+  verdient oder ob A und B ihn ohnehin schon abfangen. Zweiter Beleg nötig.
+  *(Eintrag 2026-09-04, ein Beleg)*
+
 ---
 
 ## 6. Nichts erfinden
