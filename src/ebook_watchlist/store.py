@@ -28,7 +28,7 @@ from .books import BookLike
 from .books import find as find_book
 from .migrations import migrate
 from .models import LINK_OUTCOMES, Availability, MatchReason, Observation
-from .relations import check_details, check_interest_key, check_relation_kind
+from .relations import RelationKind, check_details, check_interest_key, check_relation_kind
 
 
 class Base(DeclarativeBase):
@@ -511,6 +511,44 @@ class Store:
                 )
             )
             return {(row[0], row[1]) for row in session.execute(stmt)}
+
+    def dismissed_keys(self, profile_slug: str) -> tuple[set[tuple[str, str]], set[str]]:
+        """``(Quelle, Nummer)`` und ISBNs aller aktiven Ablehnungen.
+
+        Zwei Abfragen, nicht zwei je Ablehnung. Der naheliegende Weg — ueber
+        die Beziehungen laufen und je Buch nachschlagen — kostet bei
+        dreihundert Ablehnungen rund zweieinhalb Sekunden **pro Lauf**, und
+        genau diese Sorte Wachstum hat schon einmal eine Tabelle gekostet
+        (ADR 16, ``seeded_scope``).
+        """
+        with self.session() as session:
+            dismissed = (
+                select(BookRelationRow.book_id)
+                .where(
+                    BookRelationRow.profile_slug == profile_slug,
+                    BookRelationRow.kind == str(RelationKind.DISMISSED),
+                    BookRelationRow.active.is_(True),
+                )
+                .scalar_subquery()
+            )
+            items = {
+                (row[0], row[1])
+                for row in session.execute(
+                    select(BookSourceRow.source, BookSourceRow.source_item_id).where(
+                        BookSourceRow.book_id.in_(dismissed),
+                        BookSourceRow.source_item_id.is_not(None),
+                    )
+                )
+            }
+            isbns = {
+                row[0]
+                for row in session.execute(
+                    select(BookRow.isbn).where(
+                        BookRow.id.in_(dismissed), BookRow.isbn.is_not(None)
+                    )
+                )
+            }
+        return items, isbns
 
     def books_with_relations(self, profile_slug: str) -> dict[str, int]:
         """ISBN -> Buch-Id, aber nur fuer Buecher, zu denen etwas gesagt wurde.

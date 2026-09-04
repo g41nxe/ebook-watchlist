@@ -73,15 +73,7 @@ def dismissed_books(store: Store, profile_slug: str) -> Dismissed:
     vorgeschlagen werden dürfen — das ist der Sinn davon, sie zu deaktivieren
     statt sie zu löschen.
     """
-    items: set[tuple[str, str]] = set()
-    isbns: set[str] = set()
-    for relation in store.relations(profile_slug, kind=str(RelationKind.DISMISSED)):
-        book = store.book(relation.book_id)
-        if book is not None and book.isbn:
-            isbns.add(book.isbn)
-        for link in store.book_sources(relation.book_id):
-            if link.source_item_id:
-                items.add((link.source, link.source_item_id))
+    items, isbns = store.dismissed_keys(profile_slug)
     return Dismissed(items=frozenset(items), isbns=frozenset(isbns))
 
 

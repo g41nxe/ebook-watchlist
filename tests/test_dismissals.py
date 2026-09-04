@@ -208,3 +208,56 @@ def test_the_run_itself_never_opens_the_file_any_more(data_dir: Path) -> None:
     (data_dir / "dismissed.yaml").write_text("das ist keine Zuordnung", encoding="utf-8")
 
     assert main([]) == EXIT_OK
+
+
+def test_the_lookup_does_not_grow_with_the_number_of_dismissals(tmp_path) -> None:
+    """Zwei Abfragen, nicht zwei je Ablehnung.
+
+    Der naheliegende Weg — über die Beziehungen laufen und je Buch
+    nachschlagen — kostet bei dreihundert Ablehnungen rund zweieinhalb
+    Sekunden pro Lauf. Genau diese Sorte Wachstum hat schon einmal eine
+    Tabelle gekostet (ADR 16).
+    """
+    from datetime import datetime
+
+    from ebook_watchlist.dismissals import dismissed_books
+    from ebook_watchlist.models import LinkOutcome
+    from ebook_watchlist.relations import RelationKind
+    from ebook_watchlist.store import Store
+
+    now = datetime(2026, 9, 4, 22, 0)
+    store = Store(tmp_path / "s.db")
+    for number in range(50):
+        book = store.find_or_create_book(
+            isbn=f"978000000{number:04d}", title=f"Buch {number}", now=now
+        )
+        store.put_relation("t", book.id, str(RelationKind.DISMISSED), now=now)
+        store.put_book_source(
+            book.id, "beam", outcome=str(LinkOutcome.CONFIRMED),
+            source_item_id=str(number), resolved_at=now,
+        )
+
+    found = dismissed_books(store, "t")
+
+    assert len(found.items) == 50
+    assert len(found.isbns) == 50
+    assert found.covers("beam", "7")
+    assert found.covers("voebb", "irgendwas", isbn="9780000000007")
+
+
+def test_a_withdrawn_dismissal_is_suggested_again(tmp_path) -> None:
+    """Der Sinn davon, sie zu deaktivieren statt zu löschen."""
+    from datetime import datetime
+
+    from ebook_watchlist.dismissals import dismissed_books
+    from ebook_watchlist.relations import RelationKind
+    from ebook_watchlist.store import Store
+
+    now = datetime(2026, 9, 4, 22, 0)
+    store = Store(tmp_path / "s.db")
+    book = store.find_or_create_book(isbn="9783104911854", title="Buch", now=now)
+    store.put_relation("t", book.id, str(RelationKind.DISMISSED), now=now)
+
+    store.deactivate_relation("t", book.id, str(RelationKind.DISMISSED), now=now)
+
+    assert not dismissed_books(store, "t").covers("beam", "1", isbn="9783104911854")
