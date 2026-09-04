@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from .models import Delta, DeltaKind, MatchReason, Observation
-from .rating import Rater, Rating, RatingUnavailable
+from .rating import BATCH_SIZE, Rater, Rating, rate_in_batches
 from .ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject, subject_of
 from .store import Store
 
@@ -86,15 +86,30 @@ def apply(
     ist ausdrücklich erlaubt: gezeigt wird dann alles, was die Preisregel
     durchgelassen hat.
 
-    ``budget`` begrenzt die *Aufrufe* eines Laufs. Der erste Lauf mit einem
-    Schlüssel trifft einen Rückstand von dreihundert Entdeckungen, und die alle
-    am Stück abzufeuern widerspräche derselben Zurückhaltung, die jede andere
+    ``budget`` begrenzt die *Bücher* eines Laufs, nicht die Aufrufe. Der erste
+    Lauf trifft einen Rückstand von dreihundert Entdeckungen, und die alle am
+    Stück abzufeuern widerspräche derselben Zurückhaltung, die jede andere
     ausgehende Anfrage in diesem Projekt bindet (ADR 7). Ein gespeichertes
     Urteil kostet nichts und zählt deshalb nicht mit.
     """
     report = GateReport()
     if rater is None:
         return deltas, unrated_report(deltas)
+
+    # Erst sammeln, wer ein frisches Urteil braucht, dann gebündelt fragen.
+    # Einzeln zu fragen schickte den Maßstab je Buch erneut mit — und er ist
+    # der weitaus größte Teil des Prompts (Ticket 12).
+    #
+    # Das Budget zählt weiterhin *Bücher*, nicht Aufrufe: sonst hiesse "40"
+    # plötzlich achthundert.
+    wanted = [
+        delta.current
+        for delta in deltas
+        if _is_discovery(delta)
+        and _judgement(store, delta.current, subject_of(delta.current), rubric_version) is None
+    ][:budget]
+    fresh = rate_in_batches(rater, wanted, size=BATCH_SIZE) if wanted else {}
+    attempted = {observation.key for observation in wanted}
 
     kept: list[Delta] = []
     for delta in deltas:
@@ -138,28 +153,25 @@ def apply(
                 confidence=stored.confidence,
                 rubric_version=stored.rubric_version,
             )
-        elif report.rated + report.unrated >= budget:
-            # Budget aufgebraucht: der Rest wartet auf den naechsten Lauf und
-            # wird solange gezeigt. Uebersprungen heisst unbewertet, nicht
-            # aussortiert — sonst verschluckte ausgerechnet das Sparen die
-            # Neuzugaenge.
-            #
-            # Gezaehlt werden *Versuche*, nicht Urteile: ein totes Netz haette
-            # sonst dreihundert vergebliche Anfragen am Stueck gekostet, also
-            # genau den Ausbruch, den das Budget verhindern soll.
+        elif delta.current.key not in attempted:
+            # Ueber dem Budget und deshalb gar nicht erst gefragt: der Rest
+            # wartet auf den naechsten Lauf und wird solange gezeigt.
+            # Uebersprungen heisst unbewertet, nicht aussortiert — sonst
+            # verschluckte ausgerechnet das Sparen die Neuzugaenge.
             report.over_budget += 1
             kept.append(delta)
             continue
         else:
-            try:
-                rating = rater.rate(delta.current)
-            except RatingUnavailable:
-                # Kein Schlüssel, kein Netz, unlesbare Antwort: das Buch bleibt
-                # unbewertet und wird trotzdem gezeigt. Ein Tor, das im Zweifel
-                # schliesst, verschluckt Neuzugaenge stillschweigend.
+            judged = fresh.get(delta.current.key)
+            if judged is None:
+                # Gefragt, aber ohne Antwort: kein Schluessel, kein Netz, eine
+                # unlesbare Zeile im Buendel. Das Buch bleibt unbewertet und
+                # wird trotzdem gezeigt — ein Tor, das im Zweifel schliesst,
+                # verschluckt Neuzugaenge stillschweigend.
                 report.unrated += 1
                 kept.append(delta)
                 continue
+            rating = judged
             report.rated += 1
             store.put_rating(
                 subject,

@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -88,14 +89,24 @@ def load_rubric(path: Path | None = None) -> tuple[str, int]:
     return text, rubric_version(text)
 
 
-def prompt_for(observation: Observation, rubric: str) -> str:
-    """Was das Modell zu sehen bekommt.
+#: Wieviele Bücher höchstens in einen Aufruf gehen. Der Maßstab ist der weitaus
+#: größte Teil eines Prompts — das Buch selbst sind ein paar Zeilen —, also spart
+#: ein Bündel nicht ein paar Prozent, sondern den Großteil. Zwanzig, weil eine
+#: Antwort, die für zwanzig Bücher je eine belegte Begründung liefern soll,
+#: lang genug ist.
+BATCH_SIZE = 20
 
-    Der Maßstab und die *öffentlichen* Angaben zum Buch — mehr nicht. Keine
-    Watchlist, kein Besitz, keine Identität der Leserin (ADR 19).
+_HOW_TO_ANSWER = (
+    "Erfinde nichts. Was der Klappentext nicht hergibt, ist nicht belegt — "
+    "dann ist die confidence 'vermutet' und die Begründung sagt das."
+)
 
-    Dass der Klappentext abgeschnitten ist, wird ausdrücklich gesagt. Ein Modell,
-    das nicht weiß, wie dünn seine Grundlage ist, gibt zu sichere Urteile ab.
+
+def _facts(observation: Observation) -> list[str]:
+    """Die *öffentlichen* Angaben zu einem Buch — mehr nicht.
+
+    Keine Watchlist, kein Besitz, keine Identität der Leserin (ADR 19). Eine
+    Stelle, damit Einzel- und Bündelprompt nicht auseinanderlaufen.
     """
     facts = [f"Titel: {observation.title}"]
     if observation.subtitle:
@@ -113,6 +124,16 @@ def prompt_for(observation: Observation, rubric: str) -> str:
     if observation.blurb:
         cut = " (vom Shop abgeschnitten)" if is_truncated(observation.blurb) else ""
         facts.append(f"Klappentext{cut}: {observation.blurb}")
+    return facts
+
+
+def prompt_for(observation: Observation, rubric: str) -> str:
+    """Was das Modell zu einem einzelnen Buch zu sehen bekommt.
+
+    Dass der Klappentext abgeschnitten ist, wird ausdrücklich gesagt. Ein Modell,
+    das nicht weiß, wie dünn seine Grundlage ist, gibt zu sichere Urteile ab.
+    """
+    facts = _facts(observation)
 
     return (
         "Du bewertest ein Buch gegen den folgenden Maßstab. Halte dich strikt "
@@ -122,9 +143,72 @@ def prompt_for(observation: Observation, rubric: str) -> str:
         "Antworte ausschließlich mit JSON in genau dieser Form:\n"
         '{"stars": <0-5>, "confidence": "belegt|teils|vermutet", '
         '"reason": "<ein Satz, der eine Achse benennt und einen Beleg nennt>"}\n\n'
-        "Erfinde nichts. Was der Klappentext nicht hergibt, ist nicht belegt — "
-        "dann ist die confidence 'vermutet' und die Begründung sagt das."
+        + _HOW_TO_ANSWER
     )
+
+
+def prompt_for_many(observations: Sequence[Observation], rubric: str) -> str:
+    """Ein Aufruf für mehrere Bücher.
+
+    Der Maßstab geht einmal raus statt einmal je Buch — er ist der weitaus
+    größte Teil des Prompts. Jedes Buch bekommt eine Nummer, und die Antwort
+    wird darüber zugeordnet: ohne Kennung liesse sich eine Antwort, die ein Buch
+    auslässt oder umsortiert, nicht mehr sicher zuordnen.
+    """
+    blocks = [
+        f"--- BUCH {number} ---\n" + "\n".join(_facts(observation))
+        for number, observation in enumerate(observations, start=1)
+    ]
+
+    return (
+        f"Du bewertest {len(observations)} Bücher gegen den folgenden Maßstab. "
+        "Halte dich strikt daran, auch an die Regeln für Begründungen. Beurteile "
+        "jedes Buch für sich; die Reihenfolge sagt nichts über seine Passung.\n\n"
+        f"--- MASSSTAB ---\n{rubric}\n--- ENDE MASSSTAB ---\n\n"
+        + "\n\n".join(blocks)
+        + "\n--- ENDE BÜCHER ---\n\n"
+        "Antworte ausschließlich mit JSON in genau dieser Form, mit der Nummer "
+        "des Buches als Schlüssel:\n"
+        '{"1": {"stars": <0-5>, "confidence": "belegt|teils|vermutet", '
+        '"reason": "<ein Satz, der eine Achse benennt und einen Beleg nennt>"}, '
+        '"2": {…}}\n\n'
+        + _HOW_TO_ANSWER
+    )
+
+
+def parse_many(
+    text: str, observations: Sequence[Observation], version: int
+) -> dict[tuple[str, str], Rating]:
+    """Die Antwort auf ein Bündel, buchweise gelesen.
+
+    **Ein unbrauchbarer Eintrag kostet ein Buch, nicht das Bündel.** Ohne das
+    machte eine einzige krumme Zeile zwanzig Bücher unbewertet — der Sinn der
+    Bündelung wäre dahin, und der Schaden wäre zwanzigmal so groß wie beim
+    Einzelaufruf.
+
+    Was fehlt, fehlt: der Aufrufer behandelt jedes Buch ohne Urteil als
+    unbewertet und zeigt es trotzdem.
+    """
+    match = re.search(r"\{.*\}", text, re.S)
+    if match is None:
+        raise RatingUnavailable("Antwort enthält kein JSON")
+    try:
+        data = json.loads(match.group(0))
+    except ValueError as exc:
+        raise RatingUnavailable(f"Antwort ist kein gültiges JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RatingUnavailable("Antwort ist kein Objekt mit Buchnummern")
+
+    ratings: dict[tuple[str, str], Rating] = {}
+    for number, observation in enumerate(observations, start=1):
+        entry = data.get(str(number))
+        if not isinstance(entry, dict):
+            continue
+        try:
+            ratings[observation.key] = parse_answer(json.dumps(entry), version)
+        except RatingUnavailable:
+            continue
+    return ratings
 
 
 def parse_answer(text: str, version: int) -> Rating:
@@ -163,6 +247,37 @@ class Rater(Protocol):
     """Was der Lauf braucht. Absichtlich klein, damit ein Stub genügt."""
 
     def rate(self, observation: Observation) -> Rating: ...
+
+
+def rate_in_batches(
+    rater: Rater, observations: Sequence[Observation], *, size: int = BATCH_SIZE
+) -> dict[tuple[str, str], Rating]:
+    """Bücher bündelweise beurteilen — die eine Stelle, die das Tor benutzt.
+
+    Ein Bewerter, der ``rate_many`` anbietet, wird gebündelt gefragt; wer nur
+    ``rate`` kann, wird einzeln gefragt. So bleibt der HTTP-Weg, bei dem ein
+    Aufruf fast nichts kostet, unverändert.
+
+    Was nicht zurückkommt, fehlt einfach: der Aufrufer behandelt jedes Buch ohne
+    Urteil als unbewertet und zeigt es trotzdem. Auch ein ganzes Bündel, das
+    scheitert, kostet deshalb kein einziges Buch die Anzeige.
+    """
+    ratings: dict[tuple[str, str], Rating] = {}
+    many = getattr(rater, "rate_many", None)
+    for start in range(0, len(observations), size):
+        chunk = list(observations[start : start + size])
+        if many is not None:
+            try:
+                ratings.update(many(chunk))
+            except RatingUnavailable:
+                continue
+            continue
+        for observation in chunk:
+            try:
+                ratings[observation.key] = rater.rate(observation)
+            except RatingUnavailable:
+                continue
+    return ratings
 
 
 @dataclass(slots=True)
@@ -215,7 +330,11 @@ class ModelRater:
 #: Werkzeug auf dem eigenen Rechner der naheliegende Weg. Die Leserin hat
 #: bestätigt, dass sie das so nutzen darf.
 CLI_NAME = "claude"
-CLI_TIMEOUT = 120.0
+#: Ein Buendel von zwanzig braucht laenger als ein einzelnes Buch — die 34
+#: Sekunden einer Einzelmessung sind fast ganz Startkosten, aber die Denkzeit
+#: waechst mit jedem Buch. Grosszuegig, weil eine Zeitueberschreitung hier das
+#: ganze Buendel unbewertet macht.
+CLI_TIMEOUT = 300.0
 
 
 @dataclass(slots=True)
@@ -249,13 +368,25 @@ class ClaudeCodeRater:
             self.rubric, self.version = load_rubric()
 
     def rate(self, observation: Observation) -> Rating:
-        command = [
-            self.executable,
-            "-p",
-            prompt_for(observation, self.rubric),
-            "--output-format",
-            "json",
-        ]
+        return parse_answer(self._ask(prompt_for(observation, self.rubric)), self.version)
+
+    def rate_many(
+        self, observations: Sequence[Observation]
+    ) -> dict[tuple[str, str], Rating]:
+        """Ein Aufruf für bis zu :data:`BATCH_SIZE` Bücher.
+
+        Der eigentliche Gewinn: der Maßstab geht einmal raus statt einmal je
+        Buch. Die 34 Sekunden eines Aufrufs sind zudem fast ganz Startkosten
+        des Unterprozesses, nicht Denkzeit — zwanzig Bücher kosten kaum mehr
+        als eines.
+        """
+        if not observations:
+            return {}
+        answer = self._ask(prompt_for_many(observations, self.rubric))
+        return parse_many(answer, observations, self.version)
+
+    def _ask(self, prompt: str) -> str:
+        command = [self.executable, "-p", prompt, "--output-format", "json"]
         try:
             completed = subprocess.run(  # noqa: S603 - fester Befehl, kein Shell
                 command,
@@ -277,7 +408,7 @@ class ClaudeCodeRater:
                 f"{self.executable} endete mit {completed.returncode}"
                 + (f": {detail[-1]}" if detail else "")
             )
-        return parse_answer(_cli_text(completed.stdout), self.version)
+        return _cli_text(completed.stdout)
 
 
 def _cli_text(stdout: str) -> str:

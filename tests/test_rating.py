@@ -6,6 +6,7 @@ Methode — genau damit ein Stub genügt.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 import pytest
@@ -13,13 +14,17 @@ import pytest
 from ebook_watchlist import gate
 from ebook_watchlist.models import Delta, DeltaKind, MatchReason, Observation
 from ebook_watchlist.rating import (
+    BATCH_SIZE,
     ClaudeCodeRater,
     ModelRater,
     Rating,
     RatingUnavailable,
     build_rater,
     parse_answer,
+    parse_many,
     prompt_for,
+    prompt_for_many,
+    rate_in_batches,
     rubric_version,
 )
 from ebook_watchlist.ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject
@@ -638,3 +643,132 @@ def test_a_rater_that_never_gets_through_is_said_out_loud(store: Store) -> None:
     note = GateNote(held_back=0, threshold=3, unrated=report.unrated)
     assert note.is_worth_saying
     assert "konnten nicht bewertet werden" in note.text
+
+
+# --- gebündelte Anfragen (Ticket 12) ---------------------------------------
+
+
+def _books(count: int) -> list[Observation]:
+    return [discovery(source_item_id=str(n), title=f"Buch {n}") for n in range(1, count + 1)]
+
+
+def _entry(stars: int) -> dict:
+    return {"stars": stars, "confidence": "teils", "reason": f"Achse D, {stars} Sterne"}
+
+
+def test_the_rubric_goes_out_once_not_once_per_book() -> None:
+    """Der eigentliche Gewinn: der Maßstab ist der weitaus größte Teil des
+    Prompts, das Buch selbst sind ein paar Zeilen."""
+    prompt = prompt_for_many(_books(5), RUBRIC)
+
+    assert prompt.count("Maßstabsversion: 1") == 1
+    for number in range(1, 6):
+        assert f"--- BUCH {number} ---" in prompt
+
+
+def test_every_book_is_numbered_so_the_answer_can_be_matched() -> None:
+    """Ohne Kennung liesse sich eine Antwort, die ein Buch auslässt oder
+    umsortiert, nicht mehr sicher zuordnen."""
+    books = _books(3)
+    answer = json.dumps({"1": _entry(5), "2": _entry(1), "3": _entry(4)})
+
+    ratings = parse_many(answer, books, version=1)
+
+    assert [ratings[b.key].stars for b in books] == [5, 1, 4]
+
+
+def test_a_book_the_answer_skips_is_simply_missing() -> None:
+    books = _books(3)
+    answer = json.dumps({"1": _entry(4), "3": _entry(2)})
+
+    ratings = parse_many(answer, books, version=1)
+
+    assert books[1].key not in ratings
+    assert set(ratings) == {books[0].key, books[2].key}
+
+
+def test_one_crooked_entry_costs_one_book_not_the_batch() -> None:
+    """Sonst machte eine einzige krumme Zeile zwanzig Bücher unbewertet — der
+    Schaden wäre zwanzigmal so groß wie beim Einzelaufruf."""
+    books = _books(3)
+    answer = json.dumps({"1": _entry(4), "2": {"stars": 99}, "3": _entry(3)})
+
+    ratings = parse_many(answer, books, version=1)
+
+    assert set(ratings) == {books[0].key, books[2].key}
+
+
+def test_an_answer_without_json_fails_the_batch_but_raises_cleanly() -> None:
+    with pytest.raises(RatingUnavailable, match="kein JSON"):
+        parse_many("Ich kann das nicht beurteilen.", _books(2), version=1)
+
+
+def test_batches_are_capped_at_twenty() -> None:
+    class Counting:
+        def __init__(self) -> None:
+            self.sizes: list[int] = []
+
+        def rate_many(self, observations):
+            self.sizes.append(len(observations))
+            return {o.key: rating(4) for o in observations}
+
+    rater = Counting()
+    ratings = rate_in_batches(rater, _books(45), size=BATCH_SIZE)
+
+    assert rater.sizes == [20, 20, 5]
+    assert len(ratings) == 45
+
+
+def test_a_failed_batch_costs_that_batch_and_no_more() -> None:
+    """Was nicht zurückkommt, fehlt — und fehlende Urteile heissen unbewertet
+    und gezeigt, nie verworfen."""
+    class HalfBroken:
+        def __init__(self) -> None:
+            self.seen = 0
+
+        def rate_many(self, observations):
+            self.seen += 1
+            if self.seen == 1:
+                raise RatingUnavailable("claude endete mit 1")
+            return {o.key: rating(4) for o in observations}
+
+    books = _books(25)
+    ratings = rate_in_batches(HalfBroken(), books, size=BATCH_SIZE)
+
+    assert len(ratings) == 5  # nur das zweite Bündel
+    assert all(b.key not in ratings for b in books[:20])
+
+
+def test_a_rater_that_only_knows_single_books_is_still_used() -> None:
+    """Der HTTP-Weg, bei dem ein Aufruf fast nichts kostet, bleibt unverändert."""
+    single = StubRater(rating(4))
+    books = _books(3)
+
+    ratings = rate_in_batches(single, books, size=BATCH_SIZE)
+
+    assert len(single.calls) == 3
+    assert len(ratings) == 3
+
+
+def test_the_cli_asks_once_for_the_whole_batch(monkeypatch) -> None:
+    prompts: list[str] = []
+
+    def capture(command, **kwargs):
+        prompts.append(command[2])
+        return _completed(stdout=json.dumps({"1": _entry(4), "2": _entry(5)}))
+
+    monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", capture)
+    books = _books(2)
+
+    ratings = ClaudeCodeRater(rubric=RUBRIC, version=1).rate_many(books)
+
+    assert len(prompts) == 1
+    assert {ratings[b.key].stars for b in books} == {4, 5}
+
+
+def test_an_empty_batch_asks_nobody(monkeypatch) -> None:
+    def boom(*a, **k):
+        raise AssertionError("hätte nicht fragen dürfen")
+
+    monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", boom)
+    assert ClaudeCodeRater(rubric=RUBRIC, version=1).rate_many([]) == {}
