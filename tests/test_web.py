@@ -149,3 +149,18 @@ def test_a_source_broken_for_days_is_marked_as_such(
     body = client.get("/").text
 
     assert "seit 3 Prüfungen" in body
+
+
+def test_a_fresh_checkout_can_build_its_assets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Das Henne-Ei, das ein frischer Klon nicht auflösen konnte.
+
+    ``app.py`` baut die Anwendung beim Import und verlangt dabei das gebaute
+    Stylesheet. Solange ``ebook_watchlist.web`` das eifrig importierte, führte
+    der Import des Bauwerkzeugs — das im selben Paket liegt — zuerst dorthin,
+    und die Fehlermeldung nannte einen Befehl, der selbst nicht laufen konnte.
+    """
+    import importlib
+
+    module = importlib.import_module("ebook_watchlist.web.build")
+
+    assert hasattr(module, "main")
