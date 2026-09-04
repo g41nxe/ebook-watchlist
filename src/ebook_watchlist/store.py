@@ -28,6 +28,7 @@ from .books import BookLike
 from .books import find as find_book
 from .migrations import migrate
 from .models import LINK_OUTCOMES, Availability, MatchReason, Observation
+from .ratings import HUMAN_ORIGINS, RATING_ORIGINS
 from .relations import RelationKind, check_details, check_interest_key, check_relation_kind
 
 
@@ -157,6 +158,10 @@ class RatingRow(Base):
     sonst ``(Quelle, Item-Id)``. Ein Buch, das später eine Beziehung bekommt,
     findet sein Urteil über die ISBN wieder.
 
+    Was ein Mensch sagt, hängt dagegen am Buch — ``book:<id>``. Er vergibt seine
+    Sterne auf der Buchseite, und sie sollen gelten, egal über welche Quelle das
+    Buch das nächste Mal hereinkommt (Ticket 21).
+
     Maschinensterne und die der Leserin bleiben getrennt — und zwar dadurch,
     dass ``origin`` dabeisteht und Teil des Schlüssels ist: eine 4 von ihr ist
     eine Tatsache, eine 4 vom Modell ein Vorschlag. Beide dürfen nebeneinander
@@ -166,7 +171,8 @@ class RatingRow(Base):
     __tablename__ = "rating"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    #: Der Schlüssel des Fundes: ``isbn:978…`` oder ``item:beam:1279702``.
+    #: ``isbn:978…`` oder ``item:beam:1279702`` beim Tor, ``book:42`` bei einem
+    #: Urteil über ein Buch.
     subject: Mapped[str] = mapped_column(String)
     #: Wer geurteilt hat. Solange es nur eine Herkunft gab, war das entbehrlich;
     #: mit den Urteilen aus dem Gespräch und denen der Leserin sind es drei.
@@ -788,16 +794,58 @@ class Store:
 
     # --- Bewertungen (Ticket 12) -------------------------------------------
 
-    def rating(self, subject: str, rubric_version: int) -> RatingRow | None:
-        """Das gespeicherte Urteil — aber nur, wenn es zum heutigen Maßstab passt."""
+    def rating(
+        self, subject: str, rubric_version: int, *, origin: str = "model"
+    ) -> RatingRow | None:
+        """Das gespeicherte Urteil einer Herkunft — wenn es zum Maßstab passt.
+
+        Die Maßstabsprüfung gilt nur für Maschinenurteile; was die Leserin
+        selbst gesagt hat, verfällt nicht, wenn sie ihren Maßstab schärft.
+        """
         with self.session() as session:
             row = session.scalars(
-                select(RatingRow).where(RatingRow.subject == subject)
+                select(RatingRow).where(
+                    RatingRow.subject == subject, RatingRow.origin == origin
+                )
             ).first()
-            if row is None or row.rubric_version != rubric_version:
+            if row is None:
+                return None
+            if origin not in HUMAN_ORIGINS and row.rubric_version != rubric_version:
                 return None
             session.expunge(row)
             return row
+
+    def ratings_for(self, subjects: Iterable[str]) -> dict[tuple[str, str], RatingRow]:
+        """Alle Urteile zu diesen Schlüsseln, nach ``(Schlüssel, Herkunft)``."""
+        wanted = set(subjects)
+        if not wanted:
+            return {}
+        with self.session() as session:
+            rows = list(
+                session.scalars(select(RatingRow).where(RatingRow.subject.in_(wanted)))
+            )
+            for row in rows:
+                session.expunge(row)
+            return {(row.subject, row.origin): row for row in rows}
+
+    def drop_rating(self, subject: str, origin: str) -> bool:
+        """Ein Urteil zurücknehmen; ``True``, wenn eines dastand.
+
+        Nur die Leserin nimmt zurück, und sie tut es, indem sie ihre eigenen
+        Sterne noch einmal anklickt. Eine Null wäre dafür kein Ersatz: sie
+        hieße "passt überhaupt nicht" und ist selbst ein Urteil.
+        """
+        with self.session() as session:
+            row = session.scalars(
+                select(RatingRow).where(
+                    RatingRow.subject == subject, RatingRow.origin == origin
+                )
+            ).first()
+            if row is None:
+                return False
+            session.delete(row)
+            session.commit()
+            return True
 
     def put_rating(
         self,
@@ -808,13 +856,27 @@ class Store:
         reason: str,
         rubric_version: int,
         now: datetime,
+        origin: str = "model",
     ) -> None:
+        """Ein Urteil festhalten.
+
+        Der Schlüssel ist ``(subject, origin)``: das Urteil der Leserin und das
+        des Modells stehen nebeneinander, und keines überschreibt das andere
+        (ADR 17, Ticket 21).
+        """
+        if origin not in RATING_ORIGINS:
+            raise ValueError(
+                f"unbekannte Herkunft {origin!r} "
+                f"(bekannt: {', '.join(sorted(RATING_ORIGINS))})"
+            )
         with self.session() as session:
             row = session.scalars(
-                select(RatingRow).where(RatingRow.subject == subject)
+                select(RatingRow).where(
+                    RatingRow.subject == subject, RatingRow.origin == origin
+                )
             ).first()
             if row is None:
-                row = RatingRow(subject=subject)
+                row = RatingRow(subject=subject, origin=origin)
                 session.add(row)
             row.stars = stars
             row.confidence = confidence

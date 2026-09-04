@@ -89,6 +89,75 @@
 </p>
 {% endif %}
 
+<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
+  <svg class="i"><use href="#ic-star"/></svg>Wie gut das passt
+</h2>
+
+{# Sterne der Leserin und Sterne einer Maschine stehen bewusst getrennt und
+   sehen bewusst verschieden aus: eine 4 von ihr ist eine Tatsache, eine 4 vom
+   Modell ein Vorschlag (ADR 17). Ein gemeinsamer Durchschnitt waere genau die
+   Vermischung, die das verhindern soll. #}
+<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+  <span class="w-28 shrink-0 text-sm text-soft">Deine Sterne</span>
+  <span class="flex items-center gap-0.5">
+    {% for value in range(1, 6) %}
+    {% set on = page.my_stars is not none and value <= page.my_stars %}
+    <form method="post" action="/book/{{ page.book_id }}/sterne">
+      <input type="hidden" name="stars" value="{{ value }}">
+      <button type="submit" title="{{ value }} von 5"
+              class="flex p-0.5 text-lg transition
+                     {{ 'text-ink' if on else 'text-rule hover:text-soft' }}">
+        <svg class="i" {% if on %}style="fill:currentColor"{% endif %}><use href="#ic-star"/></svg>
+        <span class="sr-only">{{ value }} von 5</span>
+      </button>
+    </form>
+    {% endfor %}
+  </span>
+  {% if page.my_stars is not none %}
+  {# Zuruecknehmen schreibt keine Null: "nicht bewertet" und "passt ueberhaupt
+     nicht" sind zwei verschiedene Auskuenfte. #}
+  <form method="post" action="/book/{{ page.book_id }}/sterne">
+    <input type="hidden" name="stars" value="">
+    <button type="submit" class="text-xs text-soft underline underline-offset-2
+                                 hover:text-ink">zurücknehmen</button>
+  </form>
+  {% else %}
+  <span class="text-xs text-soft italic">noch nicht bewertet</span>
+  {% endif %}
+</div>
+
+{% set machine = page.judgements | rejectattr("is_human") | list %}
+{% if machine %}
+<ul class="mt-4 space-y-3">
+  {% for judgement in machine %}
+  <li class="rounded-lg border border-rule bg-card px-4 py-3">
+    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <span class="flex items-center gap-0.5 text-soft">
+        {% for value in range(1, 6) %}
+        <svg class="i" {% if value <= judgement.stars %}style="fill:currentColor"{% endif %}>
+          <use href="#ic-star"/></svg>
+        {% endfor %}
+      </span>
+      <span class="text-sm text-soft">{{ judgement.label }}</span>
+      <span class="rounded bg-hair px-1.5 py-0.5 text-[11px] text-soft">{{ judgement.confidence }}</span>
+      {% if judgement.when %}
+      <span class="text-xs text-soft">{{ judgement.when.strftime("%d.%m.%Y") }}</span>
+      {% endif %}
+      {% if judgement.stale(page.rubric_version) %}
+      {# Ein Maschinenurteil gegen einen alten Massstab ist Auskunft, keine
+         Grundlage — beim naechsten Lauf wird es neu eingeholt (ADR 19). #}
+      <span class="rounded bg-danger/10 px-1.5 py-0.5 text-[11px] text-danger">
+        gegen Maßstab {{ judgement.rubric_version }}, heute gilt {{ page.rubric_version }}</span>
+      {% endif %}
+    </div>
+    {% if judgement.reason %}
+    <p class="mt-1.5 text-sm text-ink/80">{{ judgement.reason }}</p>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
 <h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
   Bei den Quellen
 </h2>

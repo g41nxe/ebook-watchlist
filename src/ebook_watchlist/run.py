@@ -19,7 +19,7 @@ from filelock import FileLock, Timeout
 
 from . import gate, paths
 from .cleaning import clean_blurb
-from .config import ConfigError, Profile, load_dismissals, load_profile, load_watchlist
+from .config import ConfigError, Profile, load_dismissals, load_owned, load_profile, load_watchlist
 from .configuration import NotSeeded
 from .configuration import load as load_configuration
 from .covers import CoverStore
@@ -338,11 +338,12 @@ def _seed(profile, watchlist) -> int:
     zurück, was inzwischen woanders geändert wurde.
     """
     store = Store(paths.db_path())
-    report = seed(store, profile, watchlist)
+    report = seed(store, profile, watchlist, owned=load_owned())
 
     print(f"  {report.books:>4}  Bücher neu angelegt")
     print(f"  {report.relations:>4}  Beziehungen")
     print(f"  {report.interests:>4}  Interessen")
+    print(f"  {report.ratings:>4}  Urteile aus owned.yaml (im Gespräch vergeben)")
     if report.needs_attention:
         print(f"\n  {len(report.unresolved)} Einträge brauchen Aufmerksamkeit:")
         for item in report.unresolved:

@@ -19,6 +19,7 @@ from ebook_watchlist.rating import (
     prompt_for,
     rubric_version,
 )
+from ebook_watchlist.ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject
 from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 22, 0)
@@ -349,3 +350,84 @@ def test_a_dead_network_costs_the_budget_too(store: Store) -> None:
     assert len(rater.calls) == 2
     assert (report.unrated, report.over_budget) == (2, 3)
     assert kept == deltas
+
+
+# --- wessen Sterne (Ticket 21) ----------------------------------------------
+
+
+def test_the_readers_stars_outrank_the_model_and_cost_no_call(store: Store) -> None:
+    """Eine 4 von ihr ist eine Tatsache, eine 4 vom Modell ein Vorschlag
+    (ADR 17). Das Tor fragt sie zuerst und ruft dann gar kein Modell mehr."""
+    book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    store.put_rating(book_subject(book.id), stars=5, confidence="belegt", reason="",
+                     rubric_version=1, now=NOW, origin=BY_READER)
+    rater = StubRater(rating(1))
+
+    kept, report = gate.apply(
+        [first_seen(discovery(book_id=book.id))],
+        store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW,
+    )
+
+    assert rater.calls == []
+    assert (len(kept), report.reused) == (1, 1)
+
+
+def test_her_stars_survive_a_sharpened_rubric(store: Store) -> None:
+    """Eine neue Maßstabsversion entwertet ein Modellurteil. Was ein Mensch
+    gesagt hat, verfällt nicht, wenn er seinen Maßstab schärft."""
+    book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    store.put_rating(book_subject(book.id), stars=5, confidence="belegt", reason="",
+                     rubric_version=1, now=NOW, origin=BY_READER)
+    rater = StubRater(rating(1))
+
+    gate.apply(
+        [first_seen(discovery(book_id=book.id))],
+        store=store, rater=rater, rubric_version=2, threshold=3, budget=10, now=NOW,
+    )
+
+    assert rater.calls == []
+
+
+def test_the_model_never_overwrites_what_she_said(store: Store) -> None:
+    book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    store.put_rating(book_subject(book.id), stars=5, confidence="belegt", reason="",
+                     rubric_version=1, now=NOW, origin=BY_READER)
+
+    store.put_rating(book_subject(book.id), stars=1, confidence="teils", reason="Modell",
+                     rubric_version=1, now=NOW, origin=BY_MODEL)
+
+    hers = store.rating(book_subject(book.id), 1, origin=BY_READER)
+    its = store.rating(book_subject(book.id), 1, origin=BY_MODEL)
+    assert (hers.stars, its.stars) == (5, 1)
+
+
+def test_a_judgement_from_the_conversation_also_spares_the_call(store: Store) -> None:
+    """Die dreizehn aus owned.yaml sind gegen denselben Maßstab entstanden —
+    sie noch einmal einzuholen wäre Verschwendung."""
+    book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    store.put_rating(book_subject(book.id), stars=4, confidence="teils", reason="Reihe.",
+                     rubric_version=1, now=NOW, origin=BY_CONVERSATION)
+    rater = StubRater(rating(1))
+
+    gate.apply(
+        [first_seen(discovery(book_id=book.id))],
+        store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW,
+    )
+
+    assert rater.calls == []
+
+
+def test_an_unknown_origin_is_refused(store: Store) -> None:
+    with pytest.raises(ValueError, match="unbekannte Herkunft"):
+        store.put_rating("book:1", stars=4, confidence="teils", reason="", rubric_version=1,
+                         now=NOW, origin="freund")
+
+
+def test_taking_her_stars_back_leaves_nothing_rather_than_a_zero(store: Store) -> None:
+    """Nicht bewertet und "passt überhaupt nicht" sind zwei Auskünfte."""
+    store.put_rating("book:1", stars=4, confidence="belegt", reason="", rubric_version=1,
+                     now=NOW, origin=BY_READER)
+
+    assert store.drop_rating("book:1", BY_READER) is True
+    assert store.rating("book:1", 1, origin=BY_READER) is None
+    assert store.drop_rating("book:1", BY_READER) is False

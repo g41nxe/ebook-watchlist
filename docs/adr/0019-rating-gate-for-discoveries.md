@@ -94,6 +94,25 @@ version are kept in a table of their own.
 > Urteil, nicht zwei, und ein Buch, das spaeter eine Beziehung bekommt, findet
 > sein Urteil ueber die ISBN wieder.
 
+> **Nachtrag aus der Umsetzung (Ticket 21): wer geurteilt hat, steht im
+> Schlüssel.** Solange es nur das Tor gab, war die Frage entbehrlich. Mit den
+> dreizehn Urteilen aus `owned.yaml` und den Sternen, die die Leserin selbst
+> vergibt, sind es drei Herkünfte — `model`, `conversation`, `reader` — und der
+> Unterschied trägt ADR 17: eine 4 von ihr ist eine Tatsache, eine 4 vom Modell
+> ein Vorschlag. Der Schlüssel ist deshalb `(subject, origin)` und nicht
+> `subject` allein: beide dürfen nebeneinander stehen, keines überschreibt das
+> andere, und die Seite zeigt sie getrennt statt gemittelt.
+>
+> Dazu kommt eine dritte Form von `subject`: `book:<id>`. Was ein Mensch sagt,
+> gilt dem Buch, nicht dem Fund — er vergibt seine Sterne auf der Buchseite, und
+> sie sollen gelten, egal über welche Quelle das Buch das nächste Mal
+> hereinkommt. Das Tor fragt deshalb erst am Buch (Leserin, dann Gespräch) und
+> erst danach am Fund; ein menschliches Urteil erspart den Aufruf ganz.
+>
+> Und es verfällt nicht mit einer neuen Maßstabsversion. Die Regel im Absatz
+> unten gilt für Maschinenurteile: dass die Leserin ihren Maßstab schärft, ist
+> kein Grund, ihre eigene Aussage für ungültig zu erklären.
+
 Below a threshold the book never reaches the triage list.
 
 > **Nachtrag aus der Nachschau (Ticket 20):** Und was durchkommt, trägt sein

@@ -13,20 +13,26 @@ from datetime import datetime
 
 from .models import Delta, DeltaKind, MatchReason, Observation
 from .rating import Rater, Rating, RatingUnavailable
+from .ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject, subject_of
 from .store import Store
 
 
-def subject_of(observation: Observation) -> str:
-    """Woran ein Urteil hängt.
+def _judgement(store: Store, observation: Observation, subject: str, rubric_version: int):
+    """Das Urteil, das für diesen Fund schon vorliegt — Mensch vor Maschine.
 
-    Die ISBN, wo es eine gibt — dann findet dasselbe Buch sein Urteil auch über
-    eine andere Quelle wieder. Sonst der Fund selbst; Bündel und Einzelfolgen
-    haben keine ISBN, und für die ist ein Urteil je Quelle ehrlicher als eines,
-    das über Titel geraten wäre.
+    Was die Leserin selbst gesagt hat, schlägt jedes Modellurteil und verfällt
+    auch nicht mit einer neuen Maßstabsversion (ADR 17). Ihre Sterne und die
+    aus dem Gespräch hängen am *Buch*, nicht am Fund: sie hat sie auf der
+    Buchseite vergeben, und sie sollen gelten, egal über welche Quelle das Buch
+    das nächste Mal hereinkommt. Nur das Tor selbst schlüsselt am Fund.
     """
-    if observation.isbn:
-        return f"isbn:{observation.isbn}"
-    return f"item:{observation.source}:{observation.source_item_id}"
+    if observation.book_id is not None:
+        of_book = book_subject(observation.book_id)
+        for origin in (BY_READER, BY_CONVERSATION):
+            stored = store.rating(of_book, rubric_version, origin=origin)
+            if stored is not None:
+                return stored
+    return store.rating(subject, rubric_version, origin=BY_MODEL)
 
 
 @dataclass(slots=True)
@@ -97,7 +103,9 @@ def apply(
             continue
 
         subject = subject_of(delta.current)
-        stored = store.rating(subject, rubric_version)
+
+        # Ein vorhandenes Urteil - auch das der Leserin - erspart den Aufruf.
+        stored = _judgement(store, delta.current, subject, rubric_version)
         if stored is not None:
             report.reused += 1
             rating = Rating(
@@ -136,6 +144,7 @@ def apply(
                 reason=rating.reason,
                 rubric_version=rating.rubric_version,
                 now=now,
+                origin=BY_MODEL,
             )
 
         if rating.passes(threshold):

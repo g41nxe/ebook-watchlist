@@ -15,10 +15,24 @@ from datetime import datetime
 from ..config import Profile
 from ..deals import is_strong_deal
 from ..models import Availability
+from ..rating import RatingUnavailable, load_rubric
+from ..ratings import (
+    BY_CONVERSATION,
+    BY_MODEL,
+    BY_READER,
+    HUMAN_ORIGINS,
+    LABELS,
+    book_subject,
+    subject_of,
+)
 from ..relations import RELATION_KINDS, RelationKind
 from ..sources import registry
 from ..store import Store
 from .watchlist import SourceState
+
+#: Die Reihenfolge, in der Urteile auf der Seite stehen: was ein Mensch gesagt
+#: hat, zuerst.
+ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL)
 
 #: Was die Leserin über ein Buch sagen kann, in der Reihenfolge, in der es auf
 #: der Seite steht. Mehrere gelten gleichzeitig — das ist der Normalfall.
@@ -29,6 +43,9 @@ KINDS: tuple[tuple[str, str], ...] = (
     (str(RelationKind.DISLIKED), "gefiel mir nicht"),
     (str(RelationKind.DISMISSED), "nicht mehr vorschlagen"),
 )
+
+#: Nur für den Vergleich zweier Zeitstempel, von denen einer fehlen darf.
+_EPOCH = datetime.min
 
 _AVAILABILITY = {
     Availability.AVAILABLE: "ausleihbar",
@@ -80,6 +97,36 @@ class Sighting:
 
 
 @dataclass(frozen=True, slots=True)
+class Judgement:
+    """Ein Urteil über dieses Buch, mit der Angabe, wer es gefällt hat.
+
+    Der Unterschied ist der ganze Zweck der Zeile: eine 4 von der Leserin ist
+    eine Tatsache, eine 4 vom Modell ein Vorschlag (ADR 17). Sie dürfen
+    deswegen nicht gleich aussehen.
+    """
+
+    origin: str
+    label: str
+    stars: int
+    reason: str
+    confidence: str
+    rubric_version: int
+    when: datetime | None
+
+    @property
+    def is_human(self) -> bool:
+        return self.origin in HUMAN_ORIGINS
+
+    def stale(self, current: int | None) -> bool:
+        """Gegen einen älteren Maßstab gefällt — und deshalb nur noch Auskunft.
+
+        Gilt nur für Maschinenurteile: was ein Mensch gesagt hat, verfällt
+        nicht, wenn er seinen Maßstab schärft.
+        """
+        return not self.is_human and current is not None and self.rubric_version != current
+
+
+@dataclass(frozen=True, slots=True)
 class Page:
     book_id: int
     title: str
@@ -90,6 +137,22 @@ class Page:
     relations: tuple[Relation, ...]
     sources: tuple[SourceState, ...]
     history: tuple[Sighting, ...]
+    judgements: tuple[Judgement, ...]
+    #: Der heutige Maßstab, oder ``None``, wenn er nicht lesbar ist.
+    rubric_version: int | None
+
+    @property
+    def my_stars(self) -> int | None:
+        """Was die Leserin selbst vergeben hat — sonst ``None``.
+
+        Ausdrücklich nicht ``0``: keine Bewertung und "passt überhaupt nicht"
+        sind zwei verschiedene Auskünfte, und eine Reihe grauer Sterne würde
+        die zweite behaupten, wo gar nichts gesagt wurde.
+        """
+        for judgement in self.judgements:
+            if judgement.origin == BY_READER:
+                return judgement.stars
+        return None
 
     @property
     def active_kinds(self) -> set[str]:
@@ -128,6 +191,47 @@ def _price(cents: int | None) -> str | None:
     return f"{cents / 100:.2f} €".replace(".", ",")
 
 
+def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
+    """Alle Urteile, die zu diesem Buch gehören — an drei Sorten Schlüssel.
+
+    Was ein Mensch gesagt hat, hängt am Buch. Das Tor schlüsselt dagegen am
+    Fund, weil es dreihundert Funde bewertet, von denen die wenigsten je eine
+    Buchzeile bekommen (ADR 18) — sein Urteil ist deshalb über die ISBN oder
+    über die Produktnummern der Quellen zu finden, unter denen dieses Buch
+    gesichtet wurde.
+    """
+    of_book = book_subject(book.id)
+    subjects = {of_book}
+    if book.isbn:
+        subjects.add(f"isbn:{book.isbn}")
+    subjects.update(subject_of(observation) for observation in seen)
+
+    rows = store.ratings_for(subjects)
+    found: dict[str, object] = {}
+    for (subject, origin), row in rows.items():
+        # Nur das Modell darf am Fund hängen: eine Leserin-Bewertung unter
+        # einem Fund-Schlüssel gäbe es nur, wenn jemand sie dort hinschriebe.
+        if origin != BY_MODEL and subject != of_book:
+            continue
+        previous = found.get(origin)
+        if previous is None or (row.rated_at or _EPOCH) > (previous.rated_at or _EPOCH):
+            found[origin] = row
+
+    return tuple(
+        Judgement(
+            origin=origin,
+            label=LABELS[origin],
+            stars=row.stars,
+            reason=row.reason,
+            confidence=row.confidence,
+            rubric_version=row.rubric_version,
+            when=row.rated_at,
+        )
+        for origin in ORIGIN_ORDER
+        if (row := found.get(origin)) is not None
+    )
+
+
 def build(store: Store, profile: Profile, book_id: int) -> Page | None:
     """Die Seite zu einem Buch, oder ``None``, wenn es das nicht gibt."""
     book = store.book(book_id)
@@ -161,6 +265,7 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
         for link in store.book_sources(book_id)
     )
 
+    seen = store.observations_for_book(profile.slug, book_id)
     history = tuple(
         Sighting(
             when=observation.observed_at,
@@ -174,8 +279,13 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
             ),
             deal=is_strong_deal(observation.price_cents, profile),
         )
-        for observation in store.observations_for_book(profile.slug, book_id)
+        for observation in seen
     )
+
+    try:
+        _, current_rubric = load_rubric()
+    except RatingUnavailable:
+        current_rubric = None
 
     return Page(
         book_id=book.id,
@@ -187,6 +297,8 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
         relations=relations,
         sources=sources,
         history=history,
+        judgements=_judgements(store, book, seen),
+        rubric_version=current_rubric,
     )
 
 
@@ -218,3 +330,33 @@ def price_points(history: tuple[Sighting, ...]) -> list[Sighting]:
         seen.append(sighting)
         last = sighting.price
     return seen
+
+
+def set_stars(store: Store, book_id: int, stars: int | None, *, now: datetime) -> None:
+    """Die eigenen Sterne der Leserin setzen oder zurücknehmen.
+
+    Sie stehen unter ihrer eigenen Herkunft und damit neben dem Modellurteil,
+    nicht darüber: keines überschreibt das andere (ADR 17, Ticket 21). Der
+    Maßstab wird mitgeschrieben, damit später nachvollziehbar bleibt, wovon
+    hier die Rede war — verfallen tut ihr Urteil deswegen nicht.
+    """
+    if stars is None:
+        store.drop_rating(book_subject(book_id), BY_READER)
+        return
+    if not 0 <= stars <= 5:
+        raise ValueError(f"Sterne müssen zwischen 0 und 5 liegen, nicht {stars}")
+    try:
+        _, version = load_rubric()
+    except RatingUnavailable:
+        # Ohne lesbaren Maßstab bleibt ihre Bewertung trotzdem gültig — sie
+        # hängt nicht an ihm. Die 0 sagt: unter keiner bekannten Fassung.
+        version = 0
+    store.put_rating(
+        book_subject(book_id),
+        stars=stars,
+        confidence="belegt",
+        reason="",
+        rubric_version=version,
+        now=now,
+        origin=BY_READER,
+    )

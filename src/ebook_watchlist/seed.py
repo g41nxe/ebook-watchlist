@@ -26,9 +26,19 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from .config import Profile, WatchlistEntry
+from .config import OwnedBook, Profile, WatchlistEntry
+from .ratings import BY_CONVERSATION, book_subject
 from .relations import InterestKey, RelationKind
 from .store import Store
+
+#: Der Maßstab, gegen den die Urteile in ``owned.yaml`` entstanden sind.
+OWNED_RUBRIC_VERSION = 1
+#: ``owned.yaml`` nennt zu keinem Eintrag eine Sicherheit — der Dateikopf
+#: beschreibt ein ``confidence``-Feld, das kein Eintrag trägt. Also tragen alle
+#: dieselbe ein, und zwar die mittlere: die Urteile entstanden im Gespräch über
+#: Titel, Reihe und Klappentextebene, nicht über gelesene Texte. Sie je Eintrag
+#: zu unterscheiden hieße, eine Angabe zu erfinden, die die Datei nicht macht.
+OWNED_CONFIDENCE = "teils"
 
 #: ``"Cry Baby - Gillian Flynn"`` -> Titel und Autor:in. Der Bindestrich ist die
 #: Konvention dieser Liste; ein Titel, der selbst einen enthält, wird an der
@@ -49,6 +59,8 @@ class SeedReport:
     books: int = 0
     relations: int = 0
     interests: int = 0
+    #: Urteile aus ``owned.yaml`` — Maschinenurteile, keine der Leserin.
+    ratings: int = 0
     #: Freitext, der sich nicht zweifelsfrei auflösen liess. Kein Fehler,
     #: sondern eine Frage an einen Menschen.
     unresolved: list[str] = field(default_factory=list)
@@ -97,7 +109,8 @@ def _book_for_free_text(
 
 
 def seed(store: Store, profile: Profile, watchlist: list[WatchlistEntry],
-         *, now: datetime | None = None) -> SeedReport:
+         *, owned: list[OwnedBook] | None = None,
+         now: datetime | None = None) -> SeedReport:
     """Alles einlesen, was heute in YAML steht."""
     at = now or datetime.now()
     report = SeedReport()
@@ -140,6 +153,35 @@ def seed(store: Store, profile: Profile, watchlist: list[WatchlistEntry],
             details = {"note": note} if note else {}
             store.put_relation(profile.slug, book_id, str(kind), now=at, **details)
             report.relations += 1
+
+    # --- Besitz: Titel und Autor:in stehen da, das Urteil auch -------------
+    # Der Import ging bisher an dieser Datei vorbei; sie trug ihren eigenen
+    # Hinweis, dass sie von nichts gelesen wird. Die Sterne darin sind
+    # ausdrücklich **Maschinenurteile** (ADR 17, Ticket 21) — sie kommen
+    # deshalb mit ``origin=conversation`` an und nicht als das, was die Leserin
+    # gesagt hätte.
+    for entry in owned or []:
+        book = store.find_or_create_book(
+            isbn=None, title=entry.title, author=entry.author, now=at
+        )
+        # Der ``hinweis`` betrifft die Identifikation, nicht das Urteil: er
+        # bittet um Gegenprüfung, ob dieser Titel im Handel so heißt. Genau das
+        # gehört an die Beziehung, wo die Leserin es beim Nachsehen findet.
+        details = {"note": entry.hinweis} if entry.hinweis else {}
+        store.put_relation(profile.slug, book.id, str(RelationKind.OWNED), now=at, **details)
+        report.relations += 1
+        if entry.stars is None:
+            continue
+        store.put_rating(
+            book_subject(book.id),
+            stars=entry.stars,
+            confidence=OWNED_CONFIDENCE,
+            reason=entry.why or "",
+            rubric_version=OWNED_RUBRIC_VERSION,
+            now=at,
+            origin=BY_CONVERSATION,
+        )
+        report.ratings += 1
 
     # Die alten Ablehnungen stehen hier bewusst nicht mehr. Sie sind je Shop
     # eine Produktnummer, und die sagt nicht, welches Buch gemeint ist — nur

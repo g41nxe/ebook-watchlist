@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from ebook_watchlist import paths
 from ebook_watchlist.config import load_profile
 from ebook_watchlist.models import Availability, LinkOutcome, MatchReason, Observation
+from ebook_watchlist.ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject
 from ebook_watchlist.relations import RelationKind
 from ebook_watchlist.store import Store
 from ebook_watchlist.web import book as view
@@ -269,3 +270,82 @@ def test_two_prices_get_the_list(client: TestClient, db: Store) -> None:
 
     body = client.get(f"/book/{book.id}").text
     assert "Preisänderungen" in body
+
+
+# --- wessen Sterne (Ticket 21) ----------------------------------------------
+
+
+def test_a_book_without_a_judgement_shows_nothing_rather_than_zero_stars(
+    client: TestClient, db: Store
+) -> None:
+    """Nicht bewertet und "passt überhaupt nicht" sind zwei Auskünfte."""
+    book = db.books()[0]
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "noch nicht bewertet" in body
+    assert "zurücknehmen" not in body
+
+
+def test_she_can_set_her_own_stars(client: TestClient, db: Store) -> None:
+    book = db.books()[0]
+
+    client.post(f"/book/{book.id}/sterne", data={"stars": "4"})
+
+    row = db.rating(book_subject(book.id), 1, origin=BY_READER)
+    assert row.stars == 4
+    assert "zurücknehmen" in client.get(f"/book/{book.id}").text
+
+
+def test_taking_them_back_writes_no_zero(client: TestClient, db: Store) -> None:
+    book = db.books()[0]
+    client.post(f"/book/{book.id}/sterne", data={"stars": "4"})
+
+    client.post(f"/book/{book.id}/sterne", data={"stars": ""})
+
+    assert db.rating(book_subject(book.id), 1, origin=BY_READER) is None
+    assert "noch nicht bewertet" in client.get(f"/book/{book.id}").text
+
+
+def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> None:
+    """Eine 4 von ihr und eine 4 vom Modell dürfen nicht gleich aussehen
+    (ADR 17)."""
+    book = db.books()[0]
+    db.put_rating(book_subject(book.id), stars=4, confidence="teils", reason="Reihe und Stimme.",
+                  rubric_version=1, now=NOW, origin=BY_CONVERSATION)
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "im Gespräch bewertet" in body
+    assert "Reihe und Stimme." in body
+    assert "noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
+
+
+def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: Store) -> None:
+    """Das Tor schlüsselt am Fund, nicht am Buch — sonst stünde sein Urteil
+    hier nicht."""
+    book = db.find_or_create_book(isbn="9783104911854", title="Ein Fund", now=NOW)
+    db.put_rating("isbn:9783104911854", stars=2, confidence="vermutet", reason="Zu weich.",
+                  rubric_version=1, now=NOW, origin=BY_MODEL)
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "vom Werkzeug bewertet" in body
+    assert "Zu weich." in body
+
+
+def test_a_judgement_against_an_older_rubric_says_so(client: TestClient, db: Store) -> None:
+    book = db.books()[0]
+    db.put_rating(book_subject(book.id), stars=4, confidence="teils", reason="Alt.",
+                  rubric_version=0, now=NOW, origin=BY_MODEL)
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "gegen Maßstab 0" in body
+
+
+def test_a_nonsense_star_count_is_refused(client: TestClient, db: Store) -> None:
+    book = db.books()[0]
+
+    assert client.post(f"/book/{book.id}/sterne", data={"stars": "9"}).status_code == 400
+    assert client.post(f"/book/{book.id}/sterne", data={"stars": "vier"}).status_code == 400

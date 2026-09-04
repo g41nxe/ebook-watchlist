@@ -30,6 +30,10 @@ def dismissed_path() -> Path:
     return data_dir() / "dismissed.yaml"
 
 
+def owned_path() -> Path:
+    return data_dir() / "owned.yaml"
+
+
 def db_path() -> Path:
     return data_dir() / "snapshots.db"
 

@@ -75,6 +75,23 @@ class WatchlistEntry:
         return f"{self.title}|{self.author or ''}".casefold()
 
 
+@dataclass(frozen=True, slots=True)
+class OwnedBook:
+    """Eine Zeile aus ``owned.yaml``.
+
+    ``stars`` und ``why`` sind das Urteil eines Modells, nicht das der Leserin
+    — siehe :func:`load_owned`. ``hinweis`` ist etwas anderes als eine
+    Unsicherheit über das Urteil: er bittet um Gegenprüfung der *Identifikation*
+    ("heißt der Band im Handel wirklich so?").
+    """
+
+    title: str
+    author: str | None = None
+    stars: int | None = None
+    why: str | None = None
+    hinweis: str | None = None
+
+
 def _load_yaml(path: Path, what: str) -> Any:
     if not path.exists():
         raise ConfigError(f"{what} not found at {path}")
@@ -206,6 +223,48 @@ def load_dismissals(path: Path | None = None) -> dict[str, frozenset[str]]:
             raise ConfigError(f"dismissed.yaml: entries for {source!r} must be a list")
         dismissals[str(source)] = frozenset(str(item) for item in ids)
     return dismissals
+
+
+def load_owned(path: Path | None = None) -> list[OwnedBook]:
+    """Bücher im Besitz, mit einem Urteil dazu — ``owned.yaml`` (Ticket 21).
+
+    Die Sterne darin sind **Maschinenurteile**. Sie entstanden im Gespräch,
+    gegen denselben Maßstab, den das Bewertungstor benutzt, und nicht dadurch,
+    dass die Leserin sie vergeben hätte. Der Unterschied ist der Grund, aus dem
+    die Herkunft im Schlüssel steht (ADR 17): eine 4 von ihr ist eine Tatsache,
+    eine 4 von einem Modell ein Vorschlag.
+
+    Optional wie ``dismissed.yaml``: wer nichts einträgt, besitzt nichts, was
+    das Werkzeug wissen müsste.
+    """
+    path = path or paths.owned_path()
+    if not path.exists():
+        return []
+
+    data = _load_yaml(path, "owned.yaml")
+    if not isinstance(data, list):
+        raise ConfigError(f"owned.yaml at {path} must be a list of entries")
+
+    owned: list[OwnedBook] = []
+    for index, raw in enumerate(data, start=1):
+        what = f"owned.yaml entry #{index}"
+        if not isinstance(raw, dict):
+            raise ConfigError(f"{what} must be a mapping")
+        stars = raw.get("stars")
+        if stars is not None and (
+            not isinstance(stars, int) or isinstance(stars, bool) or not 0 <= stars <= 5
+        ):
+            raise ConfigError(f"{what}: 'stars' must be a whole number from 0 to 5, got {stars!r}")
+        owned.append(
+            OwnedBook(
+                title=str(_require(raw, "title", what)).strip(),
+                author=str(raw.get("author") or "").strip() or None,
+                stars=stars,
+                why=str(raw["why"]).strip() if raw.get("why") else None,
+                hinweis=str(raw["hinweis"]).strip() if raw.get("hinweis") else None,
+            )
+        )
+    return owned
 
 
 def load_watchlist(path: Path | None = None) -> list[WatchlistEntry]:

@@ -360,6 +360,25 @@ def create_app() -> FastAPI:
         )
         return RedirectResponse(f"/book/{book_id}", status_code=303)
 
+    @app.post("/book/{book_id}/sterne")
+    def book_stars(book_id: int, stars: str = Form("")) -> RedirectResponse:
+        """Die eigenen Sterne der Leserin setzen — oder zurücknehmen.
+
+        Ein leeres Feld nimmt zurück und schreibt keine Null: "nicht bewertet"
+        und "passt überhaupt nicht" sind zwei verschiedene Auskünfte.
+        """
+        try:
+            value = int(stars) if stars else None
+        except ValueError:
+            raise HTTPException(status_code=400, detail="keine Sternzahl") from None
+        try:
+            book.set_stars(
+                _store_for(paths.db_path()), book_id, value, now=datetime.now()
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return RedirectResponse(f"/book/{book_id}", status_code=303)
+
     # --- Triage (Ticket 08) -------------------------------------------------
 
     @app.get("/vorschlaege", response_class=HTMLResponse)
