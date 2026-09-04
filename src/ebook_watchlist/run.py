@@ -563,6 +563,7 @@ def _run(
             held_back=gate_report.held_back,
             threshold=DEFAULT_THRESHOLD,
             over_budget=gate_report.over_budget,
+            unrated=gate_report.unrated,
         ),
     )
 

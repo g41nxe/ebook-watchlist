@@ -63,10 +63,15 @@ class GateNote:
     threshold: int = 0
     #: Über dem Budget: nicht bewertet, aber gezeigt.
     over_budget: int = 0
+    #: Der Bewerter kam nicht durch — kein Schlüssel, keine Anmeldung, eine
+    #: Zeitüberschreitung, eine unlesbare Antwort. Das Buch wird gezeigt, und
+    #: **das muss dastehen**: ein Tor, das für jedes Buch scheitert, sieht sonst
+    #: aus wie ein Tag ohne Rückhalt statt wie ein Defekt.
+    unrated: int = 0
 
     @property
     def is_worth_saying(self) -> bool:
-        return bool(self.held_back or self.over_budget)
+        return bool(self.held_back or self.over_budget or self.unrated)
 
     @property
     def text(self) -> str:
@@ -81,6 +86,11 @@ class GateNote:
             parts.append(
                 f"{self.over_budget} heute nicht bewertet (Budget erschöpft) "
                 "und deshalb ungeprüft gezeigt"
+            )
+        if self.unrated:
+            parts.append(
+                f"{self.unrated} konnten nicht bewertet werden und werden "
+                "ungeprüft gezeigt"
             )
         return "Bewertungstor: " + ", ".join(parts)
 

@@ -227,9 +227,13 @@ doppelt laufen. Beides ist unkritisch.
 
 ## Dokumentation
 
+- [docs/rundgang.md](docs/rundgang.md) — **hier anfangen**: was das Werkzeug kann
+  und wie es funktioniert, ohne den Code zu lesen
 - [CONTEXT.md](CONTEXT.md) — Glossar der Domänenbegriffe
-- [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–18)
+- [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–20)
 - [docs/leseprofil.md](docs/leseprofil.md) — der Maßstab für Buchbewertungen
+- [docs/offene-punkte.md](docs/offene-punkte.md) — was fehlt, und welche
+  Behauptungen sich unterwegs als falsch erwiesen haben
 - [.agents/skills/](.agents/skills) — `buch-bewerten` und `leseprofil-schaerfen`
 - [docs/research/](docs/research) — Rechercheergebnisse zu den Schnittstellen von
   VÖBB und beam-shop sowie zu Calibres Metadaten-Matching

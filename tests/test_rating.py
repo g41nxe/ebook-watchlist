@@ -617,3 +617,24 @@ def test_with_neither_there_is_simply_no_gate(monkeypatch) -> None:
     monkeypatch.setattr("ebook_watchlist.rating.shutil.which", lambda name: None)
 
     assert build_rater() is None
+
+
+def test_a_rater_that_never_gets_through_is_said_out_loud(store: Store) -> None:
+    """Ein Tor, das für jedes Buch scheitert, sieht sonst aus wie ein Tag ohne
+    Rückhalt statt wie ein Defekt — und ein Cron-Job wirft stderr weg."""
+    from ebook_watchlist.digest import GateNote
+
+    broken = StubRater(RatingUnavailable("claude nicht gefunden"))
+    deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(3)]
+
+    kept, report = gate.apply(
+        deltas, store=store, rater=broken,
+        rubric_version=1, threshold=3, budget=10, now=NOW,
+    )
+
+    assert len(kept) == 3  # nichts verschluckt
+    assert report.unrated == 3
+
+    note = GateNote(held_back=0, threshold=3, unrated=report.unrated)
+    assert note.is_worth_saying
+    assert "konnten nicht bewertet werden" in note.text

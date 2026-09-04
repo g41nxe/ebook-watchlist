@@ -224,14 +224,14 @@ class ClaudeCodeRater:
 
     Kein Schlüssel, kein Guthaben, keine zweite Anmeldung. Dafür ein
     Unterprozess je Buch, und der ist **teuer**: eine Messung an einem echten
-    Titel ergab 34 Sekunden — gegenüber wenigen Sekunden für einen POST. Beim
-    voreingestellten Budget von 40 Aufrufen ist das im schlimmsten Fall über
-    zwanzig Minuten Laufzeit.
+    Titel ergab 34 Sekunden — gegenüber wenigen Sekunden für einen POST.
 
-    Das ist tragbar, weil ein nächtlicher Lauf Zeit hat und weil vor dem Tor
-    schon die Preisregel steht: es sieht nur, was ohnehin gemeldet würde, und
-    jedes Buch wird genau einmal beurteilt. Wer es schneller braucht, setzt
-    einen Schlüssel — oder senkt ``rating_budget``.
+    Das ist tragbar, weil vor dem Tor schon die Preisregel steht: es sieht nur,
+    was ohnehin gemeldet würde, und jedes Buch wird genau einmal beurteilt. Der
+    Alltag sind einzelne Titel, nicht vierzig — ``rating_budget`` ist die Bremse
+    gegen den einmaligen Rückstand, keine Tageserwartung. Genau dieser Rückstand
+    ist aber der Fall, in dem der Unterschied weh tut: wer ihn zügig abarbeiten
+    will, setzt einen Schlüssel.
 
     ``--output-format json`` liefert eine Hülle mit dem Ergebnis in ``result``;
     kommt sie nicht, wird die rohe Ausgabe gelesen. Beides landet in derselben
