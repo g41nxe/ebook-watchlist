@@ -97,3 +97,18 @@ def test_the_price_ceilings_still_have_to_be_positive(data_dir: Path) -> None:
     )
     with pytest.raises(ConfigError, match="positive integer"):
         load_profile()
+
+
+def test_liked_books_are_kept_even_though_nothing_reads_them_yet(data_dir: Path) -> None:
+    """Dormant like no_gos: the seed for judging whether a discovered title fits
+    the reader, and the list only gets sharper the longer it is kept."""
+    (data_dir / "profile.yaml").write_text(
+        "slug: t\nname: T\nliked_books:\n  - Cry Baby - Gillian Flynn\n"
+        "sources: {fake: {fixture: f.yaml}}\n",
+        encoding="utf-8",
+    )
+    assert load_profile().liked_books == ["Cry Baby - Gillian Flynn"]
+
+
+def test_no_liked_books_is_simply_an_empty_list(data_dir: Path) -> None:
+    assert load_profile().liked_books == []

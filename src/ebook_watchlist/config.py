@@ -32,6 +32,12 @@ class Profile:
     extended_sweep_weekday: int = 6
     genre_categories: list[str] = field(default_factory=list)
     no_gos: list[str] = field(default_factory=list)
+    #: Books the reader named as good. Dormant like ``no_gos`` — nothing reads
+    #: these yet. They are the raw material for judging whether a *discovered*
+    #: title fits the reader rather than merely their shelves (ADR 13), and the
+    #: profile only sharpens as the list grows, so they are worth keeping from
+    #: the first day.
+    liked_books: list[str] = field(default_factory=list)
     sources: dict[str, dict[str, Any]] = field(default_factory=dict)
     #: Appended to the outgoing User-Agent so a site operator can reach you.
     #: Opt-in — nothing personal is sent unless you put it here yourself.
@@ -152,6 +158,7 @@ def load_profile(path: Path | None = None) -> Profile:
         extended_sweep_weekday=weekday,
         genre_categories=_str_list(data, "genre_categories", what),
         no_gos=_str_list(data, "no_gos", what),
+        liked_books=_str_list(data, "liked_books", what),
         sources=data.get("sources") or {},
         contact=str(data["contact"]) if data.get("contact") else None,
     )

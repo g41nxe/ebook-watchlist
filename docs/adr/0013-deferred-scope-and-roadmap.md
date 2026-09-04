@@ -33,11 +33,28 @@ re-scoped.
   ("Die sieben Schwestern 1"). Needs its own matching rules — a series name is
   a much weaker signal than a title — so it gets an ADR of its own when it
   arrives.
+
+  There is already concrete evidence of the shape of the problem. A Watchlist
+  Entry for "Otherland" was reported as not stocked, while beam-shop in fact
+  carries all four volumes as "Otherland. Band 1" … "Band 4". The title guard
+  that stops "Der Schwarm" from accepting "Der Schwarm 2" (ADR 8) scores
+  "otherland" against "otherland band 1" at 72, below the 85 floor. The same
+  mechanism that prevents a sequel being mistaken for its predecessor prevents
+  a series name from finding its own volumes — which is exactly the distinction
+  series tracking has to make explicit rather than leave to one threshold.
 - **Profile matching of discoveries** — deciding whether a *found* title fits
   the reader's profile, not just whether its author or shelf does. This is what
   the LLM classification above is ultimately for; the atmosphere criteria in the
   profile ("beklemmend", "isolierte Settings", "Katz-und-Maus") are exactly the
-  kind of thing a shelf label cannot capture.
+  kind of thing a shelf label cannot capture. `profile.liked_books` is collected
+  from day one as the raw material, and the profile is expected to sharpen as
+  that list grows. Belongs together with the category-matching rework.
+- **Books already owned** — the reader kept saying "I have that one". Today the
+  only lever is `dismissed.yaml`, which says "stop suggesting this" rather than
+  "I own this", and it does nothing for a Watchlist Entry. A real owned-or-read
+  list is the honest concept, and it converges with the v3 Calibre integration
+  below: Calibre *is* the owned library, so the two should be designed together
+  rather than inventing a second list first.
 - **Additional Sources** — a second German-language shop and/or library,
   exercising the pluggable Source interface. (A non-fixed-price / English-language
   shop is explicitly *not* planned — the focus is German-language literature,
