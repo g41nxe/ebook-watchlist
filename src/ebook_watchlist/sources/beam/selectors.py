@@ -46,6 +46,10 @@ ATTR_PRODUCT_ID = "data-note-article"
 DETAIL_SCOPE = ".product--details"
 DETAIL_TITLE = ".product--title"
 DETAIL_PRICE_META = 'meta[itemprop="price"]'
+#: Die Bestellnummer des Hauptprodukts — dieselbe Form wie auf der Kachel, und
+#: im Gegensatz zur ISBN-Liste liegt sie innerhalb des Produktblocks. Auf der
+#: ganzen Seite stehen 63 Bestellnummern, hier genau eine.
+DETAIL_ORDER_NUMBER = 'input[name="sAdd"]'
 
 # --- listing --------------------------------------------------------------
 

@@ -18,6 +18,8 @@ from . import selectors as sel
 #: de-DE money: "." groups thousands, "," is the decimal point.
 _PRICE = re.compile(r"(\d{1,3}(?:\.\d{3})*|\d+),(\d{2})")
 _TRAILING_ID = re.compile(r"/(\d+)/[^/]*$")
+#: Bestellnummern haben die Form SW + ISBN-13 + optionalem Lieferantensuffix.
+_ORDER_ISBN = re.compile(r"^SW(97[89]\d{10})")
 
 NO_RESULTS_MARKER = "keine Artikel gefunden"
 
@@ -55,6 +57,16 @@ class Tile:
     blurb: str | None = None
     category_id: str | None = None
     badges: frozenset[str] = frozenset()
+
+    @property
+    def isbn(self) -> str | None:
+        """Die ISBN-13 aus der Bestellnummer.
+
+        Kostet keine Detailseite - sie steht in jeder Kachel. Nicht jede
+        Bestellnummer traegt eine: Buendel und Sammelausgaben haben eigene
+        Nummern ohne ISBN-Form.
+        """
+        return _isbn_from_order_number(self.order_number)
 
     @property
     def is_preorder(self) -> bool:
@@ -175,6 +187,19 @@ def parse_tiles(html: str, base: str = sel.BASE) -> list[Tile]:
 class Detail:
     title: str | None
     price_cents: int | None
+    isbn: str | None = None
+
+
+def _isbn_from_order_number(order_number: str | None) -> str | None:
+    """``SW9783104911854450914`` → ``9783104911854``, or nothing.
+
+    Bundles and collections carry order numbers that are not ISBNs at all, so
+    the shape is checked rather than assumed.
+    """
+    if not order_number:
+        return None
+    match = _ORDER_ISBN.match(order_number)
+    return match.group(1) if match else None
 
 
 def parse_detail(html: str) -> Detail:
@@ -196,10 +221,15 @@ def parse_detail(html: str) -> Detail:
     except ValueError as exc:
         raise SourceStructureError(f"beam-shop: unreadable price {content!r}") from exc
 
+    order_input = scope.select_one(sel.DETAIL_ORDER_NUMBER)
+    order_number = order_input.get("value") if order_input is not None else None
+    isbn = _isbn_from_order_number(order_number if isinstance(order_number, str) else None)
+
     title_node = scope.select_one(sel.DETAIL_TITLE)
     return Detail(
         title=title_node.get_text(" ", strip=True) if title_node else None,
         price_cents=price_cents,
+        isbn=isbn,
     )
 
 

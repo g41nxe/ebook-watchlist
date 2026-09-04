@@ -64,6 +64,7 @@ class ObservationRow(Base):
     url: Mapped[str | None] = mapped_column(String, nullable=True)
     blurb: Mapped[str | None] = mapped_column(String, nullable=True)
     subtitle: Mapped[str | None] = mapped_column(String, nullable=True)
+    isbn: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     series: Mapped[str | None] = mapped_column(String, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
 
@@ -136,6 +137,7 @@ def _to_observation(row: ObservationRow) -> Observation:
         match_reason=MatchReason(row.match_reason),
         blurb=row.blurb,
         subtitle=row.subtitle,
+        isbn=row.isbn,
         series=row.series,
         author=row.author,
         watchlist_key=row.watchlist_key,
@@ -391,6 +393,7 @@ class Store:
                     url=obs.url,
                     blurb=obs.blurb,
                     subtitle=obs.subtitle,
+                    isbn=obs.isbn,
                     series=obs.series,
                     observed_at=obs.observed_at or observed_at,
                 )

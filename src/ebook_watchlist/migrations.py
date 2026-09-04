@@ -77,7 +77,21 @@ def _add_blurb_columns(connection: Connection) -> None:
 
 
 #: Index ``n`` upgrades a database at version ``n``. Append only, never reorder.
-MIGRATIONS: tuple[Migration, ...] = (_backfill_seeded_scopes, _add_blurb_columns)
+def _add_isbn_column(connection: Connection) -> None:
+    """The identifier ADR 18 makes book identity out of.
+
+    Both Sources hand it over on pages the Run already fetches - beam in the
+    tile order number, the Onleihe in a labelled row - so it costs no extra
+    request. Existing rows stay NULL; history cannot be backfilled.
+    """
+    add_column(connection, "observation", "isbn", "TEXT")
+
+
+MIGRATIONS: tuple[Migration, ...] = (
+    _backfill_seeded_scopes,
+    _add_blurb_columns,
+    _add_isbn_column,
+)
 
 SCHEMA_VERSION = len(MIGRATIONS)
 

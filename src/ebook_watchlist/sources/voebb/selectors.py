@@ -72,6 +72,7 @@ LABEL_AVAILABLE_FROM = "Voraussichtlich verfügbar ab:"
 LABEL_AUTHOR = "Autor*in:"
 LABEL_YEAR = "Jahr:"
 LABEL_SERIES = "Reihe:"
+LABEL_ISBN = "ISBN:"
 
 # --- doctor probe ---------------------------------------------------------
 

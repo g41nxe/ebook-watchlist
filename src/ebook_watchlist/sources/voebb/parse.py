@@ -47,6 +47,7 @@ class Detail:
     #: Die Onleihe benennt die Reihe ausdruecklich - eine der wenigen Quellen,
     #: die das tut (ADR 17).
     series: str | None = None
+    isbn: str | None = None
 
     @property
     def availability(self) -> Availability:
@@ -62,6 +63,19 @@ def _labelled_value(page: BeautifulSoup, label: str) -> str | None:
             if value:
                 return value.get_text(" ", strip=True).strip(";").strip() or None
     return None
+
+
+#: Die Onleihe schreibt sie mal mit, mal ohne Bindestriche.
+_ISBN13 = re.compile(r"(?<!\d)(97[89]\d{10})(?!\d)")
+
+
+def _isbn(page: BeautifulSoup) -> str | None:
+    """Die Onleihe nennt sie in derselben Beschriftungszeile wie Autor und Reihe."""
+    raw = _labelled_value(page, sel.LABEL_ISBN)
+    if not raw:
+        return None
+    match = _ISBN13.search(raw.replace("-", ""))
+    return match.group(1) if match else None
 
 
 def parse_detail(html: str) -> Detail:
@@ -86,6 +100,7 @@ def parse_detail(html: str) -> Detail:
     return Detail(
         title=title,
         series=_labelled_value(page, sel.LABEL_SERIES),
+        isbn=_isbn(page),
         author=_labelled_value(page, sel.LABEL_AUTHOR),
         copies=copies,
         available_copies=available,

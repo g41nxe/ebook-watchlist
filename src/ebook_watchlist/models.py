@@ -56,6 +56,8 @@ class Observation:
     #: isolierte Settings und Tonlage überhaupt ablesen lassen (ADR 17).
     blurb: str | None = None
     subtitle: str | None = None
+    #: Die ISBN-13, wo die Source eine nennt. Beide tun es (ADR 18).
+    isbn: str | None = None
     #: Nur gesetzt, wo eine Source die Reihe ausdrücklich benennt.
     series: str | None = None
     observed_at: datetime | None = None

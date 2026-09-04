@@ -53,9 +53,17 @@ tiles in a real result page carried a valid one. The Onleihe states it as an
 Where no ISBN exists — 8 of those 48, being bundles, collections and single
 episodes — identity falls back to the matcher and its confidence gate (ADR 8).
 
-An ISBN identifies an *edition*, not a work. It links our two sources because
-they stock the same edition; a third source with a different edition would need
-the title comparison as a second layer.
+An ISBN identifies an *edition*, not a work — and the fallback is not an edge
+case. Measured across the books this watchlist has at both sources:
+
+| Title | beam | Onleihe | |
+|---|---|---|---|
+| Der Ruf des Kuckucks | `9783641130008` | `9783641130008` | same edition |
+| Der Knochenjäger | `9783641157180` | `9783837110951` | different editions |
+
+One of two. The ISBN is therefore a strong identifier where two sources happen
+to stock the same edition, not a general key across them; the matcher and its
+confidence gate carry the rest and will keep doing so.
 
 ### One table for every relationship
 
