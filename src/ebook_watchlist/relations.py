@@ -51,6 +51,11 @@ INTEREST_KEYS: frozenset[str] = frozenset(key.value for key in InterestKey)
 #: deshalb steht es in ``details`` und nicht in einer eigenen Spalte (ADR 18).
 TIERS: frozenset[str] = frozenset({"core", "extended"})
 
+#: Worauf ein Watchlist-Eintrag eingeschraenkt sein kann. Bewusst die *Art*
+#: einer Quelle und nicht ihr Name: wie eine Bibliothek heisst, entscheidet
+#: die Konfiguration, und ein Import darf keine Namen erfinden.
+RESTRICTIONS: frozenset[str] = frozenset({"library", "shop"})
+
 
 class ConfigurationError(Exception):
     """Ein Wert, den kein Handler bedient. Laut, nicht geduldet."""
@@ -80,11 +85,17 @@ def check_details(key: str, details: dict) -> dict:
     sind Tippfehler, die sich nur durch verändertes Verhalten bemerkbar machten
     — die teuerste Art, einen Fehler zu finden (ADR 18).
     """
-    unknown = set(details) - {"tier", "sources", "note"}
+    unknown = set(details) - {"tier", "sources", "note", "restrict"}
     if unknown:
         raise ConfigurationError(
             f"unbekannte Angaben zu {key!r}: {', '.join(sorted(unknown))} "
-            "(bekannt: note, sources, tier)"
+            "(bekannt: note, restrict, sources, tier)"
+        )
+    restrict = details.get("restrict")
+    if restrict is not None and restrict not in RESTRICTIONS:
+        raise ConfigurationError(
+            f"unbekannte Einschraenkung {restrict!r} bei {key!r} "
+            f"(bekannt: {', '.join(sorted(RESTRICTIONS))})"
         )
     tier = details.get("tier")
     if tier is not None and tier not in TIERS:

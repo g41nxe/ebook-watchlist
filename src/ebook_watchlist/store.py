@@ -595,6 +595,7 @@ class Store:
     ) -> None:
         """Was die Leserin zu einem Buch sagt. Mehrere Arten gelten gleichzeitig."""
         check_relation_kind(kind)
+        check_details(kind, dict(details))
         with self.session() as session:
             row = session.scalars(
                 select(BookRelationRow).where(
@@ -644,12 +645,16 @@ class Store:
                 session.expunge(row)
             return rows
 
-    def deactivate_relation(self, profile_slug: str, book_id: int, kind: str) -> None:
+    def deactivate_relation(
+        self, profile_slug: str, book_id: int, kind: str, *, now: datetime
+    ) -> None:
         """Beziehungen werden deaktiviert, nicht geloescht — die Tatsache, dass
-        ein Buch einmal beobachtet wurde, ist selbst eine Auskunft (ADR 18)."""
-        self.put_relation(
-            profile_slug, book_id, kind, active=False, now=datetime.now()
-        )
+        ein Buch einmal beobachtet wurde, ist selbst eine Auskunft (ADR 18).
+
+        Die Uhr wird uebergeben, nicht gelesen: ein Store, der selbst nach der
+        Zeit sieht, laesst sich nicht mit einer festen Uhr pruefen.
+        """
+        self.put_relation(profile_slug, book_id, kind, active=False, now=now)
 
     def put_interest(
         self,

@@ -136,7 +136,7 @@ def test_a_relation_is_deactivated_not_deleted(store: Store) -> None:
     seed(store, profile(), [WatchlistEntry(title="Providence", author="Max Barry")], {}, now=NOW)
     book = store.books()[0]
 
-    store.deactivate_relation("t", book.id, str(RelationKind.WATCHING))
+    store.deactivate_relation("t", book.id, str(RelationKind.WATCHING), now=NOW)
 
     assert store.relations("t", kind=str(RelationKind.WATCHING)) == []
     kept = store.relations_of("t", book.id)
@@ -228,3 +228,62 @@ def test_seeding_is_per_source(store: Store) -> None:
     store.mark_interest_seeded(carter.id, "beam", now=NOW)
 
     assert store.is_interest_seeded(carter.id, "voebb") is False
+
+
+# --- was der Review gefunden hat -------------------------------------------
+
+
+def test_a_volume_marker_is_not_an_author() -> None:
+    """Der Ausdruck teilt an der letzten Trennung, und ein angehängter
+    Bandzusatz sieht von hinten aus wie ein Name. Ohne die Ziffernsperre wäre
+    ein Buch der Autorin "Band 1" entstanden."""
+    title, author, _ = split_free_text("Achtsam morden - Karsten Dusse - Band 1")
+    assert author is None
+    assert title.startswith("Achtsam morden")
+
+
+def test_a_hyphenated_author_is_not_guessed_at() -> None:
+    """Jean-Luc Bannalec fällt durch — und das ist die richtige Richtung:
+    lieber auf die Liste als falsch aufgelöst (ADR 8)."""
+    _, author, _ = split_free_text("Bretonische Verhältnisse - Jean-Luc Bannalec")
+    assert author is None
+
+
+def test_a_restriction_names_the_kind_of_source_not_its_name(store: Store) -> None:
+    """"voebb" und "beam" hart einzutragen wäre bei jeder umbenannten Quelle
+    falsch gewesen. Wie eine Quelle heißt, sagt die Konfiguration."""
+    seed(
+        store,
+        profile(),
+        [WatchlistEntry(title="Providence", author="Max Barry", check_shop=False)],
+        {},
+        now=NOW,
+    )
+    relation = store.relations("t", kind=str(RelationKind.WATCHING))[0]
+    assert '"restrict": "library"' in relation.details
+    assert "voebb" not in relation.details
+
+
+def test_relation_details_are_validated_too(store: Store) -> None:
+    """Geprüft wurden bisher nur die Interessen — Beziehungen kamen ungeprüft
+    durch, obwohl das Ticket beides verlangt."""
+    book = store.find_or_create_book(isbn=None, title="Irgendwas", now=NOW)
+    with pytest.raises(ConfigurationError, match="unbekannte Angaben"):
+        store.put_relation("t", book.id, str(RelationKind.OWNED), now=NOW, activ=False)
+
+
+def test_an_unknown_restriction_fails_loudly(store: Store) -> None:
+    book = store.find_or_create_book(isbn=None, title="Irgendwas", now=NOW)
+    with pytest.raises(ConfigurationError, match="unbekannte Einschraenkung"):
+        store.put_relation("t", book.id, str(RelationKind.WATCHING), now=NOW, restrict="beam")
+
+
+def test_deactivating_takes_the_clock_rather_than_reading_it(store: Store) -> None:
+    """Ein Store, der selbst nach der Zeit sieht, lässt sich nicht mit einer
+    festen Uhr prüfen."""
+    book = store.find_or_create_book(isbn=None, title="Providence", now=NOW)
+    store.put_relation("t", book.id, str(RelationKind.WATCHING), now=NOW)
+
+    store.deactivate_relation("t", book.id, str(RelationKind.WATCHING), now=NOW)
+
+    assert store.relations("t", kind=str(RelationKind.WATCHING)) == []

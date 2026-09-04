@@ -29,7 +29,11 @@ from .store import Store
 #: ``"Cry Baby - Gillian Flynn"`` -> Titel und Autor:in. Der Bindestrich ist die
 #: Konvention dieser Liste; ein Titel, der selbst einen enthält, wird an der
 #: *letzten* Trennung geteilt, weil der Name hinten steht.
-_FREE_TEXT = re.compile(r"^(?P<title>.+?)\s+[-–—]\s+(?P<author>[^-–—]+)$")
+#: Der Namensteil darf keine Ziffern tragen. Ohne das wurde aus
+#: "Achtsam morden - Karsten Dusse - Band 1" ein Buch der Autorin
+#: "Band 1" - der Ausdruck teilt an der *letzten* Trennung, und ein
+#: angehaengter Bandzusatz sieht von hinten aus wie ein Name.
+_FREE_TEXT = re.compile(r"^(?P<title>.+?)\s+[-–—]\s+(?P<author>[^-–—\d]+)$")
 #: Ein Klammerzusatz am Ende ist eine Begruendung, kein Namensbestandteil.
 _TRAILING_NOTE = re.compile(r"\s*\((?P<note>[^()]*)\)\s*$")
 
@@ -103,10 +107,12 @@ def seed(store: Store, profile: Profile, watchlist: list[WatchlistEntry], dismis
         details: dict[str, object] = {}
         if entry.notes:
             details["note"] = entry.notes
-        if not (entry.check_library and entry.check_shop):
-            details["sources"] = (
-                ["voebb"] if entry.check_library else ["beam"] if entry.check_shop else []
-            )
+        # Die *Art* der Quelle, nicht ihr Name: wie eine Bibliothek in dieser
+        # Installation heisst, sagt die Konfiguration, und ein Import darf sich
+        # keinen Namen ausdenken. "voebb" und "beam" hier hart einzutragen war
+        # genau das - und wäre bei jeder umbenannten Quelle falsch gewesen.
+        if entry.check_library != entry.check_shop:
+            details["restrict"] = "library" if entry.check_library else "shop"
         store.put_relation(
             profile.slug,
             book.id,
