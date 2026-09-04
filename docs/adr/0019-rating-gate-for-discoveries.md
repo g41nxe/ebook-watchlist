@@ -92,8 +92,9 @@ version are kept in a table of their own.
 > abgelehnt hat. Der Schluessel ist deshalb der Fund: die ISBN, wo es eine gibt,
 > sonst `(Quelle, Item-Id)`. Dasselbe Buch bei zwei Shops kostet damit ein
 > Urteil, nicht zwei, und ein Buch, das spaeter eine Beziehung bekommt, findet
-> sein Urteil ueber die ISBN wieder. Below a threshold the book never reaches
-the triage list.
+> sein Urteil ueber die ISBN wieder.
+
+Below a threshold the book never reaches the triage list.
 
 Rating is keyed to the book and its rubric version, so a Run re-rates nothing:
 a book already judged under the current rubric is passed over. Raising the
@@ -155,8 +156,9 @@ gate, and the numbers above are the reason they must not be mistaken for it.
 - Genre shelves become useful rather than noisy, so they stay. Switching them
   off would have been the cheap fix and would have cost the only channel through
   which an unknown author can be found.
-- The gate needs the `book` table as somewhere to keep a rating, so it follows
-  tickets 04 and 05 rather than preceding them.
+- The gate needs somewhere to keep a rating, which is a table of its own (see
+  the Nachtrag above), and it needs the identity work of ticket 04 to key it
+  on an ISBN — so it follows 04 rather than preceding it.
 - The triage screen is designed against a pile of dozens, not hundreds. The
   prototype was built against 316 and that shaped its options; it should be
   revisited once the gate is in.
