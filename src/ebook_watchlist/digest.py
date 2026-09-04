@@ -13,6 +13,7 @@ from datetime import datetime
 from .config import Profile
 from .deals import deal_flags
 from .models import Attention, Delta, DeltaKind, MatchReason, SourceFailure
+from .reasons import why_shown
 
 SECTION_LIBRARY = "Bibliothek"
 SECTION_PRICES = "Watchlist — Preise"
@@ -89,9 +90,12 @@ def _entry_for(delta: Delta, profile: Profile | None) -> tuple[str, DigestEntry]
         )
 
     if delta.kind is DeltaKind.FIRST_SEEN:
-        detail = _format_price(current.price_cents)
-        if current.category:
-            detail += f" · {current.category}"
+        # Der Anlass zuerst, der Preis danach: die alte Reihenfolge las sich,
+        # als sei der Preis der Grund (Ticket 14).
+        detail = why_shown(current)
+        price = _format_price(current.price_cents)
+        if price != "—":
+            detail += f" · {price}"
     elif delta.kind is DeltaKind.PRICE_DROP and previous is not None:
         detail = f"{_format_price(previous.price_cents)} → {_format_price(current.price_cents)}"
     else:

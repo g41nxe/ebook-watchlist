@@ -153,8 +153,10 @@ def test_suggestions_land_in_their_own_section_never_among_real_hits() -> None:
     )
 
     assert [section.title for section in digest.sections] == [SECTION_GENRE]
-    assert digest.sections[0].entries[0].detail
-    assert SPACE_OPERA in digest.sections[0].entries[0].detail
+    detail = digest.sections[0].entries[0].detail
+    # Der Anlass steht da, in Worten - nicht der rohe Regalpfad (Ticket 14).
+    assert detail and detail.startswith("neu im Thema Space Opera")
+    assert SPACE_OPERA not in detail
 
 
 # --- dismissals -----------------------------------------------------------

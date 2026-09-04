@@ -79,8 +79,16 @@ Genre Categories — a low-confidence suggestion).
 ### Genre Category
 A Shop Source category path listed in `profile.yaml`'s `genre_categories`. v1
 genre discovery trusts the shop's own shelving: new arrivals in this small
-curated set are surfaced as suggestions, with no classifier and no keyword
-filtering in v1.0. Dismissed suggestions (`source_item_id`) never resurface.
+curated set are surfaced as suggestions. Dismissed suggestions
+(`source_item_id`) never resurface.
+
+Since ADR 19 a discovery from here is judged against the reading profile before
+it reaches the reader, and it has to be a deal to be reported at all.
+
+**Reader-facing name: *Thema*.** "Regal" was the shop's word for its own
+shelving, not the reader's word for what interests them. The code keeps
+`genre_category`; every string a reader sees says Thema, and both come from
+`reasons.py`.
 
 ### Reference Author
 An author on the Profile's whitelist. Any item by a Reference Author is a
