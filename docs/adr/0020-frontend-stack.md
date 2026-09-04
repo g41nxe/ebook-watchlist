@@ -30,10 +30,14 @@ pip, so it joins the project the same way `ruff` and `pytest` do — a
 development dependency in `pyproject.toml`, resolved by `uv`. No Node, no
 `package.json`, no `node_modules`.
 
-The build runs at development time and produces one static stylesheet. The
-machine that runs the tool serves that file and builds nothing; ADR 3's real
-intent — that a Pi Zero W never runs a toolchain — is preserved. What changes
-is that a developer now runs one command before committing.
+The build produces one static stylesheet, and **build output is not committed**.
+Checked-in artifacts drift apart from their sources the first time someone edits
+the source and forgets the build, and nothing says so. `web/static/` is
+gitignored and produced by `uv run python -m ebook_watchlist.web.build`.
+
+The cost is that a fresh checkout must build before it can serve. The web app
+therefore refuses to start with a plain message naming the command, rather than
+serving an unstyled page that reads like a CSS bug.
 
 The Tailwind Play CDN was rejected. It ships a compiler to the browser, it is
 explicitly not for production, and it is a third-party request on every page
@@ -52,9 +56,10 @@ The two have a clean division, and stating it is the point of naming both:
 Bulk triage is the case that needs both: Alpine holds the selection, HTMX posts
 it and swaps in the result.
 
-Both are vendored into the static directory and pinned, not loaded from a CDN.
-Same reason as above, plus the tool then works on a network that cannot reach
-out at all.
+Both are fetched once by the build into the static directory, pinned by version
+and checked against a SHA-256, and served from there — never loaded from a CDN
+at page load. Same reason as above, plus the tool then works on a network that
+cannot reach out at all.
 
 ### Design tokens are Tailwind's, not a second system
 
@@ -71,10 +76,13 @@ template and icons are referenced by id.
 
 ## Consequences
 
-- `uv run tailwindcss` becomes part of the development loop, and the built
-  stylesheet is committed so a checkout can be served without building.
-- CI has to fail when the committed stylesheet does not match its sources,
-  otherwise it silently goes stale.
+- The build job is a deployment step, not just a development one. ADR 12's
+  "copy the repo, `uv sync`, no build step" no longer holds for the web
+  process; the Run entrypoint is untouched and still needs nothing.
+- The build needs network access once: Tailwind's binary arrives with
+  `uv sync`, the two libraries are fetched by the build. Both are pinned by
+  version and verified by SHA-256, so a silently swapped file fails the build
+  instead of reaching a page.
 - ADR 3's "no build step" no longer holds literally. Its substance — no
   websocket, no client-side framework owning the page, server-rendered HTML —
   does.

@@ -25,6 +25,11 @@ The user wants to run locally on Windows for now and move to the regular home Pi
 - **Migration to Pi:** copy the repo, `uv sync`, copy or re-seed `data/`, add a
   systemd-timer. No build step.
 
+> **Nachtrag (ADR 20):** Für die Weboberfläche gilt der letzte Satz nicht mehr.
+> `uv run python -m ebook_watchlist.web.build` erzeugt Stylesheet und
+> Bibliotheken; das Ergebnis liegt nicht im Repository. Der Lauf selbst braucht
+> weiterhin nichts davon.
+
 ## Consequences
 
 - The scheduler is a per-host setup step, documented in the README, not shipped.

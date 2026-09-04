@@ -19,3 +19,6 @@ testlauf/
 
 # Rohdaten der Metadaten-Recherche
 metadata-probe.json
+
+# Bauergebnis der Oberflaeche (ADR 20) - "uv run python -m ebook_watchlist.web.build"
+src/ebook_watchlist/web/static/

@@ -81,8 +81,12 @@ def source_trouble(runs: list[RunRow]) -> list[str]:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="eBook-Watchlist", docs_url=None, redoc_url=None)
-    # Built by `uv run tailwindcss` and committed, so a checkout serves without
-    # a toolchain — the Pi never builds anything (ADR 20).
+    # Build output is not in the repository (ADR 20), so say so plainly rather
+    # than serving an unstyled page that looks like a CSS bug.
+    if not (STATIC / "app.css").is_file():
+        raise RuntimeError(
+            "web assets are missing — run: uv run python -m ebook_watchlist.web.build"
+        )
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @app.get("/", response_class=HTMLResponse)
