@@ -126,20 +126,52 @@ because most finds never become a Book. A human Rating is keyed to the **Book**,
 because that is where a person gives it and it should hold whichever Source the
 book next arrives through.
 
-A new Rubric version invalidates machine Ratings, and only those: that the
-reader sharpened their own yardstick is no reason to void what they said.
+A new **Reading Profile** version invalidates machine Ratings, and only those:
+that the reader sharpened their own taste is no reason to void what they said.
+A change to the Rating Scheme invalidates nothing at all (ADR 21).
 
-### Rubric
-The written yardstick a Rating is made against: `docs/leseprofil.md`, carrying
-its own version number. It lives in the repository with its own change
-procedure and an asymmetric burden of proof (ADR 17) — the web UI shows it and
-refuses to edit it, because a form there would bypass that procedure.
+### Reading Profile
+A description of the books this reader likes — as detailed and as specific to
+them as it can be made, written in prose, produced by discussing *why* they like
+the books they like. It lives in the repository as `docs/leseprofil.md` and
+carries a version number; that number means one thing only: the state of the
+reader's taste.
 
-**Reader-facing name: *Maßstab*.**
+It is the **basis for deciding whether an Observation is interesting**. Two
+things are *derived* from it and are not themselves the profile: the Reference
+Authors and the Genre Categories — what a shop can actually be asked for
+(ADR 21).
+
+It changes only through the `leseprofil-schaerfen` skill, which carries an
+asymmetric burden of proof and asks for consent per change (ADR 17). The web UI
+shows it and refuses to edit it, because a form there would bypass that
+procedure.
+
+**Reader-facing name: *Leseprofil*.**
+
+### Rating Scheme
+How a book is held against a Reading Profile and turned into stars: what a star
+means, what a justification has to contain, what `confidence` means and what a
+merely-suspected judgement may be used for, the counter-check, and the rule
+against inventing facts.
+
+It names **no** axis of taste — it is the procedure, not the content, and it
+would work unchanged for a different reader. It is therefore **not** versioned
+alongside the profile: a change to the scheme invalidates no Rating (ADR 21).
+
+Both raters read the same scheme: the `buch-bewerten` skill and the Rating Gate
+in a Run. Before they did, they had already drifted apart — the skill required
+research until a judgement was at least half-evidenced, the gate explicitly
+allowed a suspected one.
+
+**Reader-facing name: *Bewertungsschema*.**
 
 ### Reference Author
 An author on the Profile's whitelist. Any item by a Reference Author is a
 Profile Match, discovered even if not on the Watchlist.
+
+Derived from the Reading Profile rather than standing on its own: a shop can be
+asked for a name, not for "a damaged narrator" (ADR 21).
 
 ### Strong Deal
 An item whose current price is below `strong_deal_max_cents` (default 5,00 €).
