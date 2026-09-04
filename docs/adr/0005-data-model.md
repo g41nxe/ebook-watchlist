@@ -1,5 +1,10 @@
 # 5. Data Model
 
+> **Nachtrag:** Die Tabellenskizze unten ist ab Phase 2 durch **ADR 18**
+> ersetzt — bis auf `run` und `observation`, die weitgehend bleiben. Die
+> Deal-Logik, das Append-only-Prinzip und die Match Reasons gelten
+> unverändert.
+
 SQLite via SQLAlchemy for Snapshot/Run history from Phase 1; for Profile and
 Watchlist from Phase 2 (Phase 1 keeps those in YAML — see ADR 10).
 

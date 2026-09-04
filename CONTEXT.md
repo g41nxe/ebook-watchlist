@@ -14,17 +14,36 @@ The set of Watchlist Entries belonging to one Profile. Titles/authors actively
 watched regardless of whether they fit the Profile's genres.
 
 ### Watchlist Entry
-One watched item. Holds: title, author, which Source kinds to check, pinned
-per-Source links once resolved, and (v2) hold fields. Current price/availability
-is not stored on the entry — it lives in the Snapshot as Observations.
+One watched item. From Phase 2 this is a Book Relation of kind `watching`
+(ADR 18) — the title and author live on the Book, the per-Source links in
+`book_source`, and current price/availability in the Snapshot as Observations.
+Never on the entry itself.
+
+### Book
+A book as a thing in itself — title, author, ISBN, series — independent of any
+Source. A Book row exists **only where the reader has a relationship to it**
+(ADR 18); a bare discovery stays an Observation. Identity is the ISBN where one
+is available, otherwise title and author through the matcher.
+
+### Book Relation
+What a Profile has to do with a Book: `watching`, `owned`, `liked`, `disliked`,
+`dismissed`. Several hold at once — a book can be owned *and* have been watched.
+Relations are deactivated rather than deleted, so "watched until you bought it"
+stays visible.
+
+### Interest
+Where the tool should look for new books: a Reference Author or a Genre
+Category, unified into one concept because both answer the same question and
+produce the two discovery Match Reasons. Extensible by a free-text key —
+publisher, series, keyword — each needing a handler, not a migration.
 
 ### Hold
 The user's reservation ("Vormerkung") on a Library Source title that is
-currently lent out. **v2 feature** (see ADR 6). Modelled now via unused
-`watchlist_entry.hold_state` (`none` → `placed` → `ready`) and
-`hold_expected_date` columns; detecting `placed` → `ready` needs an
-authenticated scrape of the user's library account, which v1 deliberately
-avoids.
+currently lent out. **v2 feature** (see ADR 6). A hold is *observed*, not set —
+v2 reads it off the authenticated account page — so it lives on the Observation
+as `hold_state` (`none` → `placed` → `ready`) and `hold_expected_date`
+(ADR 18, correcting ADR 6). The `placed` → `ready` transition is therefore an
+ordinary Delta, with history, rather than a mutable flag on an entry.
 
 ### Source
 A place that is polled for data, behind a common interface. Two kinds in v1:
@@ -43,9 +62,13 @@ single mutable current-state row.
 
 ### Observation
 One recording of an item's state as seen by a Source during a Run: title,
-author, price, availability status, `observed_at`, the Source, a stable
-`source_item_id` from that Source, the matching Watchlist Entry (or NULL for a
-discovery), and a Match Reason.
+author, ISBN, blurb, series, price, availability status, hold state,
+`observed_at`, the Source, a stable `source_item_id` from that Source, the
+matching Book (or NULL for a discovery), and a Match Reason.
+
+An Observation records **what the Source said at that moment**, not what we
+believe. Title, author and ISBN are kept even when the Book is known, so that a
+source quietly switching editions under the same id stays detectable.
 
 ### Match Reason
 Why an item is in the Snapshot: `watchlist` (hard title/author match),

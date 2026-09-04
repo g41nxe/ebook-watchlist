@@ -1,5 +1,10 @@
 # 3. Local Web UI
 
+> **Nachtrag:** Die Konfiguration wandert **nicht vollständig** in die
+> Datenbank. `docs/leseprofil.md` bleibt Repo-Datei mit eigenem
+> Änderungsverfahren (ADR 17), und Selektoren bleiben beim Parser (ADR 18).
+> Die UI zeigt das Profil an; bearbeitet wird es über `leseprofil-schaerfen`.
+
 v1 ships a thin local web application for viewing Run results and editing the
 Profile and Watchlist.
 

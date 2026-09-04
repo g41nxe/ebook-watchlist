@@ -1,5 +1,10 @@
 # 6. Library Holds and Authenticated Access
 
+> **Nachtrag:** `hold_state` und `hold_expected_date` liegen nicht auf dem
+> Watchlist Entry, sondern auf der **Observation** (ADR 18). Eine Vormerkung
+> wird beobachtet, nicht gesetzt — damit fällt der Übergang `placed` →
+> `ready` aus der normalen Diff-Maschinerie und bekommt Historie.
+
 ## Status
 
 **v1: deferred.** v1 stays entirely login-free. Hold tracking ("notify when my

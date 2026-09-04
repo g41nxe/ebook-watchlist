@@ -1,5 +1,9 @@
 # 10. Phased Delivery
 
+> **Nachtrag:** Phase 2s Datenmodell steht in **ADR 18**. Der Satz „YAML
+> drops to import-only" gilt für Watchlist und Profil, nicht für den
+> Leseprofil-Maßstab (ADR 17).
+
 The tool is built in two phases against one architecture.
 
 ## Context
