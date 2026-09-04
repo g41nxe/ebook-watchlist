@@ -17,17 +17,36 @@ def observation(**overrides) -> Observation:
     return Observation(**{**defaults, **overrides})
 
 
-def test_a_watchlist_titles_first_sighting_is_only_a_baseline() -> None:
-    assert compare(observation(price_cents=999), None) == []
+def test_a_watchlist_title_is_reported_at_any_price() -> None:
+    """The reader named this book. Silence until it happens to be cheap meant
+    you could watch a title and never learn it had been found (ADR 19)."""
+    deltas = compare(observation(price_cents=999), None)
+    assert [d.kind for d in deltas] == [DeltaKind.FIRST_SEEN]
+    assert deltas[0].previous is None
+
+
+def test_a_shelf_find_at_full_price_stays_quiet() -> None:
+    shelf = observation(price_cents=999, match_reason=MatchReason.GENRE_CATEGORY)
+    assert compare(shelf, None, PROFILE) == []
+
+
+def test_a_reference_author_is_trusted_until_the_gate_exists() -> None:
+    """The price is the only sieve there is today, and it sieves for the wrong
+    thing: it silenced a new Jo Nesbø at 11,99 € while letting nine titles from
+    one self-publisher through at 1,99 €. A Reference Author is someone the
+    reader already chose, so that channel is trusted meanwhile (ADR 19)."""
+    nesbo = observation(
+        title="Blutmond", price_cents=1199, match_reason=MatchReason.PROFILE_AUTHOR
+    )
+    assert [d.kind for d in compare(nesbo, None, PROFILE)] == [DeltaKind.FIRST_SEEN]
 
 
 @pytest.mark.parametrize(
     "reason", [MatchReason.PROFILE_AUTHOR, MatchReason.GENRE_CATEGORY]
 )
-def test_a_discovery_turning_up_at_all_is_the_news(reason: MatchReason) -> None:
-    deltas = compare(observation(price_cents=999, match_reason=reason), None)
+def test_a_discovery_that_is_a_bargain_is_the_news(reason: MatchReason) -> None:
+    deltas = compare(observation(price_cents=399, match_reason=reason), None, PROFILE)
     assert [d.kind for d in deltas] == [DeltaKind.FIRST_SEEN]
-    assert deltas[0].previous is None
 
 
 def test_a_discovery_is_only_news_once() -> None:
@@ -86,12 +105,17 @@ def test_an_already_cheap_watchlist_title_is_reported_on_sight() -> None:
     assert [d.kind for d in deltas] == [DeltaKind.FIRST_SEEN]
 
 
-def test_a_normally_priced_watchlist_title_is_still_only_a_baseline() -> None:
-    assert compare(observation(price_cents=1499), None, PROFILE) == []
+def test_a_watchlist_title_needs_no_bargain_to_be_worth_saying() -> None:
+    assert [d.kind for d in compare(observation(price_cents=1499), None, PROFILE)] == [
+        DeltaKind.FIRST_SEEN
+    ]
 
 
-def test_without_a_profile_nothing_changes_about_first_sightings() -> None:
-    assert compare(observation(price_cents=399), None) == []
+def test_without_a_profile_a_discovery_cannot_clear_the_bar() -> None:
+    """No thresholds, no way to call anything a deal — so the channel that
+    depends on one stays silent rather than guessing."""
+    cheap = observation(price_cents=399, match_reason=MatchReason.GENRE_CATEGORY)
+    assert compare(cheap, None) == []
 
 
 def test_the_cheap_title_is_reported_once_not_every_run() -> None:
@@ -99,8 +123,9 @@ def test_the_cheap_title_is_reported_once_not_every_run() -> None:
     assert compare(cheap, cheap, PROFILE) == []
 
 
-def test_a_title_with_no_price_is_not_a_bargain() -> None:
-    assert compare(observation(price_cents=None), None, PROFILE) == []
+def test_a_discovery_with_no_price_is_not_a_bargain() -> None:
+    priceless = observation(price_cents=None, match_reason=MatchReason.GENRE_CATEGORY)
+    assert compare(priceless, None, PROFILE) == []
 
 
 def test_seeding_never_swallows_a_watchlist_bargain() -> None:
@@ -108,3 +133,20 @@ def test_seeding_never_swallows_a_watchlist_bargain() -> None:
     must not be silenced by that mechanism."""
     deltas = compute_deltas([observation(price_cents=399)], {}, PROFILE)
     assert suppress_unseeded(deltas, known_scopes=set()) == deltas
+
+
+def test_a_price_drop_on_a_shelf_find_needs_the_same_bar() -> None:
+    """Strict at the front door, open at the back was the hole: a title kept
+    quiet at 11,99 € must not be announced for slipping to 11,49 €."""
+    shelf = observation(price_cents=1149, match_reason=MatchReason.GENRE_CATEGORY)
+    before = observation(price_cents=1199, match_reason=MatchReason.GENRE_CATEGORY)
+    assert compare(shelf, before, PROFILE) == []
+
+    real = observation(price_cents=399, match_reason=MatchReason.GENRE_CATEGORY)
+    assert [d.kind for d in compare(real, before, PROFILE)] == [DeltaKind.PRICE_DROP]
+
+
+def test_a_watchlist_price_drop_is_always_worth_saying() -> None:
+    assert [d.kind for d in compare(
+        observation(price_cents=1149), observation(price_cents=1199), PROFILE
+    )] == [DeltaKind.PRICE_DROP]

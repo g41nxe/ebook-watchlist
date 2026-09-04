@@ -22,9 +22,15 @@ def observation(price: int | None, original: int | None = None) -> Observation:
     )
 
 
-@pytest.mark.parametrize("price", [0, 99, 499])
+@pytest.mark.parametrize("price", [99, 499])
 def test_cheap_outright_needs_no_argument(price: int) -> None:
     assert deal_flags(observation(price), None, PROFILE) == (STRONG_DEAL,)
+
+
+def test_free_is_filler_not_the_best_bargain_on_the_shelf() -> None:
+    """Every free title in a real Run was a bundle or a giveaway. Badging those
+    as the strongest deal on the page emptied the badge of meaning (ADR 19)."""
+    assert deal_flags(observation(0), None, PROFILE) == ()
 
 
 def test_a_standing_mid_range_price_is_not_a_deal() -> None:

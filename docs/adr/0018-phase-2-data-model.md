@@ -65,6 +65,14 @@ One of two. The ISBN is therefore a strong identifier where two sources happen
 to stock the same edition, not a general key across them; the matcher and its
 confidence gate carry the rest and will keep doing so.
 
+> **Nachtrag:** Titel, Autor:in, Reihe und Cover auf der `book`-Zeile stammen
+> aus einer Metadatenquelle, nicht aus dem Shop, der das Buch zufällig zuerst
+> gelistet hat. Was ein Shop daraus macht — `Jo Nesbø`, `Jo Nesbo` und
+> `Nesbø, Jo` stehen alle im heutigen Snapshot — bleibt auf `book_source`.
+> Der Matcher rät sonst an etwas herum, das eine Metadatenquelle schlicht
+> weiß. Welche Quelle das leisten kann, klärt die Recherche (Ticket 13);
+> bis dahin bleibt die Herkunft offen, die Trennung nicht.
+
 ### One table for every relationship
 
 ```sql

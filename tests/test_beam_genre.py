@@ -11,6 +11,7 @@ import pytest
 from ebook_watchlist.config import ConfigError, Profile, load_dismissals
 from ebook_watchlist.diff import compute_deltas, discovery_scope, suppress_unseeded
 from ebook_watchlist.digest import SECTION_GENRE, build_digest
+from ebook_watchlist.junk import is_junk
 from ebook_watchlist.models import MatchReason, Observation
 from ebook_watchlist.sources.base import RunContext
 from ebook_watchlist.sources.beam.source import BeamSource
@@ -19,6 +20,7 @@ from ebook_watchlist.store import Store
 FIXTURES = Path(__file__).parent / "fixtures" / "beam"
 NOW = datetime(2026, 9, 4, 6, 0)
 SPACE_OPERA = "belletristik/science-fiction/space-opera"
+PROFILE = Profile(slug="t", name="T")
 
 
 def fixture(name: str) -> str:
@@ -74,20 +76,40 @@ def test_a_leading_or_trailing_slash_does_not_change_the_request() -> None:
 # --- what counts as new ---------------------------------------------------
 
 
-def test_a_new_arrival_is_reported_once_and_then_stays_quiet() -> None:
-    observations = source().by_category(SPACE_OPERA)
+def _bargains(observations):
+    """The shelf as if everything on it were cheap.
 
-    first_run = compute_deltas(observations, {})
+    A discovery only reaches the reader as a deal (ADR 19), so a test about
+    *newness* has to hold the price constant or it measures the price rule
+    instead.
+    """
+    return [replace(o, price_cents=399) for o in observations if not is_junk(o)]
+
+
+def test_a_new_arrival_is_reported_once_and_then_stays_quiet() -> None:
+    observations = _bargains(source().by_category(SPACE_OPERA))
+
+    first_run = compute_deltas(observations, {}, PROFILE)
     assert len(first_run) == len(observations)
 
     already_known = {o.key: o for o in observations}
-    assert compute_deltas(observations, already_known) == []
+    assert compute_deltas(observations, already_known, PROFILE) == []
+
+
+def test_a_full_price_arrival_is_recorded_but_not_announced() -> None:
+    """It is not lost — the Observation is stored, so the day the price drops
+    the mid-band tier picks it up."""
+    full_price = [
+        o for o in source().by_category(SPACE_OPERA) if (o.price_cents or 0) >= 500
+    ]
+    assert full_price
+    assert compute_deltas(full_price, {}, PROFILE) == []
 
 
 def test_a_shelf_being_followed_for_the_first_time_is_seeded_quietly() -> None:
     """Everything on a fresh shelf is technically new; none of it is news."""
-    observations = source().by_category(SPACE_OPERA)
-    deltas = compute_deltas(observations, {})
+    observations = _bargains(source().by_category(SPACE_OPERA))
+    deltas = compute_deltas(observations, {}, PROFILE)
 
     assert suppress_unseeded(deltas, known_scopes=set()) == []
 
@@ -111,8 +133,9 @@ def test_seeding_only_silences_first_sightings_not_real_changes() -> None:
 
 
 def test_each_shelf_is_seeded_on_its_own() -> None:
-    observations = source().by_category(SPACE_OPERA)
-    deltas = compute_deltas(observations, {})
+    observations = _bargains(source().by_category(SPACE_OPERA))
+    deltas = compute_deltas(observations, {}, PROFILE)
+    assert deltas
     other_shelf = ("beam", str(MatchReason.GENRE_CATEGORY), "belletristik/krimi-thriller")
 
     assert suppress_unseeded(deltas, known_scopes={other_shelf}) == []
@@ -124,9 +147,9 @@ def test_suggestions_land_in_their_own_section_never_among_real_hits() -> None:
         profile_name="T",
         generated_at=NOW,
         since=None,
-        deltas=compute_deltas(observations, {}),
+        deltas=compute_deltas(_bargains(observations), {}, PROFILE),
         failures=[],
-        profile=Profile(slug="t", name="T"),
+        profile=PROFILE,
     )
 
     assert [section.title for section in digest.sections] == [SECTION_GENRE]

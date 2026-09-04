@@ -18,12 +18,17 @@ def digest_files(data_dir: Path) -> list[Path]:
     return sorted((data_dir / "digests").glob("*.html"))
 
 
-def test_first_run_is_silent_and_seeds_the_snapshot(
+def test_the_first_run_reports_the_watched_titles_it_found(
     data_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """A Watchlist Entry is news at any price (ADR 19). Discoveries are not:
+    the shelves are seeded quietly and stay out of this first Digest."""
     assert main([]) == EXIT_OK
-    assert capsys.readouterr().out == ""
-    assert digest_files(data_dir) == []
+
+    out = capsys.readouterr().out
+    assert "Erster Check" in out
+    assert "Der Schwarm" in out
+    assert len(digest_files(data_dir)) == 1
     assert paths.db_path().exists()
 
 
@@ -32,9 +37,11 @@ def test_second_unchanged_run_stays_silent(
 ) -> None:
     main([])
     capsys.readouterr()
+    after_first = digest_files(data_dir)
+
     assert main([]) == EXIT_OK
     assert capsys.readouterr().out == ""
-    assert digest_files(data_dir) == []
+    assert digest_files(data_dir) == after_first
 
 
 def test_a_price_drop_produces_a_digest(
@@ -55,10 +62,17 @@ def test_a_price_drop_produces_a_digest(
     assert "12,99 € → 4,99 €" in out
     assert "Änderungen seit letztem Check" in out
 
+    # The first Run already wrote today's Digest, so the second is kept beside
+    # it rather than overwriting it.
+    today = f"digest-{datetime.now():%Y-%m-%d}"
     written = digest_files(data_dir)
-    assert len(written) == 1
-    assert written[0].name == f"digest-{datetime.now():%Y-%m-%d}.html"
-    assert "Der Schwarm" in written[0].read_text(encoding="utf-8")
+    assert len(written) == 2
+    assert {path.name for path in written} == {
+        f"{today}.html",
+        f"{today}-{datetime.now():%H%M}.html",
+    }
+    dropped = next(path for path in written if path.name != f"{today}.html")
+    assert "4,99" in dropped.read_text(encoding="utf-8")
 
 
 def test_availability_change_produces_a_digest(

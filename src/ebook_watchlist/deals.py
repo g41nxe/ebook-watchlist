@@ -15,7 +15,16 @@ DEAL = "Deal"
 
 
 def is_strong_deal(price_cents: int | None, profile: Profile) -> bool:
-    return price_cents is not None and price_cents < profile.strong_deal_max_cents
+    """Cheap enough to need no argument — but not free.
+
+    Zero is not the best bargain on the shelf, it is filler: every free title in
+    a real Run was a bundle or a promotional giveaway (ADR 19). Badging those as
+    the strongest deal on the page was the surest way to make the badge
+    meaningless.
+    """
+    if price_cents is None or price_cents <= 0:
+        return False
+    return price_cents < profile.strong_deal_max_cents
 
 
 def _discounted_from(price_cents: int, reference_cents: int | None, profile: Profile) -> bool:

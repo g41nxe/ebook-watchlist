@@ -13,3 +13,6 @@ __pycache__/
 
 # Ad-hoc-Testlaeufe gegen die echten Quellen
 testlauf/
+
+# Prototypen-Server (zeigt auf .scratch/)
+.claude/launch.json

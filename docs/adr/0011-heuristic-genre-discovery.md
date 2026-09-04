@@ -1,5 +1,11 @@
 # 11. Heuristic Genre Discovery (v1)
 
+> **Nachtrag:** Die Entscheidung *kein Klassifikator in v1* ist durch
+> ADR 19 abgelöst. Der Regal-Mechanismus unten bleibt unverändert; neu ist
+> nur, dass seine Ausbeute vor der Anzeige gegen das Leseprofil bewertet
+> wird. 194 von 316 Entdeckungen eines echten Laufs kamen aus den Regalen
+> und trafen das Profil nur zufällig.
+
 Genre discovery in v1 is category-based, not classification-based: new arrivals
 in a small curated set of Shop Source categories are surfaced as low-confidence
 suggestions.
