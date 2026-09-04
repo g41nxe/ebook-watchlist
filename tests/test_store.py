@@ -69,3 +69,50 @@ def test_last_finished_run_ignores_the_current_one(tmp_path: Path) -> None:
 # --- seeded discovery scopes ----------------------------------------------
 
 
+
+
+# --- Schreibweisen auf der Buch-Zeile (Ticket 23) ---------------------------
+
+
+def test_the_book_keeps_the_better_spelling_of_the_same_author(store: Store) -> None:
+    """Der Shop liefert "Barnes, S. A.", die Watchlist sagt "S.A. Barnes".
+    Wer zuerst da war, bestimmte bisher, wie das Buch für immer heißt — bei
+    *Cold Eternity* war das der einmalige Auflöser aus dismissed.yaml."""
+    store.find_or_create_book(
+        isbn="9783641329433", title="Cold Eternity", author="Barnes, S. A.", now=NOW
+    )
+
+    again = store.find_or_create_book(
+        isbn="9783641329433", title="Cold Eternity", author="S.A. Barnes", now=NOW
+    )
+
+    assert again.author == "S.A. Barnes"
+    assert len(store.books()) == 1
+
+
+def test_a_worse_spelling_does_not_win_by_arriving_later(store: Store) -> None:
+    """Eine spätere Quelle ist nicht automatisch die bessere."""
+    store.find_or_create_book(isbn=None, title="Schneemann", author="Jo Nesbø", now=NOW)
+
+    again = store.find_or_create_book(isbn=None, title="Schneemann", author="Jo Nesbo", now=NOW)
+
+    assert again.author == "Jo Nesbø"
+
+
+def test_a_different_person_never_replaces_the_author(store: Store) -> None:
+    """Ein Namenswechsel wäre keine Schreibweise, sondern ein anderer Mensch."""
+    store.find_or_create_book(isbn="9783104911854", title="Krieg der Klone",
+                              author="John Scalzi", now=NOW)
+
+    again = store.find_or_create_book(isbn="9783104911854", title="Krieg der Klone",
+                                      author="Max Barry", now=NOW)
+
+    assert again.author == "John Scalzi"
+
+
+def test_a_missing_author_is_filled_in_when_one_turns_up(store: Store) -> None:
+    store.find_or_create_book(isbn=None, title="Providence", now=NOW)
+
+    again = store.find_or_create_book(isbn=None, title="Providence", author="Max Barry", now=NOW)
+
+    assert again.author == "Max Barry"

@@ -305,14 +305,22 @@ def _dismissals(profile, sources) -> int:
     Bewusst ein eigener Unterbefehl und kein Lauf: eine Handvoll Nummern einmal
     aufzulösen rechtfertigt kein Fegen aller Regale, und ein Lauf würde die
     Arbeit bei jedem Aufruf wiederholen.
+
+    Eine pausierte Quelle wird nicht gefragt (Ticket 23).
     """
     store = Store(paths.db_path())
+    # Der Schalter gilt auch hier. Er heisst "frag diese Quelle nicht", und
+    # eine Ausnahme fuer einen einmaligen Auflöser stand nirgends geschrieben
+    # (Ticket 23). Was ohne Anfrage geht, geht weiterhin; der Rest wird
+    # gemeldet, statt still auszufallen.
+    active, paused = _partition_enabled(sources, store)
     report = resolve_dismissals(
         store,
-        sources,
+        active,
         load_dismissals(),
         profile_slug=profile.slug,
         now=datetime.now(),
+        paused=paused,
     )
 
     for row in report.resolved:

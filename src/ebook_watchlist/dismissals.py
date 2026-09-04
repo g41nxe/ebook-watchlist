@@ -127,9 +127,18 @@ def resolve(
     *,
     profile_slug: str,
     now: datetime,
+    paused: Iterable[str] = (),
 ) -> ResolutionReport:
-    """Jede übrig gebliebene Produktnummer einmal auflösen."""
+    """Jede übrig gebliebene Produktnummer einmal auflösen.
+
+    ``paused`` sind Quellen, die die Leserin abgeschaltet hat. Der Schalter
+    verbietet **Anfragen**, nicht Arbeit: eine Nummer, die schon einmal
+    aufgelöst wurde, steht in der Datenbank und wird auch bei pausierter Quelle
+    zugeordnet. Was eine Anfrage bräuchte, wird gemeldet statt still übergangen
+    — eine verlorene Ablehnung ist genau das, was dieser Weg verhindern soll.
+    """
     by_name = {source.name: source for source in sources}
+    stopped = set(paused)
     report = ResolutionReport()
 
     for source_name, item_ids in (dismissed or {}).items():
@@ -147,6 +156,13 @@ def resolve(
                         author=book.author if book else None,
                         already_known=True,
                     )
+                )
+                continue
+
+            if source_name in stopped:
+                report.unresolved.append(
+                    f"{source_name}:{item_id} — {source_name} ist pausiert und wird "
+                    "nicht gefragt; nach dem Einschalten noch einmal aufrufen"
                 )
                 continue
 

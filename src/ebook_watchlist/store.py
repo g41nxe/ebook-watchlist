@@ -26,6 +26,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from .books import BookLike
 from .books import find as find_book
+from .cleaning import author_key, preferred_spelling
 from .migrations import migrate
 from .models import LINK_OUTCOMES, Availability, MatchReason, Observation
 from .ratings import HUMAN_ORIGINS, RATING_ORIGINS
@@ -321,6 +322,28 @@ def _to_observation(row: ObservationRow) -> Observation:
         url=row.url,
         observed_at=row.observed_at,
     )
+
+
+def _better_spelling(kept: str | None, seen: str | None) -> str | None:
+    """Die bessere Schreibweise **derselben** Person, sonst die bisherige.
+
+    Der Shop liefert ``Barnes, S. A.``, die Watchlist sagt ``S.A. Barnes``, und
+    wer zuerst da war, bestimmte bisher, wie das Buch für immer heißt — bei
+    *Cold Eternity* und *Providence* war das der einmalige Auflöser aus
+    ``dismissed.yaml``. Die Regel steht seit Ticket 16 in
+    :mod:`ebook_watchlist.cleaning` und wurde hier nie angewandt (Ticket 23).
+
+    Ausdrücklich nur *dieselbe* Person: stimmen die Namen nicht überein, bleibt
+    stehen, was dasteht. Eine spätere Quelle ist nicht automatisch die bessere,
+    und ein Namenswechsel wäre keine Schreibweise, sondern ein anderer Mensch.
+    """
+    if not seen or not seen.strip():
+        return kept
+    if not kept or not kept.strip():
+        return seen.strip()
+    if author_key(kept) != author_key(seen):
+        return kept
+    return preferred_spelling([kept, seen]) or kept
 
 
 class Store:
@@ -659,6 +682,7 @@ class Store:
                         row.isbn = isbn
                     if row.series is None and series:
                         row.series = series
+                    row.author = _better_spelling(row.author, author)
                     session.commit()
                     session.refresh(row)
                     session.expunge(row)

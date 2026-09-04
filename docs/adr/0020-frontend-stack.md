@@ -56,6 +56,26 @@ The two have a clean division, and stating it is the point of naming both:
 Bulk triage is the case that needs both: Alpine holds the selection, HTMX posts
 it and swaps in the result.
 
+> **Nachtrag aus der Umsetzung (Ticket 23):** Diese Arbeitsteilung stand acht
+> Tickets lang nur auf dem Papier. HTMX ist seit Ticket 10 im Einsatz; Alpine
+> wurde vom Build geholt, mit einer SHA gepinnt — und von **keinem** Template
+> geladen. 55 KB Abhängigkeit ohne Nutzen, und niemandem fiel es auf, weil
+> nichts fehlte.
+>
+> Jetzt trägt es den Fall, den dieser Absatz selbst nennt: die Vorschlagsseite
+> zählt, wie viele Zeilen angehakt sind, schaltet die Knöpfe frei, sobald es
+> eine ist, und kennt "alle" und "keine". Bei fünfzig Zeilen ist das die Frage
+> vor jedem Knopfdruck, und kein Server hat mit ihr zu tun.
+>
+> Eine Abweichung von der Vorhersage oben: abgeschickt wird mit einem
+> gewöhnlichen Formular, nicht mit HTMX. Die Entscheidung führt zu einer neuen
+> Seite, nicht zu einem ausgetauschten Fragment — dafür ist ein Formular das
+> richtige Werkzeug, und HTMX hätte nichts hinzugefügt.
+>
+> Alles, was ohne Alpine sinnlos wäre, trägt `x-cloak` und ist ohne das Skript
+> unsichtbar: fällt es aus, ist die Seite ein gewöhnliches Formular und kein
+> Zähler, der auf null stehenbleibt.
+
 Both are fetched once by the build into the static directory, pinned by version
 and checked against a SHA-256, and served from there — never loaded from a CDN
 at page load. Same reason as above, plus the tool then works on a network that

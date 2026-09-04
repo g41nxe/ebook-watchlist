@@ -24,7 +24,25 @@
 </p>
 {% else %}
 
-<form method="post" action="/vorschlaege/entscheiden" id="pile">
+{# Der Zaehler und "alle/keine" sind reiner Browserzustand: niemand speichert
+   sie, kein Server kennt sie, und bei fuenfzig Zeilen ist "wie viele habe ich
+   angehakt" die Frage, die vor jedem Knopfdruck steht. Genau die Haelfte der
+   Arbeitsteilung aus ADR 20, die bislang unbesetzt war. Ohne Alpine bleibt
+   alles davon per x-cloak verborgen und die Seite ist ein gewoehnliches
+   Formular. #}
+<form method="post" action="/vorschlaege/entscheiden" id="pile"
+      x-data="{
+        chosen: 0,
+        boxes() { return this.$root.querySelectorAll('input[name=keys]') },
+        recount() {
+          this.chosen = [...this.boxes()].filter(box => box.checked).length;
+        },
+        mark(on) {
+          this.boxes().forEach(box => { box.checked = on });
+          this.recount();
+        }
+      }"
+      @change="recount()">
 <input type="hidden" name="anlass" value="{{ anlass }}">
 
 <div class="mb-4 flex flex-wrap items-center gap-2 border-b border-rule pb-3">
@@ -92,10 +110,27 @@
    ganz unten eine Reise. #}
 <div class="sticky bottom-0 mt-4 flex flex-wrap items-center gap-2 border-t border-rule
             bg-paper/95 py-3 backdrop-blur">
-  <span class="text-sm text-soft">Auswahl:</span>
+  <span class="text-sm text-soft">
+    Auswahl:<span x-cloak class="ml-1 tabular-nums text-ink" x-text="chosen"></span>
+  </span>
+  {# Auswaehlen gehoert hierher und nicht zu den Filtern oben: ein Filter ist
+     eine Ansicht, eine Auswahl ist der erste Teil einer Handlung. #}
+  <span x-cloak class="mr-1 flex items-center gap-1.5 text-xs">
+    <button type="button" @click="mark(true)"
+            class="rounded border border-rule px-2 py-1 text-soft
+                   hover:border-soft hover:text-ink">alle</button>
+    <button type="button" @click="mark(false)" :disabled="chosen === 0"
+            class="rounded border border-rule px-2 py-1 text-soft
+                   hover:border-soft hover:text-ink
+                   disabled:opacity-40 disabled:hover:border-rule
+                   disabled:hover:text-soft">keine</button>
+  </span>
   {% for kind, label in actions %}
-  <button type="submit" name="kind" value="{{ kind }}"
+  {# Ohne Alpine bleibt der Knopf klickbar und tut wie bisher nichts, wenn
+     nichts angehakt ist — das ist der heutige Zustand, nicht schlechter. #}
+  <button type="submit" name="kind" value="{{ kind }}" :disabled="chosen === 0"
           class="rounded border px-3 py-1.5 text-sm font-medium transition
+                 disabled:opacity-40
                  {{ 'border-rule text-soft hover:border-danger hover:text-danger'
                     if kind == 'dismissed'
                     else 'border-rule text-ink hover:border-accent hover:text-accent' }}">

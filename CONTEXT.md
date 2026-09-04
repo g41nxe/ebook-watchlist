@@ -90,6 +90,53 @@ shelving, not the reader's word for what interests them. The code keeps
 `genre_category`; every string a reader sees says Thema, and both come from
 `reasons.py`.
 
+### Discovery
+An item a Source turned up that the reader never asked for by name — its Match
+Reason is `profile_author` or `genre_category`, never `watchlist`. A Discovery
+stays an Observation and gets **no** Book row until the reader says something
+about it (ADR 18). It is the case every filtering rule in this tool exists for:
+a Watchlist title is always reported, a Discovery has to earn it.
+
+### Rating Gate
+The step that decides whether a Discovery reaches the reader at all (ADR 19).
+It sits **behind** the Snapshot, so a failure costs a judgement and never
+history, and **behind** the price rule, so nothing is judged that would not be
+shown anyway. Without an API key it does nothing and everything is shown —
+that is the intended degraded state, not an outage.
+
+Its standing principle: **quality before quantity.** A handful of well-fitting
+suggestions beats a pile of poor ones, and an empty pile is a good result.
+
+**Reader-facing name: *Bewertungstor*.**
+
+### Rating
+What someone thinks of a book, on the Rubric's 0–5 scale, with a justification
+and a confidence (`belegt` | `teils` | `vermutet`).
+
+A Rating carries an **Origin** — who judged: `model` (the Rating Gate in a
+Run), `conversation` (judged against the same Rubric in conversation; the
+entries in `owned.yaml`), or `reader` (the reader's own stars, set on the book
+page). The Origin is part of the key, because the difference is the point: a 4
+from the reader is a fact, a 4 from a model is a suggestion (ADR 17). Both may
+stand side by side, neither overwrites the other, and the two never render the
+same.
+
+A machine Rating is keyed to the *find* — the ISBN, else `(Source, item id)` —
+because most finds never become a Book. A human Rating is keyed to the **Book**,
+because that is where a person gives it and it should hold whichever Source the
+book next arrives through.
+
+A new Rubric version invalidates machine Ratings, and only those: that the
+reader sharpened their own yardstick is no reason to void what they said.
+
+### Rubric
+The written yardstick a Rating is made against: `docs/leseprofil.md`, carrying
+its own version number. It lives in the repository with its own change
+procedure and an asymmetric burden of proof (ADR 17) — the web UI shows it and
+refuses to edit it, because a form there would bypass that procedure.
+
+**Reader-facing name: *Maßstab*.**
+
 ### Reference Author
 An author on the Profile's whitelist. Any item by a Reference Author is a
 Profile Match, discovered even if not on the Watchlist.

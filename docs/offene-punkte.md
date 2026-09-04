@@ -1,6 +1,6 @@
 # Offene Punkte und was unterwegs schiefging
 
-Stand 2026-09-04. Zwei Listen: **was noch nicht stimmt oder fehlt**, und
+Stand 2026-09-04, nach Ticket 23. Zwei Listen: **was noch nicht stimmt oder fehlt**, und
 **welche Behauptungen sich als falsch herausgestellt haben**. Die zweite ist
 die nützlichere — sie sagt, wo dieses Projekt zum Irrtum neigt.
 
@@ -50,20 +50,22 @@ offen.
 
 ### Kleinere offene Punkte
 
-- **Schreibweisen sind uneinheitlich.** Der Shop liefert `Barnes, S. A.`, der
-  Rest der Tabelle steht als `Vorname Nachname`. Der Matcher kommt damit klar,
-  die Oberfläche sieht uneinheitlich aus.
-- **Alpine ist eingebunden, aber ungenutzt.** Der Build holt es, kein Template
-  lädt es. Bislang braucht keine Seite flüchtigen Browser-Zustand — beim
-  nächsten Mal ist die Frage, ob es überhaupt bleibt.
-- **`CONTEXT.md` kennt das Bewertungstor nicht.** Es kam mit Ticket 12 und ist
-  im Glossar nie angekommen.
-- **Der `dismissals`-Befehl fragt eine Quelle auch, wenn sie pausiert ist.**
-  Bei einem einmaligen Auflöser hingenommen, aber es steht so nirgends.
 - **Die Anfragefrequenz bei der DNB ist undokumentiert.** Nirgends eine Zahl;
   wer Gewissheit will, muss `schnittstellen-service@dnb.de` fragen.
 - **Der Rückstand von 358 Vorschlägen ist unbearbeitet** — auf ausdrücklichen
   Wunsch, bis das Tor gefiltert hat (Ticket 19).
+
+### Mit Ticket 23 geschlossen
+
+- **Schreibweisen auf der Buch-Zeile.** `find_or_create_book` behält jetzt die
+  bessere Schreibweise **derselben** Person; ein anderer Name bleibt liegen.
+  *Cold Eternity* und *Providence* heißen wieder `S.A. Barnes` und `Max Barry`.
+- **Alpine.** Es wird geladen und trägt den Fall, den ADR 20 selbst nennt: der
+  Vorschlagsstapel zählt, was angehakt ist, und kennt "alle" und "keine".
+- **`CONTEXT.md`.** Bewertungstor, Urteil (mit Herkunft), Maßstab und
+  Entdeckung stehen im Glossar.
+- **Der `dismissals`-Befehl** achtet den Quellen-Schalter. Was ohne Anfrage
+  geht, geht weiter; der Rest wird gemeldet statt still zu scheitern.
 
 ---
 
@@ -125,6 +127,20 @@ von hinten aus wie ein Name.
 heißt praktisch „unter 5,00 €", weil die Buchpreisbindung Streichpreise
 verbietet und ein neuer Fund keine Vorgeschichte hat. Angewandt ließ sie neun
 Titel eines Selfpublishers durch und schwieg zu einem neuen Nesbø.
+
+### Über den eigenen Entwurf, zweiter Durchgang
+
+**Eine Regel im ADR ist keine Regel im Code.** ADR 20 beschrieb die
+Arbeitsteilung zwischen HTMX und Alpine so genau, dass „welche Zeilen sind
+angehakt" wörtlich als Alpine-Fall dasteht. Acht Tickets lang wurde Alpine
+geholt, gepinnt — und von keinem Template geladen. Es fiel niemandem auf, weil
+nichts fehlte: eine ungenutzte Abhängigkeit sieht aus wie eine benutzte.
+
+**Die uneinheitlichen Autorennamen waren kein Anzeigeproblem.** Notiert war
+„der Shop liefert `Barnes, S. A.`". Die Ursache war, *wer zuerst da war*: den
+Buch-Eintrag legte der einmalige Auflöser aus `dismissed.yaml` an, und
+`find_or_create_book` überschrieb nie etwas. Die Regel dafür lag seit Ticket 16
+ungenutzt in `cleaning.py`.
 
 ### Fehler in ausgeliefertem Code
 

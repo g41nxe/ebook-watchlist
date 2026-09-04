@@ -154,6 +154,45 @@ def test_a_source_that_no_longer_exists_is_reported_too(store: Store) -> None:
     assert "buecherheld:1" in report.unresolved[0]
 
 
+def test_a_paused_source_is_not_asked(store: Store) -> None:
+    """Der Schalter heißt "frag diese Quelle nicht". Eine Ausnahme für einen
+    einmaligen Auflöser stand nirgends geschrieben (Ticket 23)."""
+    source = beam()
+    report = resolve(
+        store, [source], {"beam": [PRODUCT_ID]}, profile_slug="t", now=NOW, paused=["beam"]
+    )
+
+    assert source.client.requests == []  # type: ignore[attr-defined]
+    assert report.requests == 0
+    assert report.needs_attention
+    assert "pausiert" in report.unresolved[0]
+    assert store.books() == []
+
+
+def test_a_pause_stops_requests_not_work_already_done(store: Store) -> None:
+    """Was einmal aufgelöst wurde, steht in der Datenbank — dafür braucht es
+    keine Anfrage, und der Schalter verbietet Anfragen, nicht Arbeit."""
+    resolve(store, [beam()], {"beam": [PRODUCT_ID]}, profile_slug="t", now=NOW)
+
+    report = resolve(
+        store, [], {"beam": [PRODUCT_ID]}, profile_slug="t", now=NOW, paused=["beam"]
+    )
+
+    assert not report.needs_attention
+    assert report.resolved[0].already_known is True
+
+
+def test_the_subcommand_honours_the_switch(data_dir: Path) -> None:
+    """Ende zu Ende: pausiert die Leserin eine Quelle, fragt auch der Auflöser
+    nicht — und meldet, was deshalb offen blieb."""
+    (data_dir / "dismissed.yaml").write_text("fake:\n  - fake-2\n", encoding="utf-8")
+    store = Store(data_dir / "snapshots.db")
+    store.set_enabled("fake", False, now=NOW)
+
+    assert main(["dismissals"]) == EXIT_SOURCE_FAILURE
+    assert store.relations("test", kind=str(RelationKind.DISMISSED)) == []
+
+
 # --- was danach unterdrückt wird -------------------------------------------
 
 

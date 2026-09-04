@@ -85,6 +85,13 @@
     stroke-linejoin: round;
   }
 
+  /* Was erst mit Alpine Sinn ergibt, bleibt ohne Alpine unsichtbar: faellt das
+     Skript aus, ist die Seite eine gewoehnliche Formularseite und nicht eine
+     mit einem Zaehler, der auf null stehenbleibt (ADR 20). */
+  [x-cloak] {
+    display: none !important;
+  }
+
   /* Icons erben Groesse und Farbe vom Text; das Sprite liefert nur die Pfade. */
   svg.i {
     width: 1em;

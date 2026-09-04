@@ -213,3 +213,33 @@ def test_the_pile_counts_what_it_does_not_show(db: Store) -> None:
 
     assert len(pile.items) == 50
     assert pile.total >= 60
+
+
+# --- flüchtiger Browserzustand (Ticket 23) ----------------------------------
+
+
+def test_alpine_is_actually_loaded(client: TestClient) -> None:
+    """Der Build holte Alpine und kein Template lud es — 55 KB Abhängigkeit
+    ohne Nutzen. Entweder eine Seite braucht es, oder es fliegt raus (ADR 20)."""
+    assert "vendor/alpine.min.js" in client.get("/vorschlaege").text
+
+
+def test_the_pile_counts_what_is_ticked_in_the_browser(client: TestClient, db: Store) -> None:
+    """Bei fünfzig Zeilen ist "wie viele habe ich angehakt" die Frage vor jedem
+    Knopfdruck — und reiner Browserzustand: kein Server kennt sie."""
+    found(db)
+    body = client.get("/vorschlaege").text
+
+    assert 'x-data="{' in body
+    assert 'x-text="chosen"' in body
+    assert ':disabled="chosen === 0"' in body
+
+
+def test_without_alpine_the_page_stays_a_plain_form(client: TestClient, db: Store) -> None:
+    """x-cloak verbirgt, was ohne Alpine sinnlos wäre. Fällt das Skript aus,
+    fehlt der Zähler — die Seite funktioniert weiter."""
+    found(db)
+    body = client.get("/vorschlaege").text
+
+    assert "x-cloak" in body
+    assert '<form method="post" action="/vorschlaege/entscheiden"' in body
