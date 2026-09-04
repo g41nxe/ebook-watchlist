@@ -157,15 +157,20 @@ class RatingRow(Base):
     sonst ``(Quelle, Item-Id)``. Ein Buch, das später eine Beziehung bekommt,
     findet sein Urteil über die ISBN wieder.
 
-    Maschinensterne und die der Leserin bleiben getrennt: eine 4 von ihr ist
-    eine Tatsache, eine 4 von hier ein Vorschlag. Ihre stehen an der Beziehung.
+    Maschinensterne und die der Leserin bleiben getrennt — und zwar dadurch,
+    dass ``origin`` dabeisteht und Teil des Schlüssels ist: eine 4 von ihr ist
+    eine Tatsache, eine 4 vom Modell ein Vorschlag. Beide dürfen nebeneinander
+    stehen, und keines überschreibt das andere (ADR 17, ADR 19, Ticket 21).
     """
 
     __tablename__ = "rating"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     #: Der Schlüssel des Fundes: ``isbn:978…`` oder ``item:beam:1279702``.
-    subject: Mapped[str] = mapped_column(String, unique=True)
+    subject: Mapped[str] = mapped_column(String)
+    #: Wer geurteilt hat. Solange es nur eine Herkunft gab, war das entbehrlich;
+    #: mit den Urteilen aus dem Gespräch und denen der Leserin sind es drei.
+    origin: Mapped[str] = mapped_column(String, default="model")
     stars: Mapped[int] = mapped_column(Integer)
     confidence: Mapped[str] = mapped_column(String)
     reason: Mapped[str] = mapped_column(String)
@@ -174,6 +179,8 @@ class RatingRow(Base):
     #: erneuter Aufruf richtig ist.
     rubric_version: Mapped[int] = mapped_column(Integer)
     rated_at: Mapped[datetime] = mapped_column(DateTime)
+
+    __table_args__ = (UniqueConstraint("subject", "origin", name="uq_rating"),)
 
 
 class BookRelationRow(Base):

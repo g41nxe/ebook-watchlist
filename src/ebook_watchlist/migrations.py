@@ -169,6 +169,50 @@ def _add_run_pid_column(connection: Connection) -> None:
     add_column(connection, "run", "pid", "INTEGER")
 
 
+def _add_rating_origin(connection: Connection) -> None:
+    """Woher ein Urteil stammt (Ticket 21).
+
+    Die Tabelle wird neu gebaut statt ergaenzt: der alte eindeutige Schluessel
+    lag auf ``subject`` allein, und genau der muss fallen — sonst koennten das
+    Urteil der Leserin und das des Modells nicht nebeneinander stehen, und eins
+    wuerde das andere ueberschreiben. SQLite kann eine Eindeutigkeit nicht
+    aendern, also gibt es dafuer keinen kleineren Weg.
+
+    Bestehende Zeilen wandern mit und gelten als Modellurteile — die einzige
+    Herkunft, die es bis hierher gab.
+    """
+    if not _has_table(connection, "rating"):
+        return
+    if "origin" in _columns(connection, "rating"):
+        return
+    connection.exec_driver_sql("ALTER TABLE rating RENAME TO rating_old")
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE rating (
+            id INTEGER NOT NULL PRIMARY KEY,
+            subject VARCHAR NOT NULL,
+            origin VARCHAR NOT NULL,
+            stars INTEGER NOT NULL,
+            confidence VARCHAR NOT NULL,
+            reason VARCHAR NOT NULL,
+            rubric_version INTEGER NOT NULL,
+            rated_at DATETIME NOT NULL,
+            CONSTRAINT uq_rating UNIQUE (subject, origin)
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        INSERT INTO rating (id, subject, origin, stars, confidence, reason,
+                            rubric_version, rated_at)
+        SELECT id, subject, 'model', stars, confidence, reason,
+               rubric_version, rated_at
+        FROM rating_old
+        """
+    )
+    connection.exec_driver_sql("DROP TABLE rating_old")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -181,6 +225,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     # bestehenden Datei, und eine verschobene Reihenfolge liesse einen
     # Datenbestand mittlerer Version die falschen Schritte ueberspringen.
     _add_run_pid_column,
+    _add_rating_origin,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

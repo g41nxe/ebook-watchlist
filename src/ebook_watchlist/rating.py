@@ -48,6 +48,18 @@ KEY_ENV = "ANTHROPIC_API_KEY"
 #: unpassende, und ein leerer Stapel ist ein gutes Ergebnis (ADR 19).
 DEFAULT_THRESHOLD = 3
 
+#: Woher ein Urteil stammt. Der Unterschied ist nicht kosmetisch: eine 4 von
+#: der Leserin ist eine Tatsache, eine 4 vom Modell ein Vorschlag (ADR 17).
+BY_MODEL = "model"
+#: Im Gespräch vergeben, gegen denselben Maßstab — die dreizehn aus
+#: ``owned.yaml`` (Ticket 21).
+BY_CONVERSATION = "conversation"
+BY_READER = "reader"
+
+ORIGINS: frozenset[str] = frozenset({BY_MODEL, BY_CONVERSATION, BY_READER})
+#: Was die Leserin selbst gesagt hat, wiegt schwerer als jedes Modellurteil.
+HUMAN: frozenset[str] = frozenset({BY_READER})
+
 
 class RatingUnavailable(Exception):
     """Es konnte nicht bewertet werden. Kein Fehler des Buches."""
