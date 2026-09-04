@@ -16,3 +16,6 @@ testlauf/
 
 # Prototypen-Server (zeigt auf .scratch/)
 .claude/launch.json
+
+# Rohdaten der Metadaten-Recherche
+metadata-probe.json
