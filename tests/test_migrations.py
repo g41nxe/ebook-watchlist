@@ -191,6 +191,10 @@ def test_the_rating_table_is_rebuilt_and_keeps_its_rows(tmp_path: Path) -> None:
         rows = connection.execute(
             "SELECT id, subject, origin, stars, reason FROM rating"
         ).fetchall()
+        # Und die Spalte trägt danach den neuen Namen (Ticket 25).
+        assert "profile_version" in {
+            row[1] for row in connection.execute("PRAGMA table_info(rating)")
+        }
         # Die Zeile wandert mit, behält ihre id und gilt als Modellurteil —
         # die einzige Herkunft, die es bis dahin gab.
         assert rows == [(7, "isbn:9783104911854", "model", 4, "Achse D")]
@@ -223,7 +227,7 @@ def test_after_the_rebuild_two_origins_stand_side_by_side(tmp_path: Path) -> Non
         )
 
     store = Store(path)
-    store.put_rating("book:5", stars=5, confidence="belegt", reason="", rubric_version=1,
+    store.put_rating("book:5", stars=5, confidence="belegt", reason="", profile_version=1,
                      now=datetime(2026, 9, 4, 20, 0), origin="reader")
 
     assert store.rating("book:5", 1, origin="model").stars == 2

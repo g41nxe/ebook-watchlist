@@ -312,7 +312,7 @@ def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> 
     (ADR 17)."""
     book = db.books()[0]
     db.put_rating(book_subject(book.id), stars=4, confidence="teils", reason="Reihe und Stimme.",
-                  rubric_version=1, now=NOW, origin=BY_CONVERSATION)
+                  profile_version=1, now=NOW, origin=BY_CONVERSATION)
 
     body = client.get(f"/book/{book.id}").text
 
@@ -326,7 +326,7 @@ def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: S
     hier nicht."""
     book = db.find_or_create_book(isbn="9783104911854", title="Ein Fund", now=NOW)
     db.put_rating("isbn:9783104911854", stars=2, confidence="vermutet", reason="Zu weich.",
-                  rubric_version=1, now=NOW, origin=BY_MODEL)
+                  profile_version=1, now=NOW, origin=BY_MODEL)
 
     body = client.get(f"/book/{book.id}").text
 
@@ -334,14 +334,14 @@ def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: S
     assert "Zu weich." in body
 
 
-def test_a_judgement_against_an_older_rubric_says_so(client: TestClient, db: Store) -> None:
+def test_a_judgement_against_an_older_leseprofil_says_so(client: TestClient, db: Store) -> None:
     book = db.books()[0]
     db.put_rating(book_subject(book.id), stars=4, confidence="teils", reason="Alt.",
-                  rubric_version=0, now=NOW, origin=BY_MODEL)
+                  profile_version=0, now=NOW, origin=BY_MODEL)
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "gegen Maßstab 0" in body
+    assert "gegen Profil 0" in body
 
 
 def test_a_nonsense_star_count_is_refused(client: TestClient, db: Store) -> None:
@@ -435,7 +435,7 @@ def test_the_gates_verdict_on_a_discovery_without_an_isbn_is_found_too(
     book = db.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
     discovery(db, book.id, reason=MatchReason.GENRE_CATEGORY, category="horror-mystery-allgemein")
     db.put_rating("item:beam:7", stars=4, confidence="teils", reason="Achse D: isoliert.",
-                  rubric_version=1, now=NOW, origin=BY_MODEL)
+                  profile_version=1, now=NOW, origin=BY_MODEL)
 
     body = client.get(f"/book/{book.id}").text
 

@@ -177,7 +177,7 @@ def test_a_suggestion_carries_its_judgement() -> None:
     (ADR 19, Ticket 14)."""
     delta = discovered()
     judgement = Rating(
-        stars=4, reason="Achse D: isoliertes Setting", confidence="teils", rubric_version=1
+        stars=4, reason="Achse D: isoliertes Setting", confidence="teils", profile_version=1
     )
     digest = build(deltas=[delta], judgements={delta.current.key: judgement})
 

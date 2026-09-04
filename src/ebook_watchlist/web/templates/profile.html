@@ -90,12 +90,12 @@
 <h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
   Der Maßstab
 </h2>
-{% if view.rubric %}
+{% if view.leseprofil %}
 <div class="rounded-lg border border-rule bg-card px-5 py-4">
   <p class="mb-3 text-sm text-soft">
-    Maßstabsversion <span class="font-medium text-ink">{{ view.rubric_version }}</span>.
+    Maßstabsversion <span class="font-medium text-ink">{{ view.profile_version }}</span>.
     <strong class="text-ink">Hier nicht änderbar</strong> — und das ist Absicht:
-    er liegt als <code class="rounded bg-hair px-1">docs/{{ view.rubric_path }}</code>
+    er liegt als <code class="rounded bg-hair px-1">docs/{{ view.leseprofil_path }}</code>
     im Repository, mit eigenem Änderungsverfahren und einer asymmetrischen
     Beweislast (ADR 17). Ein Formular an dieser Stelle würde das umgehen.
     Geändert wird er über den Skill <code class="rounded bg-hair px-1">leseprofil-schaerfen</code>,
@@ -106,7 +106,7 @@
   <details>
     <summary class="cursor-pointer text-sm text-accent">Maßstab anzeigen</summary>
     <pre class="mt-3 max-h-[32rem] overflow-auto rounded bg-paper p-4 text-xs
-                leading-relaxed whitespace-pre-wrap text-ink/90">{{ view.rubric }}</pre>
+                leading-relaxed whitespace-pre-wrap text-ink/90">{{ view.leseprofil }}</pre>
   </details>
 </div>
 {% else %}

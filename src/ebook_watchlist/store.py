@@ -185,7 +185,7 @@ class RatingRow(Base):
     #: Die Version des Maßstabs, gegen den geurteilt wurde. Eine neue Version
     #: macht das Urteil ungültig — das ist die eine Änderung, bei der ein
     #: erneuter Aufruf richtig ist.
-    rubric_version: Mapped[int] = mapped_column(Integer)
+    profile_version: Mapped[int] = mapped_column(Integer)
     rated_at: Mapped[datetime] = mapped_column(DateTime)
 
     __table_args__ = (UniqueConstraint("subject", "origin", name="uq_rating"),)
@@ -848,7 +848,7 @@ class Store:
     # --- Bewertungen (Ticket 12) -------------------------------------------
 
     def rating(
-        self, subject: str, rubric_version: int, *, origin: str = "model"
+        self, subject: str, profile_version: int, *, origin: str = "model"
     ) -> RatingRow | None:
         """Das gespeicherte Urteil einer Herkunft — wenn es zum Maßstab passt.
 
@@ -863,7 +863,7 @@ class Store:
             ).first()
             if row is None:
                 return None
-            if origin not in HUMAN_ORIGINS and row.rubric_version != rubric_version:
+            if origin not in HUMAN_ORIGINS and row.profile_version != profile_version:
                 return None
             session.expunge(row)
             return row
@@ -907,7 +907,7 @@ class Store:
         stars: int,
         confidence: str,
         reason: str,
-        rubric_version: int,
+        profile_version: int,
         now: datetime,
         origin: str = "model",
     ) -> None:
@@ -934,7 +934,7 @@ class Store:
             row.stars = stars
             row.confidence = confidence
             row.reason = reason
-            row.rubric_version = rubric_version
+            row.profile_version = profile_version
             row.rated_at = now
             session.commit()
 

@@ -158,11 +158,11 @@
       {% if judgement.when %}
       <span class="text-xs text-soft">{{ judgement.when.strftime("%d.%m.%Y") }}</span>
       {% endif %}
-      {% if judgement.stale(page.rubric_version) %}
+      {% if judgement.stale(page.profile_version) %}
       {# Ein Maschinenurteil gegen einen alten Massstab ist Auskunft, keine
          Grundlage — beim naechsten Lauf wird es neu eingeholt (ADR 19). #}
       <span class="rounded bg-danger/10 px-1.5 py-0.5 text-[11px] text-danger">
-        gegen Maßstab {{ judgement.rubric_version }}, heute gilt {{ page.rubric_version }}</span>
+        gegen Profil {{ judgement.profile_version }}, heute gilt {{ page.profile_version }}</span>
       {% endif %}
     </div>
     {% if judgement.reason %}

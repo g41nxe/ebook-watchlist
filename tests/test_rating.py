@@ -20,18 +20,18 @@ from ebook_watchlist.rating import (
     Rating,
     RatingUnavailable,
     build_rater,
+    leseprofil_version,
     parse_answer,
     parse_many,
     prompt_for,
     prompt_for_many,
     rate_in_batches,
-    rubric_version,
 )
 from ebook_watchlist.ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject
 from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 22, 0)
-RUBRIC = "Profilversion: 1\n\nHier stünde das Leseprofil."
+LESEPROFIL = "Profilversion: 1\n\nHier stünde das Leseprofil."
 SCHEMA = "Hier stünde das Bewertungsschema."
 
 
@@ -64,20 +64,20 @@ class StubRater:
 
 def rating(stars: int) -> Rating:
     return Rating(stars=stars, reason="Achse D: isoliertes Setting", confidence="teils",
-                  rubric_version=1)
+                  profile_version=1)
 
 
 # --- der Maßstab ------------------------------------------------------------
 
 
-def test_the_rubric_states_its_version() -> None:
-    assert rubric_version(RUBRIC) == 1
+def test_the_leseprofil_states_its_version() -> None:
+    assert leseprofil_version(LESEPROFIL) == 1
 
 
-def test_a_rubric_without_a_version_is_refused() -> None:
-    """Ohne Version stünden irgendwann Sterne aus drei Maßstäben nebeneinander."""
-    with pytest.raises(RatingUnavailable, match="Maßstabsversion"):
-        rubric_version("Kein Hinweis auf eine Version.")
+def test_a_leseprofil_without_a_version_is_refused() -> None:
+    """Ohne Version stünden irgendwann Sterne aus drei Fassungen nebeneinander."""
+    with pytest.raises(RatingUnavailable, match="Profilversion"):
+        leseprofil_version("Kein Hinweis auf eine Version.")
 
 
 # --- der Prompt -------------------------------------------------------------
@@ -86,7 +86,7 @@ def test_a_rubric_without_a_version_is_refused() -> None:
 def test_the_prompt_carries_only_public_facts() -> None:
     """Kein Watchlist-Inhalt, kein Besitz, keine Identität der Leserin (ADR 19)."""
     text = prompt_for(
-        discovery(author="Max Barry", blurb="Ein Schiff, allein."), RUBRIC, SCHEMA
+        discovery(author="Max Barry", blurb="Ein Schiff, allein."), LESEPROFIL, SCHEMA
     )
 
     assert "Max Barry" in text
@@ -97,12 +97,12 @@ def test_the_prompt_carries_only_public_facts() -> None:
 
 def test_a_truncated_blurb_says_so() -> None:
     """Ein Modell, das nicht weiß, wie dünn seine Grundlage ist, urteilt zu sicher."""
-    text = prompt_for(discovery(blurb="Sydney wollte nur Geld verdienen..."), RUBRIC, SCHEMA)
+    text = prompt_for(discovery(blurb="Sydney wollte nur Geld verdienen..."), LESEPROFIL, SCHEMA)
     assert "abgeschnitten" in text
 
 
 def test_a_whole_blurb_is_not_flagged() -> None:
-    text = prompt_for(discovery(blurb="Ein vollständiger Satz."), RUBRIC, SCHEMA)
+    text = prompt_for(discovery(blurb="Ein vollständiger Satz."), LESEPROFIL, SCHEMA)
     assert "abgeschnitten" not in text
 
 
@@ -114,7 +114,7 @@ def test_a_clean_answer_is_read() -> None:
     result = parse_answer(answer, version=1)
 
     assert (result.stars, result.confidence) == (4, "teils")
-    assert result.rubric_version == 1
+    assert result.profile_version == 1
 
 
 def test_json_wrapped_in_chatter_is_still_read() -> None:
@@ -143,7 +143,7 @@ def test_an_unusable_answer_is_refused_rather_than_guessed(answer: str) -> None:
 def test_a_good_fit_passes(store: Store) -> None:
     deltas = [first_seen(discovery(isbn="9783104911854"))]
     kept, report = gate.apply(
-        deltas, store=store, rater=StubRater(rating(4)), rubric_version=1,
+        deltas, store=store, rater=StubRater(rating(4)), profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
     assert kept == deltas
@@ -153,7 +153,7 @@ def test_a_good_fit_passes(store: Store) -> None:
 def test_a_poor_fit_never_reaches_the_pile(store: Store) -> None:
     deltas = [first_seen(discovery(isbn="9783104911854"))]
     kept, report = gate.apply(
-        deltas, store=store, rater=StubRater(rating(1)), rubric_version=1,
+        deltas, store=store, rater=StubRater(rating(1)), profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
     assert kept == []
@@ -165,22 +165,22 @@ def test_a_book_is_judged_once_not_every_run(store: Store) -> None:
     rater = StubRater(rating(4))
     deltas = [first_seen(discovery(isbn="9783104911854"))]
 
-    gate.apply(deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW)
+    gate.apply(deltas, store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW)
     _, second = gate.apply(
-        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW
+        deltas, store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW
     )
 
     assert len(rater.calls) == 1
     assert second.reused == 1
 
 
-def test_a_new_rubric_invalidates_the_judgement(store: Store) -> None:
+def test_a_new_leseprofil_invalidates_the_judgement(store: Store) -> None:
     """Die eine Änderung, bei der ein erneuter Aufruf richtig ist."""
     rater = StubRater(rating(4))
     deltas = [first_seen(discovery(isbn="9783104911854"))]
 
-    gate.apply(deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW)
-    gate.apply(deltas, store=store, rater=rater, rubric_version=2, threshold=3, budget=10, now=NOW)
+    gate.apply(deltas, store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW)
+    gate.apply(deltas, store=store, rater=rater, profile_version=2, threshold=3, budget=10, now=NOW)
 
     assert len(rater.calls) == 2
 
@@ -193,7 +193,7 @@ def test_the_gate_never_fails_closed(store: Store) -> None:
         deltas,
         store=store,
         rater=StubRater(RatingUnavailable("kein Netz")),
-        rubric_version=1,
+        profile_version=1,
         threshold=3,
         budget=10,
         now=NOW,
@@ -205,7 +205,7 @@ def test_the_gate_never_fails_closed(store: Store) -> None:
 def test_without_a_rater_nothing_is_held_back(store: Store) -> None:
     deltas = [first_seen(discovery())]
     kept, report = gate.apply(
-        deltas, store=store, rater=None, rubric_version=1, threshold=3, budget=10, now=NOW
+        deltas, store=store, rater=None, profile_version=1, threshold=3, budget=10, now=NOW
     )
     assert kept == deltas
     assert report.held_back == 0
@@ -218,7 +218,7 @@ def test_a_watchlist_title_is_never_judged(store: Store) -> None:
     deltas = [first_seen(discovery(match_reason=MatchReason.WATCHLIST))]
 
     kept, _ = gate.apply(
-        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW
+        deltas, store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW
     )
 
     assert kept == deltas
@@ -231,7 +231,7 @@ def test_a_price_drop_is_not_judged_again(store: Store) -> None:
     drop = Delta(DeltaKind.PRICE_DROP, discovery(price_cents=299), discovery(price_cents=999))
 
     kept, _ = gate.apply(
-        [drop], store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW
+        [drop], store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW
     )
 
     assert kept == [drop]
@@ -249,7 +249,7 @@ def test_the_judgement_follows_the_isbn_across_sources(store: Store) -> None:
 
     for deltas in ([at_beam], [at_voebb]):
         gate.apply(
-            deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW
+            deltas, store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW
         )
 
     assert len(rater.calls) == 1
@@ -272,7 +272,7 @@ def test_a_run_stops_asking_once_the_budget_is_spent(store: Store) -> None:
     deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(5)]
 
     _, report = gate.apply(
-        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=2, now=NOW
+        deltas, store=store, rater=rater, profile_version=1, threshold=3, budget=2, now=NOW
     )
 
     assert len(rater.calls) == 2
@@ -286,7 +286,7 @@ def test_what_the_budget_skips_is_shown_not_dropped(store: Store) -> None:
     deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(3)]
 
     kept, report = gate.apply(
-        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=1, now=NOW
+        deltas, store=store, rater=rater, profile_version=1, threshold=3, budget=1, now=NOW
     )
 
     assert kept == deltas
@@ -297,7 +297,7 @@ def test_the_rest_is_judged_on_the_next_run(store: Store) -> None:
     """Der Rückstand wird über Läufe abgearbeitet, nicht verloren."""
     rater = StubRater(rating(4))
     deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(4)]
-    kwargs = dict(store=store, rater=rater, rubric_version=1, threshold=3, budget=2, now=NOW)
+    kwargs = dict(store=store, rater=rater, profile_version=1, threshold=3, budget=2, now=NOW)
 
     gate.apply(deltas, **kwargs)
     _, second = gate.apply(deltas, **kwargs)
@@ -312,12 +312,12 @@ def test_a_stored_judgement_does_not_cost_budget(store: Store) -> None:
     rater = StubRater(rating(4))
     known = first_seen(discovery(source_item_id="alt"))
     gate.apply(
-        [known], store=store, rater=rater, rubric_version=1, threshold=3, budget=5, now=NOW
+        [known], store=store, rater=rater, profile_version=1, threshold=3, budget=5, now=NOW
     )
 
     _, report = gate.apply(
         [known, first_seen(discovery(source_item_id="neu"))],
-        store=store, rater=rater, rubric_version=1, threshold=3, budget=1, now=NOW,
+        store=store, rater=rater, profile_version=1, threshold=3, budget=1, now=NOW,
     )
 
     assert (report.reused, report.rated, report.over_budget) == (1, 1, 0)
@@ -343,7 +343,7 @@ def test_the_judgement_of_a_passing_find_is_reported(store: Store) -> None:
     found = discovery(isbn="9783104911854")
     _, report = gate.apply(
         [first_seen(found)],
-        store=store, rater=StubRater(rating(4)), rubric_version=1,
+        store=store, rater=StubRater(rating(4)), profile_version=1,
         threshold=3, budget=5, now=NOW,
     )
     assert report.judgements[found.key].stars == 4
@@ -356,7 +356,7 @@ def test_a_dead_network_costs_the_budget_too(store: Store) -> None:
     deltas = [first_seen(discovery(source_item_id=str(n))) for n in range(5)]
 
     kept, report = gate.apply(
-        deltas, store=store, rater=rater, rubric_version=1, threshold=3, budget=2, now=NOW
+        deltas, store=store, rater=rater, profile_version=1, threshold=3, budget=2, now=NOW
     )
 
     assert len(rater.calls) == 2
@@ -372,29 +372,29 @@ def test_the_readers_stars_outrank_the_model_and_cost_no_call(store: Store) -> N
     (ADR 17). Das Tor fragt sie zuerst und ruft dann gar kein Modell mehr."""
     book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
     store.put_rating(book_subject(book.id), stars=5, confidence="belegt", reason="",
-                     rubric_version=1, now=NOW, origin=BY_READER)
+                     profile_version=1, now=NOW, origin=BY_READER)
     rater = StubRater(rating(1))
 
     kept, report = gate.apply(
         [first_seen(discovery(book_id=book.id))],
-        store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW,
+        store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW,
     )
 
     assert rater.calls == []
     assert (len(kept), report.reused) == (1, 1)
 
 
-def test_her_stars_survive_a_sharpened_rubric(store: Store) -> None:
+def test_her_stars_survive_a_sharpened_leseprofil(store: Store) -> None:
     """Eine neue Maßstabsversion entwertet ein Modellurteil. Was ein Mensch
     gesagt hat, verfällt nicht, wenn er seinen Maßstab schärft."""
     book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
     store.put_rating(book_subject(book.id), stars=5, confidence="belegt", reason="",
-                     rubric_version=1, now=NOW, origin=BY_READER)
+                     profile_version=1, now=NOW, origin=BY_READER)
     rater = StubRater(rating(1))
 
     gate.apply(
         [first_seen(discovery(book_id=book.id))],
-        store=store, rater=rater, rubric_version=2, threshold=3, budget=10, now=NOW,
+        store=store, rater=rater, profile_version=2, threshold=3, budget=10, now=NOW,
     )
 
     assert rater.calls == []
@@ -403,10 +403,10 @@ def test_her_stars_survive_a_sharpened_rubric(store: Store) -> None:
 def test_the_model_never_overwrites_what_she_said(store: Store) -> None:
     book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
     store.put_rating(book_subject(book.id), stars=5, confidence="belegt", reason="",
-                     rubric_version=1, now=NOW, origin=BY_READER)
+                     profile_version=1, now=NOW, origin=BY_READER)
 
     store.put_rating(book_subject(book.id), stars=1, confidence="teils", reason="Modell",
-                     rubric_version=1, now=NOW, origin=BY_MODEL)
+                     profile_version=1, now=NOW, origin=BY_MODEL)
 
     hers = store.rating(book_subject(book.id), 1, origin=BY_READER)
     its = store.rating(book_subject(book.id), 1, origin=BY_MODEL)
@@ -418,12 +418,12 @@ def test_a_judgement_from_the_conversation_also_spares_the_call(store: Store) ->
     sie noch einmal einzuholen wäre Verschwendung."""
     book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
     store.put_rating(book_subject(book.id), stars=4, confidence="teils", reason="Reihe.",
-                     rubric_version=1, now=NOW, origin=BY_CONVERSATION)
+                     profile_version=1, now=NOW, origin=BY_CONVERSATION)
     rater = StubRater(rating(1))
 
     gate.apply(
         [first_seen(discovery(book_id=book.id))],
-        store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW,
+        store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW,
     )
 
     assert rater.calls == []
@@ -431,13 +431,13 @@ def test_a_judgement_from_the_conversation_also_spares_the_call(store: Store) ->
 
 def test_an_unknown_origin_is_refused(store: Store) -> None:
     with pytest.raises(ValueError, match="unbekannte Herkunft"):
-        store.put_rating("book:1", stars=4, confidence="teils", reason="", rubric_version=1,
+        store.put_rating("book:1", stars=4, confidence="teils", reason="", profile_version=1,
                          now=NOW, origin="freund")
 
 
 def test_taking_her_stars_back_leaves_nothing_rather_than_a_zero(store: Store) -> None:
     """Nicht bewertet und "passt überhaupt nicht" sind zwei Auskünfte."""
-    store.put_rating("book:1", stars=4, confidence="belegt", reason="", rubric_version=1,
+    store.put_rating("book:1", stars=4, confidence="belegt", reason="", profile_version=1,
                      now=NOW, origin=BY_READER)
 
     assert store.drop_rating("book:1", BY_READER) is True
@@ -451,7 +451,7 @@ def test_a_rejected_book_does_not_come_back_through_a_price_drop(store: Store) -
     rater = StubRater(rating(1))
     found = discovery(isbn="9783104911854", price_cents=399)
     kept, _ = gate.apply(
-        [first_seen(found)], store=store, rater=rater, rubric_version=1,
+        [first_seen(found)], store=store, rater=rater, profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
     assert kept == []
@@ -459,7 +459,7 @@ def test_a_rejected_book_does_not_come_back_through_a_price_drop(store: Store) -
     cheaper = discovery(isbn="9783104911854", price_cents=299)
     kept, report = gate.apply(
         [Delta(DeltaKind.PRICE_DROP, cheaper, found)],
-        store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW,
+        store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW,
     )
 
     assert kept == []
@@ -471,14 +471,14 @@ def test_a_price_drop_of_a_passing_book_still_carries_its_reason(store: Store) -
     rater = StubRater(rating(4))
     found = discovery(isbn="9783104911854", price_cents=399)
     gate.apply(
-        [first_seen(found)], store=store, rater=rater, rubric_version=1,
+        [first_seen(found)], store=store, rater=rater, profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
 
     cheaper = discovery(isbn="9783104911854", price_cents=299)
     kept, report = gate.apply(
         [Delta(DeltaKind.PRICE_DROP, cheaper, found)],
-        store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW,
+        store=store, rater=rater, profile_version=1, threshold=3, budget=10, now=NOW,
     )
 
     assert len(kept) == 1
@@ -492,7 +492,7 @@ def test_a_price_drop_without_a_judgement_is_shown(store: Store) -> None:
     found = discovery(isbn="9783104911854", price_cents=999)
     kept, report = gate.apply(
         [Delta(DeltaKind.PRICE_DROP, discovery(isbn="9783104911854", price_cents=899), found)],
-        store=store, rater=StubRater(rating(1)), rubric_version=1,
+        store=store, rater=StubRater(rating(1)), profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
 
@@ -502,13 +502,13 @@ def test_a_price_drop_without_a_judgement_is_shown(store: Store) -> None:
 
 def test_a_watchlist_price_drop_is_never_measured_against_a_judgement(store: Store) -> None:
     store.put_rating("isbn:9783104911854", stars=1, confidence="teils", reason="",
-                     rubric_version=1, now=NOW, origin=BY_MODEL)
+                     profile_version=1, now=NOW, origin=BY_MODEL)
     watched = discovery(isbn="9783104911854", price_cents=999,
                         match_reason=MatchReason.WATCHLIST)
 
     kept, report = gate.apply(
         [Delta(DeltaKind.PRICE_DROP, watched, watched)],
-        store=store, rater=StubRater(rating(1)), rubric_version=1,
+        store=store, rater=StubRater(rating(1)), profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
 
@@ -536,7 +536,7 @@ def test_the_cli_answer_is_read_out_of_its_json_envelope(monkeypatch) -> None:
         "ebook_watchlist.rating.subprocess.run",
         lambda *a, **k: _completed(stdout=_json.dumps({"result": ANSWER, "is_error": False})),
     )
-    rater = ClaudeCodeRater(rubric=RUBRIC, version=1)
+    rater = ClaudeCodeRater(leseprofil=LESEPROFIL, version=1)
 
     assert rater.rate(discovery()).stars == 4
 
@@ -547,7 +547,7 @@ def test_a_bare_answer_is_read_too(monkeypatch) -> None:
     monkeypatch.setattr(
         "ebook_watchlist.rating.subprocess.run", lambda *a, **k: _completed(stdout=ANSWER)
     )
-    assert ClaudeCodeRater(rubric=RUBRIC, version=1).rate(discovery()).stars == 4
+    assert ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate(discovery()).stars == 4
 
 
 def test_a_missing_executable_is_no_reason_to_fail_a_run(monkeypatch) -> None:
@@ -556,7 +556,7 @@ def test_a_missing_executable_is_no_reason_to_fail_a_run(monkeypatch) -> None:
 
     monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", boom)
     with pytest.raises(RatingUnavailable, match="nicht gefunden"):
-        ClaudeCodeRater(rubric=RUBRIC, version=1).rate(discovery())
+        ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate(discovery())
 
 
 def test_a_timeout_is_reported_as_unavailable(monkeypatch) -> None:
@@ -567,7 +567,7 @@ def test_a_timeout_is_reported_as_unavailable(monkeypatch) -> None:
 
     monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", slow)
     with pytest.raises(RatingUnavailable, match="antwortete nicht"):
-        ClaudeCodeRater(rubric=RUBRIC, version=1, timeout=1).rate(discovery())
+        ClaudeCodeRater(leseprofil=LESEPROFIL, version=1, timeout=1).rate(discovery())
 
 
 def test_a_nonzero_exit_names_what_the_cli_said(monkeypatch) -> None:
@@ -576,7 +576,7 @@ def test_a_nonzero_exit_names_what_the_cli_said(monkeypatch) -> None:
         lambda *a, **k: _completed(returncode=1, stderr="not logged in"),
     )
     with pytest.raises(RatingUnavailable, match="not logged in"):
-        ClaudeCodeRater(rubric=RUBRIC, version=1).rate(discovery())
+        ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate(discovery())
 
 
 def test_the_prompt_reaches_the_cli_and_carries_no_secret(monkeypatch) -> None:
@@ -587,7 +587,7 @@ def test_the_prompt_reaches_the_cli_and_carries_no_secret(monkeypatch) -> None:
         return _completed(stdout=ANSWER)
 
     monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", capture)
-    ClaudeCodeRater(executable="claude", rubric=RUBRIC, version=1).rate(
+    ClaudeCodeRater(executable="claude", leseprofil=LESEPROFIL, version=1).rate(
         discovery(title="Blindflug", author="Peter Watts")
     )
 
@@ -638,7 +638,7 @@ def test_a_rater_that_never_gets_through_is_said_out_loud(store: Store) -> None:
 
     kept, report = gate.apply(
         deltas, store=store, rater=broken,
-        rubric_version=1, threshold=3, budget=10, now=NOW,
+        profile_version=1, threshold=3, budget=10, now=NOW,
     )
 
     assert len(kept) == 3  # nichts verschluckt
@@ -660,10 +660,10 @@ def _entry(stars: int) -> dict:
     return {"stars": stars, "confidence": "teils", "reason": f"Achse D, {stars} Sterne"}
 
 
-def test_the_rubric_goes_out_once_not_once_per_book() -> None:
+def test_the_leseprofil_goes_out_once_not_once_per_book() -> None:
     """Der eigentliche Gewinn: Verfahren und Profil sind der weitaus größte Teil
     des Prompts, das Buch selbst sind ein paar Zeilen."""
-    prompt = prompt_for_many(_books(5), RUBRIC, SCHEMA)
+    prompt = prompt_for_many(_books(5), LESEPROFIL, SCHEMA)
 
     assert prompt.count("Profilversion: 1") == 1
     assert prompt.count(SCHEMA) == 1
@@ -765,7 +765,7 @@ def test_the_cli_asks_once_for_the_whole_batch(monkeypatch) -> None:
     monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", capture)
     books = _books(2)
 
-    ratings = ClaudeCodeRater(rubric=RUBRIC, version=1).rate_many(books)
+    ratings = ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate_many(books)
 
     assert len(prompts) == 1
     assert {ratings[b.key].stars for b in books} == {4, 5}
@@ -776,7 +776,7 @@ def test_an_empty_batch_asks_nobody(monkeypatch) -> None:
         raise AssertionError("hätte nicht fragen dürfen")
 
     monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", boom)
-    assert ClaudeCodeRater(rubric=RUBRIC, version=1).rate_many([]) == {}
+    assert ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate_many([]) == {}
 
 
 # --- was ein vermutetes Urteil darf (Ticket 24) -----------------------------
@@ -784,7 +784,7 @@ def test_an_empty_batch_asks_nobody(monkeypatch) -> None:
 
 def unsure(stars: int) -> Rating:
     return Rating(stars=stars, reason="Ruht auf Ableitung.", confidence="vermutet",
-                  rubric_version=1)
+                  profile_version=1)
 
 
 def test_a_merely_suspected_judgement_never_withholds_a_book(store: Store) -> None:
@@ -794,7 +794,7 @@ def test_a_merely_suspected_judgement_never_withholds_a_book(store: Store) -> No
     deltas = [first_seen(discovery(isbn="9783104911854"))]
 
     kept, report = gate.apply(
-        deltas, store=store, rater=StubRater(unsure(1)), rubric_version=1,
+        deltas, store=store, rater=StubRater(unsure(1)), profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
 
@@ -808,7 +808,7 @@ def test_a_well_founded_judgement_still_withholds(store: Store) -> None:
     deltas = [first_seen(discovery(isbn="9783104911854"))]
 
     kept, report = gate.apply(
-        deltas, store=store, rater=StubRater(rating(1)), rubric_version=1,
+        deltas, store=store, rater=StubRater(rating(1)), profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
 
@@ -821,12 +821,12 @@ def test_a_suspected_judgement_does_not_withhold_on_a_price_drop_either(
 ) -> None:
     """Sonst wäre die Regel an der Vordertür scharf und an der Hintertür nicht."""
     store.put_rating("isbn:9783104911854", stars=1, confidence="vermutet",
-                     reason="Ableitung.", rubric_version=1, now=NOW, origin=BY_MODEL)
+                     reason="Ableitung.", profile_version=1, now=NOW, origin=BY_MODEL)
     found = discovery(isbn="9783104911854", price_cents=399)
 
     kept, report = gate.apply(
         [Delta(DeltaKind.PRICE_DROP, discovery(isbn="9783104911854", price_cents=299), found)],
-        store=store, rater=StubRater(rating(4)), rubric_version=1,
+        store=store, rater=StubRater(rating(4)), profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
 
@@ -837,7 +837,7 @@ def test_a_suspected_judgement_does_not_withhold_on_a_price_drop_either(
 def test_a_passing_judgement_is_never_counted_as_unsure(store: Store) -> None:
     kept, report = gate.apply(
         [first_seen(discovery(isbn="9783104911854"))],
-        store=store, rater=StubRater(unsure(5)), rubric_version=1,
+        store=store, rater=StubRater(unsure(5)), profile_version=1,
         threshold=3, budget=10, now=NOW,
     )
 
@@ -864,3 +864,43 @@ def test_the_scheme_names_no_axis() -> None:
 
     for verboten in ("achse a", "achse b", "achse c", "achse d", "achse e", "kernachse"):
         assert verboten not in text, f"{verboten!r} steht im Bewertungsschema"
+
+
+# --- woran eine Bewertung hängt (Ticket 25) ---------------------------------
+
+
+def test_a_changed_scheme_ages_no_judgement(store: Store, tmp_path) -> None:
+    """Das Verfahren trägt keine Version. Es kann sich ändern, ohne dass ein
+    einziges Urteil über ein Buch dadurch falsch würde (ADR 21)."""
+    from ebook_watchlist.rating import load_rating_scheme
+
+    erst = tmp_path / "a.md"
+    erst.write_text("Verfahren, erste Fassung.", encoding="utf-8")
+    dann = tmp_path / "b.md"
+    dann.write_text("Verfahren, ganz anders.", encoding="utf-8")
+
+    rater = StubRater(rating(4))
+    deltas = [first_seen(discovery(isbn="9783104911854"))]
+    gate.apply(deltas, store=store, rater=rater, profile_version=1,
+               threshold=3, budget=10, now=NOW)
+
+    assert load_rating_scheme(erst) != load_rating_scheme(dann)
+
+    _, second = gate.apply(deltas, store=store, rater=rater, profile_version=1,
+                           threshold=3, budget=10, now=NOW)
+
+    assert len(rater.calls) == 1
+    assert second.reused == 1
+
+
+def test_a_changed_profile_ages_the_machines_judgement_but_not_hers(
+    store: Store,
+) -> None:
+    book = store.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    store.put_rating(book_subject(book.id), stars=5, confidence="belegt", reason="",
+                     profile_version=1, now=NOW, origin=BY_READER)
+    store.put_rating("isbn:9783104911854", stars=4, confidence="teils", reason="",
+                     profile_version=1, now=NOW, origin=BY_MODEL)
+
+    assert store.rating("isbn:9783104911854", 2, origin=BY_MODEL) is None
+    assert store.rating(book_subject(book.id), 2, origin=BY_READER).stars == 5

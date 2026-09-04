@@ -17,7 +17,7 @@ from .ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject, subject
 from .store import Store
 
 
-def _judgement(store: Store, observation: Observation, subject: str, rubric_version: int):
+def _judgement(store: Store, observation: Observation, subject: str, profile_version: int):
     """Das Urteil, das für diesen Fund schon vorliegt — Mensch vor Maschine.
 
     Was die Leserin selbst gesagt hat, schlägt jedes Modellurteil und verfällt
@@ -29,10 +29,10 @@ def _judgement(store: Store, observation: Observation, subject: str, rubric_vers
     if observation.book_id is not None:
         of_book = book_subject(observation.book_id)
         for origin in (BY_READER, BY_CONVERSATION):
-            stored = store.rating(of_book, rubric_version, origin=origin)
+            stored = store.rating(of_book, profile_version, origin=origin)
             if stored is not None:
                 return stored
-    return store.rating(subject, rubric_version, origin=BY_MODEL)
+    return store.rating(subject, profile_version, origin=BY_MODEL)
 
 
 @dataclass(slots=True)
@@ -78,7 +78,7 @@ def apply(
     *,
     store: Store,
     rater: Rater | None,
-    rubric_version: int,
+    profile_version: int,
     threshold: int,
     budget: int,
     now: datetime,
@@ -109,7 +109,7 @@ def apply(
         delta.current
         for delta in deltas
         if _is_discovery(delta)
-        and _judgement(store, delta.current, subject_of(delta.current), rubric_version) is None
+        and _judgement(store, delta.current, subject_of(delta.current), profile_version) is None
     ][:budget]
     fresh = rate_in_batches(rater, wanted, size=BATCH_SIZE) if wanted else {}
     attempted = {observation.key for observation in wanted}
@@ -130,7 +130,7 @@ def apply(
             # einem Stern zurueckgehalten worden war, meldete sich beim
             # naechsten Nachlass doch: streng an der Vordertuer, offen an der
             # Hintertuer.
-            stored = _judgement(store, delta.current, subject, rubric_version)
+            stored = _judgement(store, delta.current, subject, profile_version)
             if stored is None:
                 kept.append(delta)
             elif stored.stars < threshold and stored.confidence != VERMUTET:
@@ -141,20 +141,20 @@ def apply(
                     stars=stored.stars,
                     reason=stored.reason,
                     confidence=stored.confidence,
-                    rubric_version=stored.rubric_version,
+                    profile_version=stored.profile_version,
                 )
                 kept.append(delta)
             continue
 
         # Ein vorhandenes Urteil - auch das der Leserin - erspart den Aufruf.
-        stored = _judgement(store, delta.current, subject, rubric_version)
+        stored = _judgement(store, delta.current, subject, profile_version)
         if stored is not None:
             report.reused += 1
             rating = Rating(
                 stars=stored.stars,
                 reason=stored.reason,
                 confidence=stored.confidence,
-                rubric_version=stored.rubric_version,
+                profile_version=stored.profile_version,
             )
         elif delta.current.key not in attempted:
             # Ueber dem Budget und deshalb gar nicht erst gefragt: der Rest
@@ -181,7 +181,7 @@ def apply(
                 stars=rating.stars,
                 confidence=rating.confidence,
                 reason=rating.reason,
-                rubric_version=rating.rubric_version,
+                profile_version=rating.profile_version,
                 now=now,
                 origin=BY_MODEL,
             )

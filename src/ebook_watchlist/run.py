@@ -29,7 +29,7 @@ from .dismissals import dismissed_books
 from .dismissals import resolve as resolve_dismissals
 from .http import HttpClient, RateLimited, build_user_agent
 from .models import Observation, SourceFailure
-from .rating import DEFAULT_THRESHOLD, RatingUnavailable, build_rater, load_rubric
+from .rating import DEFAULT_THRESHOLD, RatingUnavailable, build_rater, load_leseprofil
 from .render import render_html, render_text
 from .seed import seed
 from .sources import build_sources
@@ -218,7 +218,7 @@ def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
     if rater is None:
         return deltas, gate.unrated_report(deltas)
     try:
-        _, version = load_rubric()
+        _, version = load_leseprofil()
     except RatingUnavailable as exc:
         print(f"Bewertung übersprungen: {exc}", file=sys.stderr)
         return deltas, gate.unrated_report(deltas)
@@ -227,7 +227,7 @@ def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
         deltas,
         store=store,
         rater=rater,
-        rubric_version=version,
+        profile_version=version,
         threshold=DEFAULT_THRESHOLD,
         budget=profile.rating_budget,
         now=now,

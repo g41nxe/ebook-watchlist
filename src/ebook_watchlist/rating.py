@@ -30,10 +30,12 @@ from .cleaning import is_truncated
 from .models import Observation
 from .reasons import THEMA, thema_name
 
-RUBRIC_PATH = Path(__file__).resolve().parents[2] / "docs" / "leseprofil.md"
+LESEPROFIL_PATH = Path(__file__).resolve().parents[2] / "docs" / "leseprofil.md"
 #: Das Verfahren, getrennt vom Profil (ADR 21). Nicht versioniert: eine
 #: Änderung hier entwertet keine gespeicherte Bewertung.
 SCHEME_PATH = Path(__file__).resolve().parents[2] / "docs" / "bewertungsschema.md"
+#: Ältere Fassungen hießen "Maßstabsversion" — der Name fiel mit ADR 21,
+#: weil er das Verfahren meinte und auf das Profil zeigte.
 _VERSION = re.compile(r"(?:Profilversion|Maßstabsversion):\s*(\d+)", re.IGNORECASE)
 
 #: Voreinstellung. Ein beschränktes Urteil gegen einen mitgelieferten Maßstab —
@@ -74,7 +76,7 @@ class Rating:
     #: Urteil über einen 219 Zeichen langen Anriss etwas anderes ist als eines
     #: über ein gelesenes Buch.
     confidence: str
-    rubric_version: int
+    profile_version: int
 
     def passes(self, threshold: int) -> bool:
         return self.stars >= threshold
@@ -91,20 +93,20 @@ class Rating:
         return not self.passes(threshold) and self.confidence != VERMUTET
 
 
-def rubric_version(text: str) -> int:
+def leseprofil_version(text: str) -> int:
     match = _VERSION.search(text)
     if match is None:
-        raise RatingUnavailable("docs/leseprofil.md nennt keine Maßstabsversion")
+        raise RatingUnavailable("docs/leseprofil.md nennt keine Profilversion")
     return int(match.group(1))
 
 
-def load_rubric(path: Path | None = None) -> tuple[str, int]:
-    target = path or RUBRIC_PATH
+def load_leseprofil(path: Path | None = None) -> tuple[str, int]:
+    target = path or LESEPROFIL_PATH
     try:
         text = target.read_text(encoding="utf-8")
     except OSError as exc:
-        raise RatingUnavailable(f"Maßstab nicht lesbar: {exc}") from exc
-    return text, rubric_version(text)
+        raise RatingUnavailable(f"Leseprofil nicht lesbar: {exc}") from exc
+    return text, leseprofil_version(text)
 
 
 def load_rating_scheme(path: Path | None = None) -> str:
@@ -158,7 +160,7 @@ def _facts(observation: Observation) -> list[str]:
     return facts
 
 
-def prompt_for(observation: Observation, rubric: str, scheme: str) -> str:
+def prompt_for(observation: Observation, leseprofil: str, scheme: str) -> str:
     """Was das Modell zu einem einzelnen Buch zu sehen bekommt.
 
     Dass der Klappentext abgeschnitten ist, wird ausdrücklich gesagt. Ein Modell,
@@ -170,7 +172,7 @@ def prompt_for(observation: Observation, rubric: str, scheme: str) -> str:
         "Du bewertest ein Buch. Das VERFAHREN sagt, wie zu urteilen ist; das "
         "LESEPROFIL sagt, wonach. Halte dich an beides.\n\n"
         f"--- VERFAHREN ---\n{scheme}\n--- ENDE VERFAHREN ---\n\n"
-        f"--- LESEPROFIL ---\n{rubric}\n--- ENDE LESEPROFIL ---\n\n"
+        f"--- LESEPROFIL ---\n{leseprofil}\n--- ENDE LESEPROFIL ---\n\n"
         f"--- BUCH ---\n" + "\n".join(facts) + "\n--- ENDE BUCH ---\n\n"
         "Antworte ausschließlich mit JSON in genau dieser Form:\n"
         '{"stars": <0-5>, "confidence": "belegt|teils|vermutet", '
@@ -180,7 +182,7 @@ def prompt_for(observation: Observation, rubric: str, scheme: str) -> str:
 
 
 def prompt_for_many(
-    observations: Sequence[Observation], rubric: str, scheme: str
+    observations: Sequence[Observation], leseprofil: str, scheme: str
 ) -> str:
     """Ein Aufruf für mehrere Bücher.
 
@@ -200,7 +202,7 @@ def prompt_for_many(
         "Beurteile jedes Buch für sich; die Reihenfolge sagt nichts über seine "
         "Passung.\n\n"
         f"--- VERFAHREN ---\n{scheme}\n--- ENDE VERFAHREN ---\n\n"
-        f"--- LESEPROFIL ---\n{rubric}\n--- ENDE LESEPROFIL ---\n\n"
+        f"--- LESEPROFIL ---\n{leseprofil}\n--- ENDE LESEPROFIL ---\n\n"
         + "\n\n".join(blocks)
         + "\n--- ENDE BÜCHER ---\n\n"
         "Antworte ausschließlich mit JSON in genau dieser Form, mit der Nummer "
@@ -276,7 +278,7 @@ def parse_answer(text: str, version: int) -> Rating:
     if not reason:
         raise RatingUnavailable("Antwort nennt keine Begründung")
 
-    return Rating(stars=stars, reason=reason, confidence=confidence, rubric_version=version)
+    return Rating(stars=stars, reason=reason, confidence=confidence, profile_version=version)
 
 
 class Rater(Protocol):
@@ -323,14 +325,14 @@ class ModelRater:
     api_key: str
     model: str = DEFAULT_MODEL
     timeout: float = 30.0
-    rubric: str = ""
+    leseprofil: str = ""
     scheme: str = ""
     version: int = 0
     session: requests.Session | None = None
 
     def __post_init__(self) -> None:
-        if not self.rubric:
-            self.rubric, self.version = load_rubric()
+        if not self.leseprofil:
+            self.leseprofil, self.version = load_leseprofil()
         if not self.scheme:
             self.scheme = load_rating_scheme()
         if self.session is None:
@@ -341,7 +343,7 @@ class ModelRater:
             "model": self.model,
             "max_tokens": 300,
             "messages": [
-                {"role": "user", "content": prompt_for(observation, self.rubric, self.scheme)}
+                {"role": "user", "content": prompt_for(observation, self.leseprofil, self.scheme)}
             ],
         }
         headers = {
@@ -401,18 +403,18 @@ class ClaudeCodeRater:
 
     executable: str = CLI_NAME
     timeout: float = CLI_TIMEOUT
-    rubric: str = ""
+    leseprofil: str = ""
     scheme: str = ""
     version: int = 0
 
     def __post_init__(self) -> None:
-        if not self.rubric:
-            self.rubric, self.version = load_rubric()
+        if not self.leseprofil:
+            self.leseprofil, self.version = load_leseprofil()
         if not self.scheme:
             self.scheme = load_rating_scheme()
 
     def rate(self, observation: Observation) -> Rating:
-        prompt = prompt_for(observation, self.rubric, self.scheme)
+        prompt = prompt_for(observation, self.leseprofil, self.scheme)
         return parse_answer(self._ask(prompt), self.version)
 
     def rate_many(
@@ -427,7 +429,7 @@ class ClaudeCodeRater:
         """
         if not observations:
             return {}
-        answer = self._ask(prompt_for_many(observations, self.rubric, self.scheme))
+        answer = self._ask(prompt_for_many(observations, self.leseprofil, self.scheme))
         return parse_many(answer, observations, self.version)
 
     def _ask(self, prompt: str) -> str:
@@ -490,7 +492,7 @@ def build_rater(model: str | None = None) -> Rater | None:
     sondern der Zustand ohne Tor — alles bleibt unbewertet und wird gezeigt.
     """
     try:
-        rubric, version = load_rubric()
+        leseprofil, version = load_leseprofil()
         scheme = load_rating_scheme()
     except RatingUnavailable:
         return None
@@ -500,7 +502,7 @@ def build_rater(model: str | None = None) -> Rater | None:
         return ModelRater(
             api_key=key,
             model=model or DEFAULT_MODEL,
-            rubric=rubric,
+            leseprofil=leseprofil,
             scheme=scheme,
             version=version,
         )
@@ -508,6 +510,6 @@ def build_rater(model: str | None = None) -> Rater | None:
     executable = shutil.which(CLI_NAME)
     if executable:
         return ClaudeCodeRater(
-            executable=executable, rubric=rubric, scheme=scheme, version=version
+            executable=executable, leseprofil=leseprofil, scheme=scheme, version=version
         )
     return None

@@ -86,13 +86,13 @@ def test_the_counts_cover_every_relation(client: TestClient, db: Store) -> None:
         assert label in body
 
 
-def test_the_rubric_is_shown_with_its_version(client: TestClient) -> None:
+def test_the_leseprofil_is_shown_with_its_version(client: TestClient) -> None:
     body = client.get("/profil").text
     assert "Maßstabsversion" in body
     assert "Kernachsen" in body
 
 
-def test_the_page_says_the_rubric_is_not_editable_here(client: TestClient) -> None:
+def test_the_page_says_the_leseprofil_is_not_editable_here(client: TestClient) -> None:
     """Ein Formular hier würde das Änderungsverfahren aus ADR 17 umgehen."""
     body = client.get("/profil").text
     assert "nicht änderbar" in body

@@ -15,7 +15,7 @@ from datetime import datetime
 from ..config import Profile
 from ..deals import is_strong_deal
 from ..models import Availability, MatchReason
-from ..rating import RatingUnavailable, load_rubric
+from ..rating import RatingUnavailable, load_leseprofil
 from ..ratings import (
     BY_CONVERSATION,
     BY_MODEL,
@@ -128,7 +128,7 @@ class Judgement:
     stars: int
     reason: str
     confidence: str
-    rubric_version: int
+    profile_version: int
     when: datetime | None
 
     @property
@@ -141,7 +141,7 @@ class Judgement:
         Gilt nur für Maschinenurteile: was ein Mensch gesagt hat, verfällt
         nicht, wenn er seinen Maßstab schärft.
         """
-        return not self.is_human and current is not None and self.rubric_version != current
+        return not self.is_human and current is not None and self.profile_version != current
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +157,7 @@ class Page:
     history: tuple[Sighting, ...]
     judgements: tuple[Judgement, ...]
     #: Der heutige Maßstab, oder ``None``, wenn er nicht lesbar ist.
-    rubric_version: int | None
+    profile_version: int | None
     #: Warum dieser Fund überhaupt hereinkam — nur bei Entdeckungen (Ticket 22).
     origin: Origin | None
 
@@ -265,7 +265,7 @@ def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
             stars=row.stars,
             reason=row.reason,
             confidence=row.confidence,
-            rubric_version=row.rubric_version,
+            profile_version=row.profile_version,
             when=row.rated_at,
         )
         for origin in ORIGIN_ORDER
@@ -324,9 +324,9 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
     )
 
     try:
-        _, current_rubric = load_rubric()
+        _, current_leseprofil = load_leseprofil()
     except RatingUnavailable:
-        current_rubric = None
+        current_leseprofil = None
 
     return Page(
         book_id=book.id,
@@ -339,7 +339,7 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
         sources=sources,
         history=history,
         judgements=_judgements(store, book, seen),
-        rubric_version=current_rubric,
+        profile_version=current_leseprofil,
         origin=_origin(seen),
     )
 
@@ -388,7 +388,7 @@ def set_stars(store: Store, book_id: int, stars: int | None, *, now: datetime) -
     if not 0 <= stars <= 5:
         raise ValueError(f"Sterne müssen zwischen 0 und 5 liegen, nicht {stars}")
     try:
-        _, version = load_rubric()
+        _, version = load_leseprofil()
     except RatingUnavailable:
         # Ohne lesbaren Maßstab bleibt ihre Bewertung trotzdem gültig — sie
         # hängt nicht an ihm. Die 0 sagt: unter keiner bekannten Fassung.
@@ -398,7 +398,7 @@ def set_stars(store: Store, book_id: int, stars: int | None, *, now: datetime) -
         stars=stars,
         confidence="belegt",
         reason="",
-        rubric_version=version,
+        profile_version=version,
         now=now,
         origin=BY_READER,
     )

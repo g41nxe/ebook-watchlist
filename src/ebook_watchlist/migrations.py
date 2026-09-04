@@ -180,6 +180,11 @@ def _add_rating_origin(connection: Connection) -> None:
 
     Bestehende Zeilen wandern mit und gelten als Modellurteile — die einzige
     Herkunft, die es bis hierher gab.
+
+    Die Spalte heißt hier weiterhin ``rubric_version``. Sie wird erst von der
+    *naechsten* Migration umbenannt, und eine Migration muss weiter tun, was sie
+    tat, als sie geschrieben wurde (ADR 16) — sonst liest sie aus einer alten
+    Datenbank eine Spalte, die es dort noch nicht gibt.
     """
     if not _has_table(connection, "rating"):
         return
@@ -213,6 +218,26 @@ def _add_rating_origin(connection: Connection) -> None:
     connection.exec_driver_sql("DROP TABLE rating_old")
 
 
+def _rename_rubric_version(connection: Connection) -> None:
+    """``rubric_version`` heißt ``profile_version`` (ADR 21, Ticket 25).
+
+    Der alte Name behauptete, ein Urteil hänge am *Maßstab* — an dem Dokument
+    also, das inzwischen das Verfahren ist und ausdrücklich keine Bewertung
+    entwertet. Es hängt am Leseprofil, und der Name sagt das jetzt.
+
+    Eine reine Umbenennung, kein Neubau: SQLite kann ``RENAME COLUMN`` seit
+    3.25 (ADR 16).
+    """
+    if not _has_table(connection, "rating"):
+        return
+    spalten = _columns(connection, "rating")
+    if "profile_version" in spalten or "rubric_version" not in spalten:
+        return
+    connection.exec_driver_sql(
+        "ALTER TABLE rating RENAME COLUMN rubric_version TO profile_version"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -226,6 +251,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     # Datenbestand mittlerer Version die falschen Schritte ueberspringen.
     _add_run_pid_column,
     _add_rating_origin,
+    _rename_rubric_version,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

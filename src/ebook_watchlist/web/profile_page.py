@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from ..config import Profile
-from ..rating import RUBRIC_PATH, RatingUnavailable, load_rubric
+from ..rating import LESEPROFIL_PATH, RatingUnavailable, load_leseprofil
 from ..reasons import thema_name
 from ..relations import InterestKey, RelationKind
 from ..store import Store
@@ -64,9 +64,9 @@ class Overview:
     sweep_weekday: str
     last_sweep: datetime | None
     no_gos: tuple[str, ...]
-    rubric: str | None
-    rubric_version: int | None
-    rubric_path: str
+    leseprofil: str | None
+    profile_version: int | None
+    leseprofil_path: str
 
     @property
     def next_sweep(self) -> str:
@@ -111,9 +111,9 @@ def build(store: Store, profile: Profile) -> Overview:
     )
 
     try:
-        rubric, version = load_rubric()
+        leseprofil, version = load_leseprofil()
     except RatingUnavailable:
-        rubric, version = None, None
+        leseprofil, version = None, None
 
     return Overview(
         authors=collect(InterestKey.AUTHOR),
@@ -125,7 +125,7 @@ def build(store: Store, profile: Profile) -> Overview:
         sweep_weekday=_WEEKDAYS[profile.extended_sweep_weekday % 7],
         last_sweep=store.get_state(profile.slug, EXTENDED_SWEEP_KEY),
         no_gos=tuple(profile.no_gos),
-        rubric=rubric,
-        rubric_version=version,
-        rubric_path=str(RUBRIC_PATH.name),
+        leseprofil=leseprofil,
+        profile_version=version,
+        leseprofil_path=str(LESEPROFIL_PATH.name),
     )

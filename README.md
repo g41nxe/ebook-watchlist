@@ -230,8 +230,10 @@ doppelt laufen. Beides ist unkritisch.
 - [docs/rundgang.md](docs/rundgang.md) — **hier anfangen**: was das Werkzeug kann
   und wie es funktioniert, ohne den Code zu lesen
 - [CONTEXT.md](CONTEXT.md) — Glossar der Domänenbegriffe
-- [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–20)
-- [docs/leseprofil.md](docs/leseprofil.md) — der Maßstab für Buchbewertungen
+- [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–21)
+- [docs/leseprofil.md](docs/leseprofil.md) — die Beschreibung des Lesegeschmacks
+- [docs/bewertungsschema.md](docs/bewertungsschema.md) — wie ein Buch dagegen
+  gehalten und in Sterne übersetzt wird
 - [docs/offene-punkte.md](docs/offene-punkte.md) — was fehlt, und welche
   Behauptungen sich unterwegs als falsch erwiesen haben
 - [.agents/skills/](.agents/skills) — `buch-bewerten` und `leseprofil-schaerfen`

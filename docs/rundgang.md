@@ -1,8 +1,8 @@
 # Rundgang: wie die Watchlist arbeitet
 
-Stand 2026-09-04. Was dieses Werkzeug kann und wie es funktioniert — in der
+Stand 2026-09-05. Was dieses Werkzeug kann und wie es funktioniert — in der
 Tiefe, in der man es einmal verstehen will, ohne den Code zu lesen. Die
-Entscheidungen hinter jedem Absatz stehen als ADR 1–20 daneben, die Begriffe in
+Entscheidungen hinter jedem Absatz stehen als ADR 1–21 daneben, die Begriffe in
 [`CONTEXT.md`](../CONTEXT.md).
 
 Alle Zahlen hier stammen aus der laufenden Datenbank und aus gemessenen Läufen.
@@ -23,11 +23,11 @@ Teil der Arbeit steckt in der Frage, was davon dich überhaupt erreichen darf.
 | | |
 | --- | --- |
 | Quellen | 2 — VÖBB Onleihe (Bibliothek), beam-shop.de (Shop) |
-| Beobachtete Titel | 10 |
-| Bücher mit Beziehung | 34 |
+| Beobachtete Titel | 15 |
+| Bücher mit Beziehung | 50 |
 | Offene Vorschläge | 373 |
-| Entscheidungen | ADR 1–20 |
-| Tests | 579 |
+| Entscheidungen | ADR 1–21 |
+| Tests | 607 |
 
 ---
 
@@ -130,13 +130,16 @@ zu bekommen.
 ### 3. Das Bewertungstor — **noch nie gelaufen**
 
 Ein Modell bewertet jede Entdeckung von 0 bis 5 gegen dein schriftlich
-festgehaltenes Leseprofil ([`leseprofil.md`](leseprofil.md)) und begründet das
-Urteil. Unter dem Schwellwert kommt sie nicht auf den Stapel. Höchstens 40
-Urteile pro Lauf; gespeicherte kosten nichts.
+festgehaltenes Leseprofil ([`leseprofil.md`](leseprofil.md)), nach dem Verfahren
+aus dem [Bewertungsschema](bewertungsschema.md), und begründet das Urteil. Unter
+dem Schwellwert kommt sie nicht auf den Stapel — es sei denn, das Urteil ruht
+nur auf Vermutung, dann wird gezeigt statt verschwiegen. Höchstens 40 Urteile
+pro Lauf; gespeicherte kosten nichts.
 
-Gebaut, getestet, eingebunden — es fehlt der API-Schlüssel. Alles, was über sein
-Verhalten gesagt wird, stammt aus Tests mit einem Stellvertreter, nicht aus
-Betrieb.
+Gebaut, getestet, eingebunden — und noch nie ausgeführt. Ein Schlüssel wird
+dafür nicht gebraucht: fehlt er, benutzt das Tor die lokal angemeldete
+Claude-Code-Installation. Alles, was über sein Verhalten gesagt wird, stammt aus
+Tests mit einem Stellvertreter, nicht aus Betrieb.
 
 ---
 
@@ -164,13 +167,16 @@ Interesse wird beim ersten Mal still angesät, sonst meldete eine frisch
 hinzugefügte Autorin ihre gesamte Backlist als Neuzugänge.
 
 **Urteil** — Sterne, Begründung und Sicherheit, gegen eine nummerierte Fassung
-deines Leseprofils. Dazu die Herkunft, und die ist Teil des Schlüssels:
+deines Leseprofils. Wie geurteilt wird, steht getrennt davon im
+[Bewertungsschema](bewertungsschema.md) und ist nicht versioniert (ADR 21).
+Dazu die Herkunft, und die ist Teil des Schlüssels:
 
 > „Eine 4 von dir ist eine Tatsache. Eine 4 von einem Modell ist ein Vorschlag."
 
 Deshalb stehen `reader`, `conversation` und `model` nebeneinander, überschreiben
-einander nie und sehen auf der Buchseite verschieden aus. Ein neuer Maßstab
-entwertet Maschinenurteile — und nur die (ADR 17).
+einander nie und sehen auf der Buchseite verschieden aus. Eine neue
+Profilversion entwertet Maschinenurteile — und nur die (ADR 17). Eine Änderung
+am Verfahren entwertet gar nichts.
 
 Die zwei Regeln, die zählen: **der Snapshot wird nur angehängt**, und **eine
 Buchzeile entsteht nur, wo du eine Beziehung hast**.
