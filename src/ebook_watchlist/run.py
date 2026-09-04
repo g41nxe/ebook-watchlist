@@ -11,12 +11,14 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from filelock import FileLock, Timeout
 
 from . import paths
+from .cleaning import clean_blurb
 from .config import ConfigError, load_dismissals, load_profile, load_watchlist
 from .diff import (
     DISCOVERY_REASONS,
@@ -125,7 +127,16 @@ def _collect(
             failures.append(
                 SourceFailure(source=source.name, message=f"{type(exc).__name__}: {exc}")
             )
-    return observations, failures
+    # One place, every Source, before anything is compared or stored. Cleaning
+    # inside each parser would mean two implementations that drift (Ticket 16).
+    return [_cleaned(observation) for observation in observations], failures
+
+
+def _cleaned(observation: Observation) -> Observation:
+    blurb = clean_blurb(observation.blurb)
+    if blurb == observation.blurb:
+        return observation
+    return replace(observation, blurb=blurb)
 
 
 def _write_html(digest, generated_at: datetime) -> Path:
