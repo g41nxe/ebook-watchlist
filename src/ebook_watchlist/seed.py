@@ -1,0 +1,161 @@
+"""Die YAML-Dateien einmalig in die Datenbank überführen (Ticket 05, ADR 10).
+
+Vier Dateien werden zu vier Begriffen: **Profil**, **Buch**, **Beziehung**,
+**Interesse**. Vorher lagen dieselben Bücher verstreut — *Cold Eternity* stand
+in ``owned.yaml`` als Titel, in ``dismissed.yaml`` als beam-Produktnummer, und
+war einmal eine Zeile in ``watchlist.yaml``.
+
+Das Risiko ist nicht das Schema, sondern der Import. ``liked_books`` ist
+Freitext wie ``"Cry Baby - Gillian Flynn"``, und daraus ein Buch zu machen
+heißt raten. Es gilt dieselbe Regel wie überall sonst: was sich nicht
+zweifelsfrei auflösen lässt, kommt auf die Liste "braucht Aufmerksamkeit" und
+wird **nicht** erraten (ADR 8).
+
+Der Import ist wiederholbar. Ein zweiter Lauf legt nichts doppelt an, und er
+setzt nichts zurück, was die Leserin inzwischen in der Oberfläche geändert hat
+— nur fehlende Zeilen kommen dazu.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from .config import Profile, WatchlistEntry
+from .relations import InterestKey, RelationKind
+from .store import Store
+
+#: ``"Cry Baby - Gillian Flynn"`` -> Titel und Autor:in. Der Bindestrich ist die
+#: Konvention dieser Liste; ein Titel, der selbst einen enthält, wird an der
+#: *letzten* Trennung geteilt, weil der Name hinten steht.
+_FREE_TEXT = re.compile(r"^(?P<title>.+?)\s+[-–—]\s+(?P<author>[^-–—]+)$")
+#: Ein Klammerzusatz am Ende ist eine Begruendung, kein Namensbestandteil.
+_TRAILING_NOTE = re.compile(r"\s*\((?P<note>[^()]*)\)\s*$")
+
+
+@dataclass(slots=True)
+class SeedReport:
+    """Was der Import getan hat — und was er nicht zu entscheiden wagte."""
+
+    books: int = 0
+    relations: int = 0
+    interests: int = 0
+    #: Freitext, der sich nicht zweifelsfrei auflösen liess. Kein Fehler,
+    #: sondern eine Frage an einen Menschen.
+    unresolved: list[str] = field(default_factory=list)
+
+    @property
+    def needs_attention(self) -> bool:
+        return bool(self.unresolved)
+
+
+def split_free_text(entry: str) -> tuple[str, str | None, str | None]:
+    """``"Cry Baby - Gillian Flynn"`` -> ``("Cry Baby", "Gillian Flynn", None)``.
+
+    Ein Klammerzusatz am Ende ist eine Begruendung, kein Teil des Namens:
+    ``"Der Schwarm - Frank Schätzing (Grund: langsames Erzähltempo)"``. Ohne
+    diese Regel klebte der Grund am Autornamen, und jeder spaetere Vergleich
+    haette gegen "Frank Schätzing (Grund: …)" gematcht.
+
+    Ohne erkennbare Trennung bleibt der ganze Text der Titel. Einen Namen aus
+    einem Text zu raten, der keinen nennt, wäre genau die Sorte stille
+    Erfindung, die dieses Werkzeug vermeidet.
+    """
+    cleaned = " ".join(entry.split())
+    note = None
+    trailing = _TRAILING_NOTE.search(cleaned)
+    if trailing is not None:
+        note = trailing.group("note").strip() or None
+        cleaned = cleaned[: trailing.start()].strip()
+
+    match = _FREE_TEXT.match(cleaned)
+    if match is None:
+        return cleaned, None, note
+    return match.group("title").strip(), match.group("author").strip(), note
+
+
+def _book_for_free_text(
+    store: Store, entry: str, now: datetime
+) -> tuple[int | None, str | None]:
+    title, author, note = split_free_text(entry)
+    if not title or author is None:
+        # Nichts, woran ein Titel sich festmachen liesse. Der Matcher wuerde
+        # hier auf gut Glueck vergleichen; das ist die Stelle, an der wir
+        # fragen statt zu raten (ADR 8).
+        return None, note
+    book = store.find_or_create_book(isbn=None, title=title, author=author, now=now)
+    return book.id, note
+
+
+def seed(store: Store, profile: Profile, watchlist: list[WatchlistEntry], dismissed: dict,
+         *, now: datetime | None = None) -> SeedReport:
+    """Alles einlesen, was heute in YAML steht."""
+    at = now or datetime.now()
+    report = SeedReport()
+    before = len(store.books())
+
+    # --- Watchlist: Titel und Autor:in stehen ausdruecklich da --------------
+    for entry in watchlist:
+        book = store.find_or_create_book(
+            isbn=None, title=entry.title, author=entry.author, now=at
+        )
+        details: dict[str, object] = {}
+        if entry.notes:
+            details["note"] = entry.notes
+        if not (entry.check_library and entry.check_shop):
+            details["sources"] = (
+                ["voebb"] if entry.check_library else ["beam"] if entry.check_shop else []
+            )
+        store.put_relation(
+            profile.slug,
+            book.id,
+            str(RelationKind.WATCHING),
+            active=entry.active,
+            now=at,
+            **details,
+        )
+        report.relations += 1
+
+    # --- Gefallen und nicht gefallen: Freitext, also mit Vorbehalt ----------
+    for kind, entries in (
+        (RelationKind.LIKED, profile.liked_books),
+        (RelationKind.DISLIKED, profile.disliked_books),
+    ):
+        for entry in entries:
+            book_id, note = _book_for_free_text(store, entry, at)
+            if book_id is None:
+                report.unresolved.append(f"{kind}: {entry}")
+                continue
+            details = {"note": note} if note else {}
+            store.put_relation(profile.slug, book_id, str(kind), now=at, **details)
+            report.relations += 1
+
+    # --- Verworfen: bisher eine Produktnummer je Shop -----------------------
+    #
+    # Die alte Form kannte nur "dieser Shop soll das nicht mehr zeigen". Eine
+    # Buch-Zeile daraus zu bauen ginge nur ueber eine Abfrage beim Shop, und die
+    # gehoert nicht in einen Import. Sie bleiben deshalb als Notiz am Profil
+    # liegen und werden beim naechsten Lauf zu Beziehungen, sobald der Shop
+    # sagt, welches Buch die Nummer meint.
+    for source, item_ids in (dismissed or {}).items():
+        for item_id in item_ids:
+            report.unresolved.append(f"dismissed: {source}:{item_id}")
+
+    # --- Interessen: Autor:innen und Themen --------------------------------
+    for author in profile.reference_authors:
+        store.put_interest(profile.slug, str(InterestKey.AUTHOR), author, now=at, tier="core")
+        report.interests += 1
+    for author in profile.extended_authors:
+        if author in profile.reference_authors:
+            continue
+        store.put_interest(
+            profile.slug, str(InterestKey.AUTHOR), author, now=at, tier="extended"
+        )
+        report.interests += 1
+    for category in profile.genre_categories:
+        store.put_interest(profile.slug, str(InterestKey.THEMA), category, now=at, tier="core")
+        report.interests += 1
+
+    report.books = len(store.books()) - before
+    return report

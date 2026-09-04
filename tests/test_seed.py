@@ -1,0 +1,230 @@
+"""Vier YAML-Dateien werden vier Begriffe: Profil, Buch, Beziehung, Interesse.
+
+Alle Beispiele stammen aus der echten Konfiguration.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+
+import pytest
+
+from ebook_watchlist.config import Profile, WatchlistEntry
+from ebook_watchlist.relations import (
+    ConfigurationError,
+    InterestKey,
+    RelationKind,
+    check_details,
+    check_interest_key,
+    check_relation_kind,
+)
+from ebook_watchlist.seed import seed, split_free_text
+from ebook_watchlist.store import Store
+
+NOW = datetime(2026, 9, 4, 20, 0)
+
+
+@pytest.fixture
+def store(tmp_path: Path) -> Store:
+    return Store(tmp_path / "snapshots.db")
+
+
+def profile(**overrides) -> Profile:
+    return Profile(slug="t", name="Test", **overrides)
+
+
+# --- Freitext ---------------------------------------------------------------
+
+
+def test_the_usual_shape_splits_cleanly() -> None:
+    assert split_free_text("Cry Baby - Gillian Flynn") == ("Cry Baby", "Gillian Flynn", None)
+
+
+def test_a_trailing_parenthesis_is_a_reason_not_part_of_the_name() -> None:
+    """Ohne diese Regel hiess die Autorin "Frank Schätzing (Grund: …)" und jeder
+    spätere Vergleich hätte dagegen gematcht."""
+    title, author, note = split_free_text(
+        "Der Schwarm - Frank Schätzing (Grund: langsames Erzähltempo, Achse E)"
+    )
+    assert (title, author) == ("Der Schwarm", "Frank Schätzing")
+    assert note == "Grund: langsames Erzähltempo, Achse E"
+
+
+def test_a_hyphenated_title_survives() -> None:
+    assert split_free_text("Das Rosie-Projekt - Graeme Simsion") == (
+        "Das Rosie-Projekt",
+        "Graeme Simsion",
+        None,
+    )
+
+
+def test_text_that_names_nobody_names_nobody() -> None:
+    """Einen Namen zu raten, wo keiner steht, ist genau die stille Erfindung,
+    die dieses Werkzeug vermeidet."""
+    assert split_free_text("Irgendein Buch") == ("Irgendein Buch", None, None)
+
+
+# --- das Vokabular ----------------------------------------------------------
+
+
+def test_an_unknown_relation_fails_loudly() -> None:
+    with pytest.raises(ConfigurationError, match="unbekannte Beziehung"):
+        check_relation_kind("besitze")
+
+
+def test_an_unknown_interest_fails_loudly() -> None:
+    """Ein Interesse unter 'autor' statt 'author' würde nie abgefragt — und
+    nichts würde das sagen."""
+    with pytest.raises(ConfigurationError, match="unbekanntes Interesse"):
+        check_interest_key("autor")
+
+
+def test_a_misspelled_tier_fails_loudly() -> None:
+    """'extendet' hätte eine wöchentliche Autor:in still in die tägliche Liste
+    befördert — ein Fehler, der sich nur durch verändertes Verhalten zeigt."""
+    with pytest.raises(ConfigurationError, match="unbekannte Stufe"):
+        check_details("author", {"tier": "extendet"})
+
+
+def test_an_unknown_detail_fails_loudly() -> None:
+    with pytest.raises(ConfigurationError, match="unbekannte Angaben"):
+        check_details("author", {"activ": False})
+
+
+def test_the_known_details_pass() -> None:
+    assert check_details("author", {"tier": "extended", "sources": ["beam"], "note": "x"})
+
+
+# --- der Import -------------------------------------------------------------
+
+
+def test_the_watchlist_becomes_books_and_relations(store: Store) -> None:
+    report = seed(
+        store,
+        profile(),
+        [WatchlistEntry(title="Blindflug", author="Peter Watts")],
+        {},
+        now=NOW,
+    )
+    assert report.books == 1
+    book = store.books()[0]
+    assert (book.title, book.author) == ("Blindflug", "Peter Watts")
+
+    relations = store.relations("t", kind=str(RelationKind.WATCHING))
+    assert [row.book_id for row in relations] == [book.id]
+
+
+def test_several_relations_hold_at_once(store: Store) -> None:
+    """Cold Eternity ist owned *und* war watching. Eine Statusspalte hätte das
+    nicht ausdrücken können."""
+    seed(
+        store,
+        profile(liked_books=["Cold Eternity - S.A. Barnes"]),
+        [WatchlistEntry(title="Cold Eternity", author="S.A. Barnes")],
+        {},
+        now=NOW,
+    )
+    book = store.books()[0]
+    kinds = {row.kind for row in store.relations_of("t", book.id)}
+    assert kinds == {str(RelationKind.WATCHING), str(RelationKind.LIKED)}
+
+
+def test_a_relation_is_deactivated_not_deleted(store: Store) -> None:
+    """Providence von der Watchlist zu nehmen zerstörte bisher die Tatsache,
+    dass es je beobachtet wurde."""
+    seed(store, profile(), [WatchlistEntry(title="Providence", author="Max Barry")], {}, now=NOW)
+    book = store.books()[0]
+
+    store.deactivate_relation("t", book.id, str(RelationKind.WATCHING))
+
+    assert store.relations("t", kind=str(RelationKind.WATCHING)) == []
+    kept = store.relations_of("t", book.id)
+    assert [row.active for row in kept] == [False]
+
+
+def test_authors_and_themes_become_interests(store: Store) -> None:
+    report = seed(
+        store,
+        profile(
+            reference_authors=["Chris Carter"],
+            extended_authors=["Dave Eggers"],
+            genre_categories=["belletristik/krimi-thriller/psychothriller"],
+        ),
+        [],
+        {},
+        now=NOW,
+    )
+    assert report.interests == 3
+
+    authors = store.interests("t", key=str(InterestKey.AUTHOR))
+    assert {row.value for row in authors} == {"Chris Carter", "Dave Eggers"}
+    tiers = {row.value: row.details for row in authors}
+    assert '"tier": "core"' in tiers["Chris Carter"]
+    assert '"tier": "extended"' in tiers["Dave Eggers"]
+
+
+def test_an_author_on_both_lists_is_swept_daily_not_twice(store: Store) -> None:
+    report = seed(
+        store,
+        profile(reference_authors=["Chris Carter"], extended_authors=["Chris Carter"]),
+        [],
+        {},
+        now=NOW,
+    )
+    assert report.interests == 1
+
+
+def test_dismissals_are_not_guessed_into_books(store: Store) -> None:
+    """Eine Produktnummer sagt nicht, welches Buch gemeint ist. Das käme nur
+    über eine Abfrage beim Shop, und die gehört nicht in einen Import."""
+    report = seed(store, profile(), [], {"beam": ["1067554"]}, now=NOW)
+
+    assert report.needs_attention
+    assert "beam:1067554" in report.unresolved[0]
+    assert store.books() == []
+
+
+def test_importing_twice_changes_nothing(store: Store) -> None:
+    """Der Import ist wiederholbar — sonst wäre er einmalig und damit ein Risiko."""
+    args = (
+        profile(reference_authors=["Chris Carter"], liked_books=["Cry Baby - Gillian Flynn"]),
+        [WatchlistEntry(title="Blindflug", author="Peter Watts")],
+        {},
+    )
+    seed(store, *args, now=NOW)
+    first = (len(store.books()), len(store.relations("t")), len(store.interests("t")))
+
+    seed(store, *args, now=NOW)
+    assert (len(store.books()), len(store.relations("t")), len(store.interests("t"))) == first
+
+
+def test_a_second_import_does_not_revive_what_was_switched_off(store: Store) -> None:
+    args = (profile(), [WatchlistEntry(title="Providence", author="Max Barry", active=False)], {})
+    seed(store, *args, now=NOW)
+    assert store.relations("t", kind=str(RelationKind.WATCHING)) == []
+
+
+# --- die Aussaat, pro Interesse --------------------------------------------
+
+
+def test_each_interest_is_seeded_on_its_own(store: Store) -> None:
+    """Der behobene Fehler: der alte Schlüssel liess 'category' bei Autor:innen
+    leer, so dass alle Autor:innen sich eine Aussaat teilten — die erste säte
+    still an, jede weitere meldete ihre ganze Backlist."""
+    seed(store, profile(reference_authors=["Chris Carter", "Jo Nesbø"]), [], {}, now=NOW)
+    carter, nesbo = store.interests("t", key=str(InterestKey.AUTHOR))
+
+    store.mark_interest_seeded(carter.id, "beam", now=NOW)
+
+    assert store.is_interest_seeded(carter.id, "beam") is True
+    assert store.is_interest_seeded(nesbo.id, "beam") is False
+
+
+def test_seeding_is_per_source(store: Store) -> None:
+    seed(store, profile(reference_authors=["Chris Carter"]), [], {}, now=NOW)
+    carter = store.interests("t")[0]
+
+    store.mark_interest_seeded(carter.id, "beam", now=NOW)
+
+    assert store.is_interest_seeded(carter.id, "voebb") is False

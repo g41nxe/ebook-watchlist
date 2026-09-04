@@ -32,6 +32,7 @@ from .digest import build_digest
 from .http import HttpClient, RateLimited, build_user_agent
 from .models import Observation, SourceFailure
 from .render import render_html, render_text
+from .seed import seed
 from .sources import build_sources
 from .sources.base import RunContext
 from .store import Store
@@ -69,10 +70,11 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "command",
         nargs="?",
         default="run",
-        choices=["run", "doctor", "sources"],
+        choices=["run", "doctor", "sources", "seed"],
         help=(
             "'run' checks everything; 'doctor' only asks each Source whether it still "
-            "parses; 'sources' lists them and can pause one"
+            "parses; 'sources' lists them and can pause one; 'seed' imports the YAML "
+            "files into the database once"
         ),
     )
     parser.add_argument("--enable", metavar="QUELLE", help="eine pausierte Quelle wieder aufnehmen")
@@ -236,6 +238,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _doctor(sources)
         if args.command == "sources":
             return _sources(sources, enable=args.enable, disable=args.disable)
+        if args.command == "seed":
+            return _seed(profile, watchlist, dismissed)
         return _run(
             profile,
             watchlist,
@@ -247,6 +251,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     finally:
         lock.release()
+
+
+def _seed(profile, watchlist, dismissed) -> int:
+    """Die YAML-Dateien in die Datenbank überführen (Ticket 05).
+
+    Wiederholbar: ein zweiter Aufruf legt nichts doppelt an und setzt nichts
+    zurück, was inzwischen woanders geändert wurde.
+    """
+    store = Store(paths.db_path())
+    report = seed(store, profile, watchlist, dismissed)
+
+    print(f"  {report.books:>4}  Bücher neu angelegt")
+    print(f"  {report.relations:>4}  Beziehungen")
+    print(f"  {report.interests:>4}  Interessen")
+    if report.needs_attention:
+        print(f"\n  {len(report.unresolved)} Einträge brauchen Aufmerksamkeit:")
+        for item in report.unresolved:
+            print(f"    - {item}")
+        print("\n  Nicht geraten: diese Zeilen nennen kein Buch, das sich")
+        print("  zweifelsfrei auflösen ließe (ADR 8).")
+    return EXIT_OK
 
 
 def _sources(sources, *, enable: str | None, disable: str | None) -> int:

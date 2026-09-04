@@ -17,6 +17,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    UniqueConstraint,
     create_engine,
     func,
     select,
@@ -27,6 +28,7 @@ from .books import BookLike
 from .books import find as find_book
 from .migrations import migrate
 from .models import LINK_OUTCOMES, Availability, MatchReason, Observation
+from .relations import check_details, check_interest_key, check_relation_kind
 
 
 class Base(DeclarativeBase):
@@ -135,6 +137,77 @@ class BookSourceRow(Base):
     #: them* - the last two exist so a wrong automatic resolution stays visible
     #: (ADR 9). JSON rather than columns: nothing filters or sorts on them.
     details: Mapped[str] = mapped_column(String, default="{}")
+
+
+class BookRelationRow(Base):
+    """Was die Leserin zu einem Buch sagt (ADR 18).
+
+    Eine Tabelle für alle fünf Beziehungen, weil sie alle dasselbe sagen — nur
+    die Art unterscheidet sich. Vorher lagen dieselben Bücher in vier Dateien:
+    *Cold Eternity* stand in ``owned.yaml`` als Titel, in ``dismissed.yaml`` als
+    beam-Produktnummer, und war einmal eine Zeile in ``watchlist.yaml``. Ein
+    Buch als vorhanden zu markieren kostete zwei Bearbeitungen in zwei Formaten,
+    und die Ablehnung galt nur für einen Shop.
+
+    Beziehungen werden **deaktiviert, nicht gelöscht**. *Providence* heute von
+    der Watchlist zu nehmen zerstörte die Tatsache, dass es je beobachtet wurde;
+    ``active = false`` behält sie — "beobachtet, bis du es gekauft hast".
+    """
+
+    __tablename__ = "book_relation"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    profile_slug: Mapped[str] = mapped_column(String, index=True)
+    book_id: Mapped[int] = mapped_column(Integer, index=True)
+    kind: Mapped[str] = mapped_column(String)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    details: Mapped[str] = mapped_column(String, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint("profile_slug", "book_id", "kind", name="uq_relation"),
+    )
+
+
+class InterestRow(Base):
+    """Wo nach neuen Büchern gesehen werden soll (ADR 18).
+
+    Referenzautor:in und Thema beantworten dieselbe Frage, also eine Tabelle.
+    ``key`` ist Freitext, damit ein dritter Kanal — Verlag, Reihe, Schlagwort —
+    einen Handler kostet und keine Migration; geprüft wird er beim Laden.
+    """
+
+    __tablename__ = "interest"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    profile_slug: Mapped[str] = mapped_column(String, index=True)
+    key: Mapped[str] = mapped_column(String)
+    value: Mapped[str] = mapped_column(String)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    details: Mapped[str] = mapped_column(String, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint("profile_slug", "key", "value", name="uq_interest"),
+    )
+
+
+class InterestSeededRow(Base):
+    """Dieses Interesse wurde bei dieser Quelle schon einmal angesehen.
+
+    Löst ``seeded_scope`` ab und behebt einen Fehler, der beim Dokumentieren
+    auffiel: der alte Schlüssel war ``(source, match_reason, category)``, und
+    ``category`` blieb bei Autor:innen leer — **alle Autor:innen teilten sich
+    also eine Aussaat**. Eine neue Referenzautor:in meldete daraufhin ihre
+    ganze Backlist als Neuzugänge, während ein neues Thema still ansäte. Pro
+    Interesse gehalten verhalten sich beide gleich.
+    """
+
+    __tablename__ = "interest_seeded"
+
+    interest_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String, primary_key=True)
+    seeded_at: Mapped[datetime] = mapped_column(DateTime)
 
 
 class SeededScopeRow(Base):
@@ -507,6 +580,141 @@ class Store:
             row.resolved_at = resolved_at
             row.details = json.dumps({"outcome": outcome, **details}, ensure_ascii=False)
             session.commit()
+
+    # --- Beziehungen und Interessen (Ticket 05) ----------------------------
+
+    def put_relation(
+        self,
+        profile_slug: str,
+        book_id: int,
+        kind: str,
+        *,
+        active: bool = True,
+        now: datetime,
+        **details: object,
+    ) -> None:
+        """Was die Leserin zu einem Buch sagt. Mehrere Arten gelten gleichzeitig."""
+        check_relation_kind(kind)
+        with self.session() as session:
+            row = session.scalars(
+                select(BookRelationRow).where(
+                    BookRelationRow.profile_slug == profile_slug,
+                    BookRelationRow.book_id == book_id,
+                    BookRelationRow.kind == kind,
+                )
+            ).first()
+            if row is None:
+                row = BookRelationRow(
+                    profile_slug=profile_slug,
+                    book_id=book_id,
+                    kind=kind,
+                    created_at=now,
+                )
+                session.add(row)
+            row.active = active
+            if details:
+                row.details = json.dumps(details, ensure_ascii=False)
+            session.commit()
+
+    def relations(
+        self, profile_slug: str, *, kind: str | None = None, active_only: bool = True
+    ) -> list[BookRelationRow]:
+        with self.session() as session:
+            stmt = select(BookRelationRow).where(BookRelationRow.profile_slug == profile_slug)
+            if kind is not None:
+                stmt = stmt.where(BookRelationRow.kind == kind)
+            if active_only:
+                stmt = stmt.where(BookRelationRow.active.is_(True))
+            rows = list(session.scalars(stmt.order_by(BookRelationRow.id)))
+            for row in rows:
+                session.expunge(row)
+            return rows
+
+    def relations_of(self, profile_slug: str, book_id: int) -> list[BookRelationRow]:
+        with self.session() as session:
+            rows = list(
+                session.scalars(
+                    select(BookRelationRow).where(
+                        BookRelationRow.profile_slug == profile_slug,
+                        BookRelationRow.book_id == book_id,
+                    )
+                )
+            )
+            for row in rows:
+                session.expunge(row)
+            return rows
+
+    def deactivate_relation(self, profile_slug: str, book_id: int, kind: str) -> None:
+        """Beziehungen werden deaktiviert, nicht geloescht — die Tatsache, dass
+        ein Buch einmal beobachtet wurde, ist selbst eine Auskunft (ADR 18)."""
+        self.put_relation(
+            profile_slug, book_id, kind, active=False, now=datetime.now()
+        )
+
+    def put_interest(
+        self,
+        profile_slug: str,
+        key: str,
+        value: str,
+        *,
+        active: bool = True,
+        now: datetime,
+        **details: object,
+    ) -> InterestRow:
+        check_interest_key(key)
+        check_details(key, dict(details))
+        with self.session() as session:
+            row = session.scalars(
+                select(InterestRow).where(
+                    InterestRow.profile_slug == profile_slug,
+                    InterestRow.key == key,
+                    InterestRow.value == value,
+                )
+            ).first()
+            if row is None:
+                row = InterestRow(
+                    profile_slug=profile_slug, key=key, value=value, created_at=now
+                )
+                session.add(row)
+            row.active = active
+            if details:
+                row.details = json.dumps(details, ensure_ascii=False)
+            session.commit()
+            session.refresh(row)
+            session.expunge(row)
+            return row
+
+    def interests(
+        self, profile_slug: str, *, key: str | None = None, active_only: bool = True
+    ) -> list[InterestRow]:
+        with self.session() as session:
+            stmt = select(InterestRow).where(InterestRow.profile_slug == profile_slug)
+            if key is not None:
+                stmt = stmt.where(InterestRow.key == key)
+            if active_only:
+                stmt = stmt.where(InterestRow.active.is_(True))
+            rows = list(session.scalars(stmt.order_by(InterestRow.id)))
+            for row in rows:
+                session.expunge(row)
+            return rows
+
+    def is_interest_seeded(self, interest_id: int, source: str) -> bool:
+        with self.session() as session:
+            return session.get(InterestSeededRow, (interest_id, source)) is not None
+
+    def mark_interest_seeded(self, interest_id: int, source: str, *, now: datetime) -> None:
+        """Pro Interesse, nicht pro Anlass.
+
+        Der alte Schluessel liess ``category`` bei Autor:innen leer, so dass
+        sich *alle* Autor:innen eine Aussaat teilten: die erste saete still an,
+        jede weitere meldete ihre ganze Backlist als Neuzugaenge.
+        """
+        with self.session() as session:
+            if session.get(InterestSeededRow, (interest_id, source)) is None:
+                session.add(
+                    InterestSeededRow(interest_id=interest_id, source=source, seeded_at=now)
+                )
+                session.commit()
 
     # --- Quellen-Zustand (Ticket 03) ---------------------------------------
 
