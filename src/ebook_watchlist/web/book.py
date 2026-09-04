@@ -136,10 +136,10 @@ class Judgement:
         return self.origin in HUMAN_ORIGINS
 
     def stale(self, current: int | None) -> bool:
-        """Gegen einen älteren Maßstab gefällt — und deshalb nur noch Auskunft.
+        """Gegen eine ältere Profilfassung gefällt — und deshalb nur noch Auskunft.
 
         Gilt nur für Maschinenurteile: was ein Mensch gesagt hat, verfällt
-        nicht, wenn er seinen Maßstab schärft.
+        nicht, wenn er sein Profil schärft.
         """
         return not self.is_human and current is not None and self.profile_version != current
 
@@ -156,7 +156,7 @@ class Page:
     sources: tuple[SourceState, ...]
     history: tuple[Sighting, ...]
     judgements: tuple[Judgement, ...]
-    #: Der heutige Maßstab, oder ``None``, wenn er nicht lesbar ist.
+    #: Die heutige Profilversion, oder ``None``, wenn das Profil nicht lesbar ist.
     profile_version: int | None
     #: Warum dieser Fund überhaupt hereinkam — nur bei Entdeckungen (Ticket 22).
     origin: Origin | None
@@ -324,9 +324,9 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
     )
 
     try:
-        _, current_leseprofil = load_leseprofil()
+        _, current_version = load_leseprofil()
     except RatingUnavailable:
-        current_leseprofil = None
+        current_version = None
 
     return Page(
         book_id=book.id,
@@ -339,7 +339,7 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
         sources=sources,
         history=history,
         judgements=_judgements(store, book, seen),
-        profile_version=current_leseprofil,
+        profile_version=current_version,
         origin=_origin(seen),
     )
 
@@ -379,7 +379,7 @@ def set_stars(store: Store, book_id: int, stars: int | None, *, now: datetime) -
 
     Sie stehen unter ihrer eigenen Herkunft und damit neben dem Modellurteil,
     nicht darüber: keines überschreibt das andere (ADR 17, Ticket 21). Der
-    Maßstab wird mitgeschrieben, damit später nachvollziehbar bleibt, wovon
+    Profilfassung wird mitgeschrieben, damit später nachvollziehbar bleibt, wovon
     hier die Rede war — verfallen tut ihr Urteil deswegen nicht.
     """
     if stars is None:
@@ -390,7 +390,7 @@ def set_stars(store: Store, book_id: int, stars: int | None, *, now: datetime) -
     try:
         _, version = load_leseprofil()
     except RatingUnavailable:
-        # Ohne lesbaren Maßstab bleibt ihre Bewertung trotzdem gültig — sie
+        # Ohne lesbares Profil bleibt ihre Bewertung trotzdem gültig — sie
         # hängt nicht an ihm. Die 0 sagt: unter keiner bekannten Fassung.
         version = 0
     store.put_rating(

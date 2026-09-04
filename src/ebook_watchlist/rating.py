@@ -1,10 +1,14 @@
 """Das Bewertungstor: passt dieses Buch zur Leserin? (ADR 19, Ticket 12)
 
-Bewertet wird gegen ``docs/leseprofil.md`` — den Maßstab, den die Leserin selbst
-geschrieben hat, mitsamt seiner Version. Ein Buch wird **einmal** beurteilt; ein
-Lauf, der es wiedersieht, kostet keinen Aufruf mehr. Erst eine neue
-Maßstabsversion macht die Urteile ungültig, und das ist die eine Änderung, bei
-der das auch richtig ist.
+Zwei Dokumente tragen das (ADR 21): ``docs/leseprofil.md`` sagt, **wonach**
+geurteilt wird — die Beschreibung, die die Leserin selbst geschrieben hat,
+mitsamt ihrer Version. ``docs/bewertungsschema.md`` sagt, **wie**; es trägt
+keine Version, weil eine Änderung am Verfahren kein Urteil über ein Buch falsch
+macht.
+
+Ein Buch wird **einmal** beurteilt; ein Lauf, der es wiedersieht, kostet keinen
+Aufruf mehr. Erst eine neue Profilversion macht die Urteile ungültig, und das
+ist die eine Änderung, bei der das auch richtig ist.
 
 **Das Tor scheitert nie zu.** Kein Schlüssel, kein Netz, eine Absage, eine
 unlesbare Antwort: das Buch gilt als unbewertet und wird trotzdem angezeigt. Ein
@@ -38,7 +42,7 @@ SCHEME_PATH = Path(__file__).resolve().parents[2] / "docs" / "bewertungsschema.m
 #: weil er das Verfahren meinte und auf das Profil zeigte.
 _VERSION = re.compile(r"(?:Profilversion|Maßstabsversion):\s*(\d+)", re.IGNORECASE)
 
-#: Voreinstellung. Ein beschränktes Urteil gegen einen mitgelieferten Maßstab —
+#: Voreinstellung. Ein beschränktes Urteil gegen ein mitgeliefertes Profil —
 #: dafür ist das kleinste Modell das richtige.
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 API_URL = "https://api.anthropic.com/v1/messages"
@@ -72,7 +76,7 @@ class RatingUnavailable(Exception):
 class Rating:
     stars: int
     reason: str
-    #: ``belegt`` | ``teils`` | ``vermutet`` — der Maßstab verlangt sie, weil ein
+    #: ``belegt`` | ``teils`` | ``vermutet`` — das Schema verlangt sie, weil ein
     #: Urteil über einen 219 Zeichen langen Anriss etwas anderes ist als eines
     #: über ein gelesenes Buch.
     confidence: str
@@ -122,7 +126,7 @@ def load_rating_scheme(path: Path | None = None) -> str:
         raise RatingUnavailable(f"Bewertungsschema nicht lesbar: {exc}") from exc
 
 
-#: Wieviele Bücher höchstens in einen Aufruf gehen. Der Maßstab ist der weitaus
+#: Wieviele Bücher höchstens in einen Aufruf gehen. Profil und Verfahren sind der weitaus
 #: größte Teil eines Prompts — das Buch selbst sind ein paar Zeilen —, also spart
 #: ein Bündel nicht ein paar Prozent, sondern den Großteil. Zwanzig, weil eine
 #: Antwort, die für zwanzig Bücher je eine belegte Begründung liefern soll,
@@ -422,7 +426,7 @@ class ClaudeCodeRater:
     ) -> dict[tuple[str, str], Rating]:
         """Ein Aufruf für bis zu :data:`BATCH_SIZE` Bücher.
 
-        Der eigentliche Gewinn: der Maßstab geht einmal raus statt einmal je
+        Der eigentliche Gewinn: Profil und Verfahren gehen einmal raus statt je
         Buch. Die 34 Sekunden eines Aufrufs sind zudem fast ganz Startkosten
         des Unterprozesses, nicht Denkzeit — zwanzig Bücher kosten kaum mehr
         als eines.

@@ -186,3 +186,17 @@ def test_a_suggestion_carries_its_judgement() -> None:
     assert "Achse D: isoliertes Setting" in text
     assert "(teils)" in text
     assert "Achse D" in render_html(digest)
+
+
+def test_the_digest_says_when_a_book_was_shown_only_because_nobody_was_sure() -> None:
+    """Ein vermutetes Urteil hält kein Buch zurück (bewertungsschema.md, 3).
+    Die Regel muss sichtbar wirken, sonst sieht ein durchgelassener Fund aus wie
+    ein gutbewerteter."""
+    text = render_text(build(gate=GateNote(threshold=3, shown_unsure=4)))
+
+    assert "4" in text
+    assert "Vermutung" in text
+
+
+def test_a_gate_note_about_nothing_stays_silent() -> None:
+    assert build(gate=GateNote(threshold=3, shown_unsure=0)).is_empty

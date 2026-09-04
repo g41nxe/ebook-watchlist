@@ -88,7 +88,7 @@ def test_the_counts_cover_every_relation(client: TestClient, db: Store) -> None:
 
 def test_the_leseprofil_is_shown_with_its_version(client: TestClient) -> None:
     body = client.get("/profil").text
-    assert "Maßstabsversion" in body
+    assert "Profilversion" in body
     assert "Kernachsen" in body
 
 
@@ -108,3 +108,15 @@ def test_no_write_route_exists_for_the_profile(client: TestClient) -> None:
         if getattr(route, "methods", set()) - {"GET", "HEAD"}
     ]
     assert not any(path.startswith("/profil") for path in writable)
+
+
+def test_the_scheme_is_shown_beside_the_profile_and_without_a_version(
+    client: TestClient,
+) -> None:
+    """Zwei Dokumente, nicht eins (ADR 21). Nur eines trägt eine Version — und
+    die Seite muss sagen, welches, sonst hilft die Trennung niemandem."""
+    body = client.get("/profil").text
+
+    assert "Das Leseprofil" in body
+    assert "Das Bewertungsschema" in body
+    assert "Ohne Version" in body

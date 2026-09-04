@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -904,3 +905,34 @@ def test_a_changed_profile_ages_the_machines_judgement_but_not_hers(
 
     assert store.rating("isbn:9783104911854", 2, origin=BY_MODEL) is None
     assert store.rating(book_subject(book.id), 2, origin=BY_READER).stars == 5
+
+
+def test_without_a_scheme_there_is_no_gate_rather_than_a_crash(monkeypatch) -> None:
+    """Ein fehlendes Verfahren ist derselbe Fall wie ein fehlender Schlüssel:
+    kein Tor, alles wird gezeigt. Ein Lauf darf daran nicht sterben."""
+    import ebook_watchlist.rating as rating_module
+
+    monkeypatch.setattr(rating_module, "SCHEME_PATH", Path("gibt-es-nicht.md"))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+
+    assert build_rater() is None
+
+
+def test_a_price_drop_of_an_unsure_low_rating_carries_its_reason(store: Store) -> None:
+    """Erstsichtung und Preissturz entscheiden mit derselben Funktion. Vorher
+    zählte nur der eine Weg mit und nur der eine trug die Begründung."""
+    store.put_rating("isbn:9783104911854", stars=1, confidence="vermutet",
+                     reason="Ruht auf Ableitung.", profile_version=1, now=NOW,
+                     origin=BY_MODEL)
+    teuer = discovery(isbn="9783104911854", price_cents=999)
+    billig = discovery(isbn="9783104911854", price_cents=299)
+
+    kept, report = gate.apply(
+        [Delta(DeltaKind.PRICE_DROP, billig, teuer)],
+        store=store, rater=StubRater(rating(4)), profile_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+
+    assert len(kept) == 1
+    assert report.shown_unsure == 1
+    assert report.judgements[billig.key].reason == "Ruht auf Ableitung."

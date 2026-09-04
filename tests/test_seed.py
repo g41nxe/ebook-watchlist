@@ -19,7 +19,7 @@ from ebook_watchlist.relations import (
     check_interest_key,
     check_relation_kind,
 )
-from ebook_watchlist.seed import OWNED_LESEPROFIL_VERSION, seed, split_free_text
+from ebook_watchlist.seed import OWNED_PROFILE_VERSION, seed, split_free_text
 from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 20, 0)
@@ -286,7 +286,7 @@ def test_owned_becomes_a_relation_and_a_machine_judgement(store: Store) -> None:
     book = store.books()[0]
     assert {row.kind for row in store.relations_of("t", book.id)} == {str(RelationKind.OWNED)}
 
-    row = store.rating(book_subject(book.id), OWNED_LESEPROFIL_VERSION, origin=BY_CONVERSATION)
+    row = store.rating(book_subject(book.id), OWNED_PROFILE_VERSION, origin=BY_CONVERSATION)
     assert (row.stars, row.reason) == (5, "Hunter.")
 
 

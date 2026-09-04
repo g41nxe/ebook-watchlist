@@ -22,7 +22,7 @@ from .models import Observation
 
 #: Das Bewertungstor im Lauf (ADR 19).
 BY_MODEL = "model"
-#: Im Gespräch vergeben, gegen denselben Maßstab — die dreizehn aus
+#: Im Gespräch vergeben, gegen dasselbe Profil — die dreizehn aus
 #: ``owned.yaml``. Maschinenurteile, auch wenn sie im Gespräch entstanden.
 BY_CONVERSATION = "conversation"
 #: Die Leserin selbst.
@@ -30,7 +30,7 @@ BY_READER = "reader"
 
 RATING_ORIGINS: frozenset[str] = frozenset({BY_MODEL, BY_CONVERSATION, BY_READER})
 
-#: Was ein Mensch gesagt hat. Verfällt nicht mit einer neuen Maßstabsversion,
+#: Was ein Mensch gesagt hat. Verfällt nicht mit einer neuen Profilversion,
 #: und wird von keinem Modellurteil überschrieben.
 HUMAN_ORIGINS: frozenset[str] = frozenset({BY_READER})
 

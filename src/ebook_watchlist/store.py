@@ -182,9 +182,10 @@ class RatingRow(Base):
     stars: Mapped[int] = mapped_column(Integer)
     confidence: Mapped[str] = mapped_column(String)
     reason: Mapped[str] = mapped_column(String)
-    #: Die Version des Maßstabs, gegen den geurteilt wurde. Eine neue Version
-    #: macht das Urteil ungültig — das ist die eine Änderung, bei der ein
-    #: erneuter Aufruf richtig ist.
+    #: Die Fassung des Leseprofils, gegen die geurteilt wurde. Eine neue
+    #: Fassung macht ein Maschinenurteil ungültig — das ist die eine Änderung,
+    #: bei der ein erneuter Aufruf richtig ist. Eine Änderung am
+    #: Bewertungsschema tut das ausdrücklich nicht (ADR 21).
     profile_version: Mapped[int] = mapped_column(Integer)
     rated_at: Mapped[datetime] = mapped_column(DateTime)
 
@@ -850,10 +851,12 @@ class Store:
     def rating(
         self, subject: str, profile_version: int, *, origin: str = "model"
     ) -> RatingRow | None:
-        """Das gespeicherte Urteil einer Herkunft — wenn es zum Maßstab passt.
+        """Das gespeicherte Urteil einer Herkunft — wenn es zum Profil passt.
 
-        Die Maßstabsprüfung gilt nur für Maschinenurteile; was die Leserin
-        selbst gesagt hat, verfällt nicht, wenn sie ihren Maßstab schärft.
+        Die Versionsprüfung gilt nur für Maschinenurteile; was die Leserin
+        selbst gesagt hat, verfällt nicht, wenn sie ihr Profil schärft. Und sie
+        gilt gegen das **Leseprofil**, nicht gegen das Bewertungsschema — das
+        trägt gar keine Version (ADR 21).
         """
         with self.session() as session:
             row = session.scalars(

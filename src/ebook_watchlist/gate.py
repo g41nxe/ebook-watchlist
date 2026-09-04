@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from .models import Delta, DeltaKind, MatchReason, Observation
-from .rating import BATCH_SIZE, VERMUTET, Rater, Rating, rate_in_batches
+from .rating import BATCH_SIZE, Rater, Rating, rate_in_batches
 from .ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject, subject_of
 from .store import Store
 
@@ -21,7 +21,7 @@ def _judgement(store: Store, observation: Observation, subject: str, profile_ver
     """Das Urteil, das für diesen Fund schon vorliegt — Mensch vor Maschine.
 
     Was die Leserin selbst gesagt hat, schlägt jedes Modellurteil und verfällt
-    auch nicht mit einer neuen Maßstabsversion (ADR 17). Ihre Sterne und die
+    auch nicht mit einer neuen Profilversion (ADR 17). Ihre Sterne und die
     aus dem Gespräch hängen am *Buch*, nicht am Fund: sie hat sie auf der
     Buchseite vergeben, und sie sollen gelten, egal über welche Quelle das Buch
     das nächste Mal hereinkommt. Nur das Tor selbst schlüsselt am Fund.
@@ -33,6 +33,36 @@ def _judgement(store: Store, observation: Observation, subject: str, profile_ver
             if stored is not None:
                 return stored
     return store.rating(subject, profile_version, origin=BY_MODEL)
+
+
+def _as_rating(row) -> Rating:
+    """Eine gespeicherte Zeile als Urteil — damit beide Wege dasselbe halten."""
+    return Rating(
+        stars=row.stars,
+        reason=row.reason,
+        confidence=row.confidence,
+        profile_version=row.profile_version,
+    )
+
+
+def _decide(
+    rating: Rating, delta: Delta, threshold: int, kept: list[Delta], report: GateReport
+) -> None:
+    """Ob dieses Urteil den Fund durchlässt — die **einzige** Stelle dafür.
+
+    Erstsichtung und Preissturz haben das eine Weile getrennt entschieden, und
+    genau so entstand die offene Hintertür, die dieses Modul schon einmal
+    hatte. Ein zweites Mal ist es dieselbe Funktion.
+    """
+    if rating.withholds(threshold):
+        report.held_back += 1
+        return
+    if not rating.passes(threshold):
+        # Zu schwach, aber nur vermutet: gezeigt und mitgezählt, damit es im
+        # Digest steht statt still zu wirken (bewertungsschema.md, 3).
+        report.shown_unsure += 1
+    report.judgements[delta.current.key] = rating
+    kept.append(delta)
 
 
 @dataclass(slots=True)
@@ -100,7 +130,7 @@ def apply(
         return deltas, unrated_report(deltas)
 
     # Erst sammeln, wer ein frisches Urteil braucht, dann gebündelt fragen.
-    # Einzeln zu fragen schickte den Maßstab je Buch erneut mit — und er ist
+    # Einzeln zu fragen schickte Profil und Verfahren je Buch erneut mit — sie sind
     # der weitaus größte Teil des Prompts (Ticket 12).
     #
     # Das Budget zählt weiterhin *Bücher*, nicht Aufrufe: sonst hiesse "40"
@@ -133,17 +163,9 @@ def apply(
             stored = _judgement(store, delta.current, subject, profile_version)
             if stored is None:
                 kept.append(delta)
-            elif stored.stars < threshold and stored.confidence != VERMUTET:
-                report.held_back += 1
-            else:
-                report.reused += 1
-                report.judgements[delta.current.key] = Rating(
-                    stars=stored.stars,
-                    reason=stored.reason,
-                    confidence=stored.confidence,
-                    profile_version=stored.profile_version,
-                )
-                kept.append(delta)
+                continue
+            report.reused += 1
+            _decide(_as_rating(stored), delta, threshold, kept, report)
             continue
 
         # Ein vorhandenes Urteil - auch das der Leserin - erspart den Aufruf.
@@ -186,15 +208,7 @@ def apply(
                 origin=BY_MODEL,
             )
 
-        if rating.withholds(threshold):
-            report.held_back += 1
-        else:
-            if not rating.passes(threshold):
-                # Zu schwach, aber nur vermutet: gezeigt und mitgezählt, damit
-                # es im Digest steht statt still zu wirken.
-                report.shown_unsure += 1
-            report.judgements[delta.current.key] = rating
-            kept.append(delta)
+        _decide(rating, delta, threshold, kept, report)
     return kept, report
 
 

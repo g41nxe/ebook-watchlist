@@ -31,8 +31,8 @@ from .ratings import BY_CONVERSATION, book_subject
 from .relations import InterestKey, RelationKind
 from .store import Store
 
-#: Der Maßstab, gegen den die Urteile in ``owned.yaml`` entstanden sind.
-OWNED_LESEPROFIL_VERSION = 1
+#: Die Profilfassung, gegen die die Urteile in ``owned.yaml`` entstanden sind.
+OWNED_PROFILE_VERSION = 1
 #: ``owned.yaml`` nennt zu keinem Eintrag eine Sicherheit — der Dateikopf
 #: beschreibt ein ``confidence``-Feld, das kein Eintrag trägt. Also tragen alle
 #: dieselbe ein, und zwar die mittlere: die Urteile entstanden im Gespräch über
@@ -177,7 +177,7 @@ def seed(store: Store, profile: Profile, watchlist: list[WatchlistEntry],
             stars=entry.stars,
             confidence=OWNED_CONFIDENCE,
             reason=entry.why or "",
-            profile_version=OWNED_LESEPROFIL_VERSION,
+            profile_version=OWNED_PROFILE_VERSION,
             now=at,
             origin=BY_CONVERSATION,
         )

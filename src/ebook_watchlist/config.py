@@ -43,7 +43,7 @@ class Profile:
     #: profile only sharpens as the list grows, so they are worth keeping from
     #: the first day.
     liked_books: list[str] = field(default_factory=list)
-    #: Die Gegenprobe. Ein Maßstab, der nur aus Zustimmung gebaut ist, weiß
+    #: Die Gegenprobe. Ein Profil, das nur aus Zustimmung gebaut ist, weiß
     #: nicht, wo seine Grenze verläuft — am wertvollsten ist hier ein Buch, das
     #: auf dem Papier gepasst hätte (ADR 17). Ebenfalls dormant.
     disliked_books: list[str] = field(default_factory=list)
@@ -229,7 +229,7 @@ def load_owned(path: Path | None = None) -> list[OwnedBook]:
     """Bücher im Besitz, mit einem Urteil dazu — ``owned.yaml`` (Ticket 21).
 
     Die Sterne darin sind **Maschinenurteile**. Sie entstanden im Gespräch,
-    gegen denselben Maßstab, den das Bewertungstor benutzt, und nicht dadurch,
+    gegen dasselbe Profil, das das Bewertungstor benutzt, und nicht dadurch,
     dass die Leserin sie vergeben hätte. Der Unterschied ist der Grund, aus dem
     die Herkunft im Schlüssel steht (ADR 17): eine 4 von ihr ist eine Tatsache,
     eine 4 von einem Modell ein Vorschlag.

@@ -1,6 +1,6 @@
 """Was das Werkzeug über die Leserin zu wissen glaubt (Ticket 09).
 
-Ausdrücklich **nur lesend**. Der Maßstab liegt als Repo-Datei mit eigenem
+Ausdrücklich **nur lesend**. Das Leseprofil liegt als Repo-Datei mit eigenem
 Änderungsverfahren und einer asymmetrischen Beweislast (ADR 17): ein Formular
 hier würde genau dieses Verfahren umgehen. Die Seite zeigt ihn, verlinkt ihn
 und nennt den Weg, auf dem er sich ändert.
@@ -13,7 +13,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from ..config import Profile
-from ..rating import LESEPROFIL_PATH, RatingUnavailable, load_leseprofil
+from ..rating import (
+    LESEPROFIL_PATH,
+    RatingUnavailable,
+    load_leseprofil,
+    load_rating_scheme,
+)
 from ..reasons import thema_name
 from ..relations import InterestKey, RelationKind
 from ..store import Store
@@ -67,6 +72,8 @@ class Overview:
     leseprofil: str | None
     profile_version: int | None
     leseprofil_path: str
+    #: Das Verfahren, ohne Version (ADR 21).
+    scheme: str | None
 
     @property
     def next_sweep(self) -> str:
@@ -114,6 +121,10 @@ def build(store: Store, profile: Profile) -> Overview:
         leseprofil, version = load_leseprofil()
     except RatingUnavailable:
         leseprofil, version = None, None
+    try:
+        scheme = load_rating_scheme()
+    except RatingUnavailable:
+        scheme = None
 
     return Overview(
         authors=collect(InterestKey.AUTHOR),
@@ -128,4 +139,5 @@ def build(store: Store, profile: Profile) -> Overview:
         leseprofil=leseprofil,
         profile_version=version,
         leseprofil_path=str(LESEPROFIL_PATH.name),
+        scheme=scheme,
     )
