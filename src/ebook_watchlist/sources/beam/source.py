@@ -151,6 +151,7 @@ class BeamSource(ShopSource):
                     blurb=tile.blurb,
                     subtitle=tile.subtitle,
                     isbn=tile.isbn,
+                    cover_url=tile.cover_url,
                     url=tile.url,
                 )
             )
@@ -192,6 +193,7 @@ class BeamSource(ShopSource):
                         blurb=tile.blurb,
                         subtitle=tile.subtitle,
                         isbn=tile.isbn,
+                    cover_url=tile.cover_url,
                         category=category_path,
                         url=tile.url,
                     )
@@ -220,6 +222,7 @@ class BeamSource(ShopSource):
             title=detail.title or entry.title,
             author=entry.author,
             isbn=detail.isbn,
+            cover_url=detail.cover_url,
             match_reason=MatchReason.WATCHLIST,
             watchlist_key=entry.key,
             price_cents=detail.price_cents,

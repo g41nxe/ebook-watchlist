@@ -103,6 +103,9 @@ class BookRow(Base):
     title: Mapped[str] = mapped_column(String)
     author: Mapped[str | None] = mapped_column(String, nullable=True)
     series: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Dateiname im Cover-Ordner, nicht die Adresse beim Shop: die Seite
+    #: laedt nichts von einem Dritten nach (Ticket 15).
+    cover_file: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
     __table_args__ = (Index("ix_book_title", "title"),)
@@ -404,6 +407,14 @@ class Store:
             session.refresh(row)
             session.expunge(row)
             return row
+
+    def set_cover(self, book_id: int, file_name: str) -> None:
+        with self.session() as session:
+            row = session.get(BookRow, book_id)
+            if row is None:
+                return
+            row.cover_file = file_name
+            session.commit()
 
     def learn_isbn(self, book_id: int, isbn: str) -> bool:
         """Die ISBN nachtragen, die ein Watchlist-Eintrag selbst nicht mitbrachte.

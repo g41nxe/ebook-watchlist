@@ -38,5 +38,11 @@ def digests_dir() -> Path:
     return data_dir() / "digests"
 
 
+def covers_dir() -> Path:
+    """Titelbilder, einmal geholt (Ticket 15). Neben der Datenbank, weil sie
+    zu ihr gehoeren: ohne die book-Zeile ist die Datei nur noch Muell."""
+    return data_dir() / "covers"
+
+
 def lock_path() -> Path:
     return data_dir() / "run.lock"

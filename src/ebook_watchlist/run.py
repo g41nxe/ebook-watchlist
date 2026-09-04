@@ -20,6 +20,7 @@ from filelock import FileLock, Timeout
 from . import paths
 from .cleaning import clean_blurb
 from .config import ConfigError, load_dismissals, load_profile, load_watchlist
+from .covers import CoverStore
 from .diff import (
     DISCOVERY_REASONS,
     compute_deltas,
@@ -28,7 +29,7 @@ from .diff import (
     suppress_unseeded,
 )
 from .digest import build_digest
-from .http import HttpClient, build_user_agent
+from .http import HttpClient, RateLimited, build_user_agent
 from .models import Observation, SourceFailure
 from .render import render_html, render_text
 from .sources import build_sources
@@ -165,6 +166,35 @@ def _cleaned(observation: Observation) -> Observation:
     return replace(observation, blurb=blurb)
 
 
+def _fetch_covers(store: Store, client: HttpClient, observations: Sequence[Observation]) -> None:
+    """Titelbilder holen — einmal pro Buch, und nur für Bücher (Ticket 15).
+
+    Eine Entdeckung bekommt keins: das wären dreihundert Anfragen pro Lauf statt
+    einer Handvoll, und für ein Buch, zu dem die Leserin keine Beziehung hat,
+    gibt es ohnehin keine Zeile, an der ein Bild hängen könnte (ADR 18).
+
+    Ein Bild ist Beiwerk. Schlägt es fehl, läuft der Rest weiter — nur eine
+    Drosselung bricht ab, denn dann hat der Shop Halt gesagt.
+    """
+    covers = CoverStore(paths.covers_dir())
+    done: set[int] = set()
+    for observation in observations:
+        book_id, url = observation.book_id, observation.cover_url
+        if not book_id or not url or book_id in done:
+            continue
+        done.add(book_id)
+        book = store.book(book_id)
+        if book is None or book.cover_file:
+            continue
+        try:
+            name = covers.fetch(client, book_id, url)
+        except RateLimited:
+            print("Titelbilder: der Shop drosselt — Rest übersprungen", file=sys.stderr)
+            return
+        if name:
+            store.set_cover(book_id, name)
+
+
 def _write_html(digest, generated_at: datetime) -> Path:
     directory = paths.digests_dir()
     directory.mkdir(parents=True, exist_ok=True)
@@ -211,6 +241,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             watchlist,
             sources,
             dismissed,
+            client=client,
             trigger=args.trigger,
             skip_probes=args.skip_probes,
         )
@@ -311,7 +342,14 @@ def _should_sweep_extended(profile, store: Store, now: datetime) -> bool:
 
 
 def _run(
-    profile, watchlist, sources, dismissed, *, trigger: str, skip_probes: bool = False
+    profile,
+    watchlist,
+    sources,
+    dismissed,
+    *,
+    client: HttpClient,
+    trigger: str,
+    skip_probes: bool = False,
 ) -> int:
     store = Store(paths.db_path())
     started_at = datetime.now()
@@ -343,6 +381,7 @@ def _run(
     for observation in observations:
         if observation.book_id and observation.isbn:
             store.learn_isbn(observation.book_id, observation.isbn)
+    _fetch_covers(store, client, observations)
 
     previous = store.latest_observations(profile.slug, keys_of(observations))
     seeded = store.seeded_scopes(profile.slug)

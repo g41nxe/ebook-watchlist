@@ -42,6 +42,26 @@ def canonical_url(href: str, base: str = sel.BASE) -> str:
     return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
 
 
+def _cover_from(node: Tag | None) -> str | None:
+    """Die erste Adresse aus einem ``srcset``.
+
+    Ein srcset ist ``url 1x, url 2x`` — die erste ist die Normalaufloesung, und
+    die reicht: 200x200 auf der Kachel, 600x600 auf der Detailseite. Das
+    ``src``-Attribut ist bei diesen Bildern ein Platzhalterpixel, weil das Theme
+    sie erst beim Scrollen nachlaedt.
+    """
+    if node is None:
+        return None
+    for attribute in (sel.ATTR_SRCSET, "srcset", "src"):
+        value = node.get(attribute)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        first = value.split(",")[0].strip().split(" ")[0]
+        if first.startswith("http"):
+            return first
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class Tile:
     """One product as it appears in any listing."""
@@ -55,6 +75,8 @@ class Tile:
     subtitle: str | None = None
     #: Teaser von der Trefferseite - kostet keinen eigenen Request (ADR 17).
     blurb: str | None = None
+    #: Adresse des Titelbilds, direkt aus der Kachel (Ticket 15).
+    cover_url: str | None = None
     category_id: str | None = None
     badges: frozenset[str] = frozenset()
 
@@ -148,6 +170,7 @@ def _parse_tile(tile: Tag, base: str) -> Tile | None:
         url=url,
         subtitle=subtitle,
         blurb=blurb or None,
+        cover_url=_cover_from(tile.select_one(sel.TILE_IMAGE)),
         category_id=category_id if isinstance(category_id, str) else None,
         # Badges repeat inside a tile once per layout slot.
         badges=frozenset(node.get_text(strip=True) for node in tile.select(sel.TILE_BADGE)),
@@ -188,6 +211,7 @@ class Detail:
     title: str | None
     price_cents: int | None
     isbn: str | None = None
+    cover_url: str | None = None
 
 
 def _isbn_from_order_number(order_number: str | None) -> str | None:
@@ -230,6 +254,7 @@ def parse_detail(html: str) -> Detail:
         title=title_node.get_text(" ", strip=True) if title_node else None,
         price_cents=price_cents,
         isbn=isbn,
+        cover_url=_cover_from(scope.select_one(sel.DETAIL_IMAGE)),
     )
 
 

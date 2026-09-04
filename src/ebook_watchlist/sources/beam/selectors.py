@@ -33,10 +33,14 @@ TILE_PRICE = ".price--default"
 TILE_NOTE_BUTTON = "[data-note-article]"
 TILE_BADGE = ".product--badge"
 TILE_DESCRIPTION = ".product--description"
+#: Das Cover. Lazy geladen, also steht die echte Adresse im srcset-Attribut
+#: und nicht im src, das nur ein Platzhalterpixel traegt.
+TILE_IMAGE = "a.product--image img"
 
 ATTR_ORDER_NUMBER = "data-ordernumber"
 ATTR_CATEGORY_ID = "data-category-id"
 ATTR_PRODUCT_ID = "data-note-article"
+ATTR_SRCSET = "data-srcset"
 
 # --- product detail page --------------------------------------------------
 
@@ -50,6 +54,8 @@ DETAIL_PRICE_META = 'meta[itemprop="price"]'
 #: im Gegensatz zur ISBN-Liste liegt sie innerhalb des Produktblocks. Auf der
 #: ganzen Seite stehen 63 Bestellnummern, hier genau eine.
 DETAIL_ORDER_NUMBER = 'input[name="sAdd"]'
+#: Auf der Detailseite ist das Bild groesser (600x600 statt 200x200).
+DETAIL_IMAGE = "img[data-srcset], img[srcset]"
 
 # --- listing --------------------------------------------------------------
 

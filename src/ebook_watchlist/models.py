@@ -85,6 +85,9 @@ class Observation:
     subtitle: str | None = None
     #: Die ISBN-13, wo die Source eine nennt. Beide tun es (ADR 18).
     isbn: str | None = None
+    #: Adresse des Titelbilds bei der Quelle. Wird einmal geholt und lokal
+    #: abgelegt, nie verlinkt (Ticket 15).
+    cover_url: str | None = None
     #: Nur gesetzt, wo eine Source die Reihe ausdrücklich benennt.
     series: str | None = None
     observed_at: datetime | None = None

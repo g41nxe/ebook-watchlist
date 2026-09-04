@@ -114,12 +114,18 @@ def _drop_resolution_table(connection: Connection) -> None:
     connection.exec_driver_sql("DROP TABLE IF EXISTS resolution")
 
 
+def _add_cover_column(connection: Connection) -> None:
+    """Der Dateiname des lokal abgelegten Titelbilds (Ticket 15)."""
+    add_column(connection, "book", "cover_file", "TEXT")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
     _add_isbn_column,
     _add_book_id_column,
     _drop_resolution_table,
+    _add_cover_column,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -81,6 +81,23 @@ class HttpClient:
 
     def get(self, url: str, params: dict[str, str] | None = None) -> str:
         """Fetch one page as text. Raises rather than returning something empty."""
+        response = self._fetch(url, params)
+        # The Onleihe and Shopware both serve UTF-8 but do not always say so;
+        # trusting requests' latin-1 guess mangles umlauts.
+        if response.encoding is None or response.encoding.lower() == "iso-8859-1":
+            response.encoding = response.apparent_encoding or "utf-8"
+        return response.text
+
+    def get_bytes(self, url: str) -> bytes:
+        """Fetch one file as it is — a cover image, nothing decoded.
+
+        Same queue, same pause, same retry as a page: an image is a request like
+        any other, and fetching a hundred of them quickly would undo the
+        politeness the rest of this class exists for.
+        """
+        return self._fetch(url, None).content
+
+    def _fetch(self, url: str, params: dict[str, str] | None) -> requests.Response:
         assert self.session is not None  # set in __post_init__
         last_error: Exception | None = None
 
@@ -99,11 +116,7 @@ class HttpClient:
                     last_error = FetchError(f"{url} answered {response.status_code}")
                 else:
                     response.raise_for_status()
-                    # The Onleihe and Shopware both serve UTF-8 but do not always
-                    # say so; trusting requests' latin-1 guess mangles umlauts.
-                    if response.encoding is None or response.encoding.lower() == "iso-8859-1":
-                        response.encoding = response.apparent_encoding or "utf-8"
-                    return response.text
+                    return response
 
             if attempt == 0:
                 time.sleep(self.max_delay * 2)
