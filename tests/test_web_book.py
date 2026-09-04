@@ -349,3 +349,96 @@ def test_a_nonsense_star_count_is_refused(client: TestClient, db: Store) -> None
 
     assert client.post(f"/book/{book.id}/sterne", data={"stars": "9"}).status_code == 400
     assert client.post(f"/book/{book.id}/sterne", data={"stars": "vier"}).status_code == 400
+
+
+# --- warum das hier steht (Ticket 22) ---------------------------------------
+
+
+def discovery(db: Store, book_id: int, *, reason: MatchReason, author: str | None = None,
+              category: str | None = None, when: datetime = NOW) -> None:
+    """Eine Sichtung, die keine Watchlist-Pruefung war."""
+    run_id = db.start_run("test", "cli", when)
+    db.append(
+        run_id,
+        "test",
+        [
+            Observation(
+                source="beam",
+                source_item_id="7",
+                title="Ein Fund",
+                match_reason=reason,
+                book_id=book_id,
+                author=author,
+                category=category,
+                price_cents=399,
+                observed_at=when,
+            )
+        ],
+        when,
+    )
+
+
+def test_a_discovery_names_the_author_who_brought_it_in(
+    client: TestClient, db: Store
+) -> None:
+    """Dieselben Worte wie im Digest — wer eine Entdeckung nicht ueber den
+    Digest oeffnet, bekam bisher keine Antwort auf "warum sehe ich das"."""
+    book = db.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    discovery(db, book.id, reason=MatchReason.PROFILE_AUTHOR, author="Jo Nesbø")
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "neu von Jo Nesbø, der du folgst" in body
+
+
+def test_a_discovery_from_a_thema_says_which(client: TestClient, db: Store) -> None:
+    book = db.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    discovery(
+        db,
+        book.id,
+        reason=MatchReason.GENRE_CATEGORY,
+        category="belletristik/krimi-thriller/psychothriller",
+    )
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "neu im Thema Psychothriller" in body
+    assert "Regal" not in body  # das war der Begriff des Shops, nicht ihrer
+
+
+def test_a_watchlist_title_explains_nothing(client: TestClient, db: Store) -> None:
+    """Warum es dasteht, weiss die Leserin — sie hat es hingeschrieben."""
+    book = db.books()[0]
+    sighting(db, book.id, when=NOW, price=999)
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "steht auf deiner Watchlist" not in body
+    assert "neu von" not in body
+
+
+def test_the_reason_survives_a_later_watchlist_check(client: TestClient, db: Store) -> None:
+    """Ein entdecktes Buch, das sie dann beobachtet, hat weiterhin einen
+    Anlass — die Watchlist-Sichtung darf ihn nicht verdecken."""
+    book = db.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    discovery(db, book.id, reason=MatchReason.PROFILE_AUTHOR, author="Jo Nesbø")
+    sighting(db, book.id, when=NOW + timedelta(days=1), title="Ein Fund")
+
+    assert "neu von Jo Nesbø, der du folgst" in client.get(f"/book/{book.id}").text
+
+
+def test_the_gates_verdict_on_a_discovery_without_an_isbn_is_found_too(
+    client: TestClient, db: Store
+) -> None:
+    """Buendel und Einzelfolgen tragen keine ISBN — dort haengt das Urteil an
+    der Produktnummer, unter der dieses Buch gesichtet wurde."""
+    book = db.find_or_create_book(isbn=None, title="Ein Fund", now=NOW)
+    discovery(db, book.id, reason=MatchReason.GENRE_CATEGORY, category="horror-mystery-allgemein")
+    db.put_rating("item:beam:7", stars=4, confidence="teils", reason="Achse D: isoliert.",
+                  rubric_version=1, now=NOW, origin=BY_MODEL)
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "vom Werkzeug bewertet" in body
+    assert "Achse D: isoliert." in body
+    assert "noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt

@@ -37,6 +37,21 @@
         <dd class="inline tabular-nums">{{ page.isbn }}</dd></div>
       {% endif %}
     </dl>
+
+    {# Warum dieses Buch ueberhaupt hereinkam. Ein Watchlist-Titel bekommt
+       hier nichts: warum er da steht, weiss die Leserin, sie hat ihn
+       hingeschrieben. Eine Entdeckung ist die eigentliche Frage - und wer sie
+       nicht ueber den Digest oeffnet, hatte bisher keine Antwort (Ticket 22).
+       Dieselben Worte wie im Digest und in der Triage, aus einer Stelle. #}
+    {% if page.origin %}
+    <p class="mt-3 flex flex-wrap items-center gap-2 text-sm">
+      <span class="rounded px-1.5 py-0.5 text-[11px] font-medium
+                   {{ 'bg-accent/15 text-accent' if page.origin.author_driven
+                      else 'bg-amber/15 text-amber' }}">{{ page.origin.short }}</span>
+      <span class="text-soft">{{ page.origin.why }}{% if page.origin.when %},
+        zuletzt gesehen am {{ page.origin.when.strftime("%d.%m.%Y") }}{% endif %}</span>
+    </p>
+    {% endif %}
   </div>
 </div>
 

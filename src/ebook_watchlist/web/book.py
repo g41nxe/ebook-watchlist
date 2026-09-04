@@ -14,7 +14,7 @@ from datetime import datetime
 
 from ..config import Profile
 from ..deals import is_strong_deal
-from ..models import Availability
+from ..models import Availability, MatchReason
 from ..rating import RatingUnavailable, load_rubric
 from ..ratings import (
     BY_CONVERSATION,
@@ -25,6 +25,7 @@ from ..ratings import (
     book_subject,
     subject_of,
 )
+from ..reasons import short_why, why_shown
 from ..relations import RELATION_KINDS, RelationKind
 from ..sources import registry
 from ..store import Store
@@ -97,6 +98,23 @@ class Sighting:
 
 
 @dataclass(frozen=True, slots=True)
+class Origin:
+    """Was dieses Buch hereingebracht hat — in den Worten des Digests.
+
+    Ein Watchlist-Titel braucht das nicht: warum er da ist, weiß die Leserin,
+    sie hat ihn hingeschrieben. Eine Entdeckung ist der ganze Grund, aus dem
+    die Frage überhaupt gestellt wird — und wer sie nicht über den Digest
+    öffnet, bekam bisher keine Antwort darauf.
+    """
+
+    why: str
+    short: str
+    #: Autor:in oder Thema — dieselbe Farbtrennung wie in der Triage.
+    author_driven: bool
+    when: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
 class Judgement:
     """Ein Urteil über dieses Buch, mit der Angabe, wer es gefällt hat.
 
@@ -140,6 +158,8 @@ class Page:
     judgements: tuple[Judgement, ...]
     #: Der heutige Maßstab, oder ``None``, wenn er nicht lesbar ist.
     rubric_version: int | None
+    #: Warum dieser Fund überhaupt hereinkam — nur bei Entdeckungen (Ticket 22).
+    origin: Origin | None
 
     @property
     def my_stars(self) -> int | None:
@@ -189,6 +209,27 @@ def _price(cents: int | None) -> str | None:
     if cents is None:
         return None
     return f"{cents / 100:.2f} €".replace(".", ",")
+
+
+def _origin(seen) -> Origin | None:
+    """Die jüngste Sichtung, die keine Watchlist-Prüfung war.
+
+    Ein Buch, das nur über die Watchlist beobachtet wird, hat keine solche
+    Sichtung — und bekommt deshalb keine Zeile, ohne dass es dafür eine eigene
+    Regel bräuchte. Die Formulierung kommt aus :mod:`ebook_watchlist.reasons`,
+    damit Digest, Triage und diese Seite nicht dreimal dasselbe verschieden
+    sagen (Ticket 14).
+    """
+    for observation in seen:
+        if observation.match_reason is MatchReason.WATCHLIST:
+            continue
+        return Origin(
+            why=why_shown(observation),
+            short=short_why(observation),
+            author_driven=observation.match_reason is MatchReason.PROFILE_AUTHOR,
+            when=observation.observed_at,
+        )
+    return None
 
 
 def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
@@ -299,6 +340,7 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
         history=history,
         judgements=_judgements(store, book, seen),
         rubric_version=current_rubric,
+        origin=_origin(seen),
     )
 
 
