@@ -60,6 +60,30 @@ def _build_beam(name: str, options: dict, client: HttpClient) -> Source:
     return BeamSource(client=client, name=name)
 
 
+#: Welcher Art eine Quelle ist. Die Oberflaeche zeigt die Art, nicht den Namen:
+#: "voebb" war nie ein Wort fuer die Leserin, und wie ihre Bibliothek in dieser
+#: Installation heisst, entscheidet die Konfiguration (Ticket 14).
+#:
+#: Hier und nicht in einer Vorlage, weil die Registry ohnehin die Stelle ist,
+#: die weiss, *was* eine Quelle ist.
+KINDS: dict[str, str] = {"voebb": "library", "beam": "shop", "fake": "shop"}
+
+LIBRARY = "Bibliothek"
+SHOP = "Shop"
+
+
+def category(profile: Profile, name: str) -> str:
+    """``"library"`` oder ``"shop"`` fuer eine konfigurierte Quelle."""
+    options = profile.sources.get(name) or {}
+    kind = options.get("kind", name) if isinstance(options, dict) else name
+    return KINDS.get(kind, "shop")
+
+
+def label(profile: Profile, name: str) -> str:
+    """Wie die Quelle der Leserin gegenueber heisst."""
+    return LIBRARY if category(profile, name) == "library" else SHOP
+
+
 _BUILDERS: dict[str, Callable[[str, dict, HttpClient], Source]] = {
     "fake": _build_fake,
     "voebb": _build_voebb,

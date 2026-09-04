@@ -16,6 +16,7 @@ from ..config import Profile
 from ..deals import is_strong_deal
 from ..models import Availability
 from ..relations import RELATION_KINDS, RelationKind
+from ..sources import registry
 from ..store import Store
 from .watchlist import SourceState
 
@@ -66,12 +67,15 @@ class Sighting:
     """Eine Zeile der Geschichte."""
 
     when: datetime | None
+    #: Die *Art* der Quelle, nicht ihr interner Name: "voebb" war nie ein Wort
+    #: fuer die Leserin (Ticket 14).
     source: str
     price: str | None
     availability: str | None
-    #: Wie *diese* Quelle das Buch damals nannte. Daran bleibt eine falsche
-    #: automatische Zuordnung sichtbar (ADR 9).
-    title: str
+    #: Wie *diese* Quelle das Buch damals nannte — aber nur, wenn es von
+    #: unserem Titel abweicht. Sonst wiederholte die Spalte in jeder Zeile
+    #: dasselbe, und der eine interessante Fall ginge darin unter.
+    other_title: str | None
     deal: bool
 
 
@@ -151,6 +155,8 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
             matched_title=_details(link).get("matched_title"),
             matched_author=_details(link).get("matched_author"),
             reason=_details(link).get("reason", ""),
+            category=registry.category(profile, link.source),
+            display=registry.label(profile, link.source),
         )
         for link in store.book_sources(book_id)
     )
@@ -158,12 +164,14 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
     history = tuple(
         Sighting(
             when=observation.observed_at,
-            source=observation.source,
+            source=registry.label(profile, observation.source),
             price=_price(observation.price_cents),
             availability=_AVAILABILITY.get(observation.availability)
             if observation.availability
             else None,
-            title=observation.title,
+            other_title=(
+                observation.title if observation.title.strip() != book.title.strip() else None
+            ),
             deal=is_strong_deal(observation.price_cents, profile),
         )
         for observation in store.observations_for_book(profile.slug, book_id)

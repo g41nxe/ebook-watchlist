@@ -14,6 +14,7 @@ from ..config import Profile
 from ..deals import is_strong_deal
 from ..models import Availability, LinkOutcome, Observation
 from ..relations import RelationKind
+from ..sources import registry
 from ..store import Store
 
 #: Was die Leserin je Eintrag einschränken kann. Leer heißt: alle Quellen, die
@@ -38,6 +39,11 @@ class SourceState:
     matched_title: str | None
     matched_author: str | None
     reason: str
+    #: "library" oder "shop" — was diese Quelle *ist*. Die Registry sagt es,
+    #: nicht eine Namensliste in der Vorlage (Ticket 14).
+    category: str = "shop"
+    #: Wie sie der Leserin gegenueber heisst.
+    display: str = "Shop"
 
     @property
     def is_question(self) -> bool:
@@ -140,6 +146,8 @@ def entries(
                 matched_title=_details(link).get("matched_title"),
                 matched_author=_details(link).get("matched_author"),
                 reason=_details(link).get("reason", ""),
+                category=registry.category(profile, link.source),
+                display=registry.label(profile, link.source),
             )
             for link in store.book_sources(book.id)
         )

@@ -50,7 +50,7 @@
   </p>
   <ul class="mt-1.5 space-y-0.5 text-ink/80">
     {% for state in page.mismatch %}
-    <li>{{ state.name }}: „{{ state.matched_title }}“{% if state.matched_author %},
+    <li>{{ state.display }}: „{{ state.matched_title }}“{% if state.matched_author %},
       {{ state.matched_author }}{% endif %}</li>
     {% endfor %}
   </ul>
@@ -97,12 +97,12 @@
 {% endif %}
 <ul class="divide-y divide-hair">
   {% for state in page.sources %}
-  {% set kind = "voebb" if state.name == "voebb" else "beam" %}
+  {% set library = state.category == "library" %}
   <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-sm">
     <span class="flex w-28 shrink-0 items-center gap-1.5
-                 {{ 'text-accent' if kind == 'voebb' else 'text-amber' }}">
-      <svg class="i"><use href="#ic-{{ 'lib' if kind == 'voebb' else 'shop' }}"/></svg>
-      {{ "Bibliothek" if kind == "voebb" else "Shop" }}
+                 {{ 'text-accent' if library else 'text-amber' }}">
+      <svg class="i"><use href="#ic-{{ 'lib' if library else 'shop' }}"/></svg>
+      {{ state.display }}
     </span>
     <span class="{{ 'text-danger' if state.is_question else 'text-soft' }}">{{ state.label }}</span>
     {% if state.matched_title %}
@@ -129,22 +129,21 @@
 </p>
 {% else %}
 
-{% if price_points %}
-<p class="mb-2 text-xs text-soft">
-  {% if price_points | length == 1 %}
-  {# Ein Punkt ist kein Verlauf. Das zu sagen ist ehrlicher, als eine Linie zu
-     zeichnen, die nichts zeigt. #}
+{# Ein Punkt ist kein Verlauf: bei einer einzigen Preisangabe stuende die
+   Zahl dreimal auf der Seite, ohne dass die Liste etwas beitraegt. Dann sagt
+   ein Satz mehr. #}
+{% if price_points | length == 1 %}
+<p class="mb-4 text-xs text-soft">
   Bisher nur ein Preis bekannt — ein Verlauf entsteht erst mit weiteren Läufen.
-  {% else %}
-  Preisänderungen; unveränderte Läufe stehen nicht dabei.
-  {% endif %}
 </p>
+{% elif price_points %}
+<p class="mb-2 text-xs text-soft">Preisänderungen; unveränderte Läufe stehen nicht dabei.</p>
 <ul class="mb-6 space-y-1">
   {% for point in price_points %}
   <li class="flex items-baseline gap-3 text-sm">
-    <span class="w-28 shrink-0 tabular-nums text-soft">
-      {{ point.when.strftime("%d.%m.%Y %H:%M") if point.when else "" }}</span>
-    <span class="w-20 shrink-0 text-soft">{{ point.source }}</span>
+    <span class="w-24 shrink-0 tabular-nums text-soft">
+      {{ point.when.strftime("%d.%m. %H:%M") if point.when else "" }}</span>
+    <span class="w-24 shrink-0 text-soft">{{ point.source }}</span>
     <span class="font-semibold tabular-nums {{ 'text-amber' if point.deal }}">{{ point.price }}</span>
   </li>
   {% endfor %}
@@ -159,7 +158,7 @@
       <th class="py-1.5 pr-3 font-semibold">Quelle</th>
       <th class="py-1.5 pr-3 font-semibold">Preis</th>
       <th class="py-1.5 pr-3 font-semibold">Bibliothek</th>
-      <th class="py-1.5 font-semibold">So genannt</th>
+      <th class="py-1.5 font-semibold">Dort anders genannt</th>
     </tr>
   </thead>
   <tbody class="divide-y divide-hair">
@@ -172,7 +171,11 @@
         {{ sighting.price or "—" }}</td>
       <td class="py-2 pr-3 {{ 'text-accent' if sighting.availability == 'ausleihbar' }}">
         {{ sighting.availability or "—" }}</td>
-      <td class="py-2 text-soft">{{ sighting.title }}</td>
+      {# Nur, wenn die Quelle anders benennt — sonst wiederholte die Spalte
+         in jeder Zeile denselben Titel, und der eine Fall, auf den es
+         ankommt, ginge darin unter (ADR 9). #}
+      <td class="py-2 {{ 'text-danger' if sighting.other_title else 'text-soft' }}">
+        {{ sighting.other_title or "—" }}</td>
     </tr>
     {% endfor %}
   </tbody>

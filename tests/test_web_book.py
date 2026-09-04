@@ -216,3 +216,56 @@ def test_a_bargain_is_marked_in_the_history(db: Store) -> None:
 
     page = view.build(db, load_profile(), book.id)
     assert page.history[0].deal is True
+
+
+# --- was der Review gefunden hat -------------------------------------------
+
+
+def test_the_reader_never_sees_an_internal_source_name(client: TestClient, db: Store) -> None:
+    """"voebb" war nie ein Wort für die Leserin — und welche Quelle eine
+    Bibliothek ist, sagt die Registry, nicht eine Liste in der Vorlage."""
+    book = db.books()[0]
+    db.put_book_source(book.id, "voebb", outcome=str(LinkOutcome.LINKED), resolved_at=NOW)
+    sighting(db, book.id, when=NOW, source="voebb", availability=Availability.AVAILABLE)
+
+    body = client.get(f"/book/{book.id}").text
+
+    assert "voebb" not in body
+    assert "beam" not in body
+    assert "Bibliothek" in body
+
+
+def test_a_source_that_agrees_on_the_title_says_nothing(db: Store) -> None:
+    """Sonst wiederholte die Spalte in jeder Zeile denselben Titel."""
+    book = db.books()[0]
+    sighting(db, book.id, when=NOW, title=book.title)
+
+    page = view.build(db, load_profile(), book.id)
+    assert page.history[0].other_title is None
+
+
+def test_a_source_that_disagrees_is_recorded(db: Store) -> None:
+    book = db.books()[0]
+    sighting(db, book.id, when=NOW, title="Ganz anderer Titel")
+
+    page = view.build(db, load_profile(), book.id)
+    assert page.history[0].other_title == "Ganz anderer Titel"
+
+
+def test_a_single_price_gets_a_sentence_not_a_list(client: TestClient, db: Store) -> None:
+    """Bei einem Punkt stünde die Zahl sonst dreimal auf der Seite."""
+    book = db.books()[0]
+    sighting(db, book.id, when=NOW, price=999)
+
+    body = client.get(f"/book/{book.id}").text
+    assert "nur ein Preis bekannt" in body
+    assert "Preisänderungen" not in body
+
+
+def test_two_prices_get_the_list(client: TestClient, db: Store) -> None:
+    book = db.books()[0]
+    sighting(db, book.id, when=NOW, price=999)
+    sighting(db, book.id, when=NOW + timedelta(days=1), price=499)
+
+    body = client.get(f"/book/{book.id}").text
+    assert "Preisänderungen" in body
