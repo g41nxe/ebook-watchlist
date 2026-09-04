@@ -104,18 +104,3 @@ def preferred_spelling(names: Iterable[str]) -> str | None:
         candidates,
         key=lambda name: ("," in name, -_diacritics(name), -len(name), name),
     )
-
-
-def group_spellings(names: Iterable[str]) -> dict[str, str]:
-    """Jede beobachtete Schreibweise auf die bevorzugte abbilden."""
-    buckets: dict[str, list[str]] = {}
-    for name in names:
-        if not name or not name.strip():
-            continue
-        buckets.setdefault(author_key(name), []).append(name.strip())
-    resolved = {}
-    for spellings in buckets.values():
-        best = preferred_spelling(spellings)
-        for spelling in spellings:
-            resolved[spelling] = best or spelling
-    return resolved

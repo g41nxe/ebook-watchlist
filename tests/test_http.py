@@ -96,11 +96,29 @@ def test_a_404_is_reported_as_gone_not_as_a_malfunction(instant: None) -> None:
     assert len(session.calls) == 1
 
 
-def test_other_client_errors_still_surface(instant: None) -> None:
-    session = FakeSession(FakeResponse(403))
-    with pytest.raises(requests.HTTPError):
+@pytest.mark.parametrize("status", [400, 401, 403, 451])
+def test_a_refusal_is_a_fetch_error_not_a_requests_exception(
+    instant: None, status: int
+) -> None:
+    """403 ist die Antwort, mit der ein Shop uns aussperrt — und sie entkam
+    dieser Schicht als ``requests.HTTPError``, den kein einziger Aufrufer
+    fängt. Ein 403 auf ein Titelbild riss damit einen ganzen Lauf ab, bevor
+    eine Beobachtung geschrieben war."""
+    session = FakeSession(FakeResponse(status))
+
+    with pytest.raises(FetchError):
         client_for(session).get("https://example.invalid/")
+
+    # Kein zweiter Versuch: der Server hat verstanden und abgelehnt.
     assert len(session.calls) == 1
+
+
+def test_a_refusal_on_a_file_is_a_fetch_error_too(instant: None) -> None:
+    """``get_bytes`` nimmt denselben Weg — die Titelbilder gingen hier durch."""
+    session = FakeSession(FakeResponse(403))
+
+    with pytest.raises(FetchError):
+        client_for(session).get_bytes("https://example.invalid/bild.jpg")
 
 
 def test_requests_are_spaced_out(monkeypatch: pytest.MonkeyPatch) -> None:

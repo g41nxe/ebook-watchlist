@@ -10,7 +10,6 @@ import pytest
 from ebook_watchlist.cleaning import (
     author_key,
     clean_blurb,
-    group_spellings,
     is_truncated,
     preferred_spelling,
 )
@@ -81,18 +80,11 @@ def test_the_choice_is_stable() -> None:
     assert preferred_spelling(names) == preferred_spelling(list(reversed(names)))
 
 
-def test_grouping_maps_every_spelling_to_the_best_one() -> None:
-    resolved = group_spellings(["Jo Nesbo", "Nesbø, Jo", "Jo Nesbø", "Simon Beckett"])
-    assert resolved["Jo Nesbo"] == "Jo Nesbø"
-    assert resolved["Nesbø, Jo"] == "Jo Nesbø"
-    assert resolved["Simon Beckett"] == "Simon Beckett"
-
-
 def test_two_different_people_stay_apart() -> None:
-    resolved = group_spellings(["Chris Carter", "Karsten Dusse"])
-    assert set(resolved.values()) == {"Chris Carter", "Karsten Dusse"}
+    """Was ``author_key`` trennt, führt keine Schreibweisenregel zusammen — die
+    Stelle, an der das zählt, ist ``find_or_create_book`` (siehe test_store)."""
+    assert author_key("Chris Carter") != author_key("Karsten Dusse")
 
 
-def test_nothing_to_group() -> None:
-    assert group_spellings([]) == {}
+def test_nothing_to_choose_from() -> None:
     assert preferred_spelling([]) is None

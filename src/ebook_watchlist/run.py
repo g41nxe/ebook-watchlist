@@ -177,6 +177,10 @@ def _fetch_covers(store: Store, client: HttpClient, observations: Sequence[Obser
 
     Ein Bild ist Beiwerk. Schlägt es fehl, läuft der Rest weiter — nur eine
     Drosselung bricht ab, denn dann hat der Shop Halt gesagt.
+
+    Läuft **hinter** dem Snapshot: vorher stand dieser Schritt davor, und ein
+    403 auf ein Bild riss den ganzen Lauf ab, bevor eine einzige Beobachtung
+    geschrieben war.
     """
     covers = CoverStore(paths.covers_dir())
     done: set[int] = set()
@@ -193,6 +197,13 @@ def _fetch_covers(store: Store, client: HttpClient, observations: Sequence[Obser
         except RateLimited:
             print("Titelbilder: der Shop drosselt — Rest übersprungen", file=sys.stderr)
             return
+        except Exception as exc:  # noqa: BLE001 - bewusst: ein Bild ist Beiwerk
+            # Dieselbe Ueberlegung wie bei einer einzelnen Quelle in _collect:
+            # was hier schiefgeht, darf hoechstens dieses eine Bild kosten. Ein
+            # Lauf, der an einem Titelbild stirbt, waere die teuerste denkbare
+            # Art, ein Platzhalterbild zu vermeiden.
+            print(f"Titelbild {book_id}: {type(exc).__name__}: {exc}", file=sys.stderr)
+            continue
         if name:
             store.set_cover(book_id, name)
 
@@ -510,8 +521,6 @@ def _run(
     for observation in observations:
         if observation.book_id and observation.isbn:
             store.learn_isbn(observation.book_id, observation.isbn)
-    _fetch_covers(store, client, observations)
-
     previous = store.latest_observations(profile.slug, keys_of(observations))
     # Angesaet ist je *Quelle*: ein Interesse, das beam kennt, ist der Onleihe
     # deswegen nicht vertraut. Vorher genuegte "irgendeine Quelle", und die
@@ -526,6 +535,12 @@ def _run(
     )
 
     store.append(run_id, profile.slug, observations, started_at)
+
+    # Erst die Geschichte, dann das Beiwerk. Vorher standen die Titelbilder
+    # davor, und ein 403 auf ein Bild riss den Lauf ab, bevor eine einzige
+    # Beobachtung geschrieben war — dieselbe Regel wie beim Tor eine Zeile
+    # weiter unten: ein Ausfall kostet nie Geschichte.
+    _fetch_covers(store, client, observations)
 
     # Das Tor sitzt hinter dem Snapshot: ein Ausfall kostet ein Urteil, nie
     # Geschichte. Und hinter der Preisregel: ein Buch zu bewerten, das ohnehin

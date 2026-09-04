@@ -30,15 +30,19 @@ def test_a_shelf_find_at_full_price_stays_quiet() -> None:
     assert compare(shelf, None, PROFILE) == []
 
 
-def test_a_reference_author_is_trusted_until_the_gate_exists() -> None:
-    """The price is the only sieve there is today, and it sieves for the wrong
-    thing: it silenced a new Jo Nesbø at 11,99 € while letting nine titles from
-    one self-publisher through at 1,99 €. A Reference Author is someone the
-    reader already chose, so that channel is trusted meanwhile (ADR 19)."""
+def test_a_reference_author_at_full_price_waits_for_a_deal_too() -> None:
+    """Die Ausnahme für Referenzautor:innen war ausdrücklich vorläufig — bis es
+    ein Tor gibt, das nach Relevanz fragt. Das Tor kam mit Ticket 12, die
+    Ausnahme blieb, und sie widersprach ADR 19 wörtlich: eine Entdeckung wird
+    gemeldet, wenn sie ein Schnäppchen ist, von einer Referenzautorin wie aus
+    einem Thema.
+
+    Verloren ist nichts: die Beobachtung wird gespeichert, und der neue Nesbø
+    meldet sich an dem Tag, an dem sein Preis fällt."""
     nesbo = observation(
         title="Blutmond", price_cents=1199, match_reason=MatchReason.PROFILE_AUTHOR
     )
-    assert [d.kind for d in compare(nesbo, None, PROFILE)] == [DeltaKind.FIRST_SEEN]
+    assert compare(nesbo, None, PROFILE) == []
 
 
 @pytest.mark.parametrize(

@@ -79,6 +79,30 @@ reader reads. They are not lost — they are waiting for a price.
 The gate below therefore runs *after* this rule, not before it: rating a book
 nobody will be shown is waste.
 
+> **Nachtrag aus dem Review (nach Ticket 23): die Ausnahme ist beendet.** Der
+> Absatz oben stand von Anfang an so da — und der Code tat es nicht. Für
+> Referenzautor:innen galt eine ausdrücklich als *vorläufig* bezeichnete
+> Ausnahme: gemeldet zu jedem Preis, bis es ein Tor gibt, das nach Relevanz
+> fragt statt nach dem Preis. Das Tor kam mit Ticket 12. Die Ausnahme blieb —
+> im Code, im Docstring und im Namen ihres eigenen Tests
+> (`..._until_the_gate_exists`).
+>
+> Sie ist jetzt entfernt: eine Entdeckung wird gemeldet, wenn sie ein
+> Schnäppchen ist, von einer Referenzautorin wie aus einem Thema.
+>
+> Der Preis davon steht schon zwei Absätze weiter oben und gilt unverändert:
+> ein neuer Roman einer Autorin, die die Leserin eng verfolgt, bleibt zum
+> vollen Preis still. Solange kein Schlüssel gesetzt ist, urteilt auch niemand
+> über ihn — dann ist der Preis wieder die einzige Regel, diesmal aber für alle
+> drei Kanäle dieselbe. Verloren ist nichts: die Beobachtung steht im Snapshot
+> und meldet sich an dem Tag, an dem der Preis fällt.
+>
+> **Und dieselbe Strenge gilt jetzt an der Hintertür.** Ein Preissturz einer
+> Entdeckung lief am Tor vorbei — ein Buch, das mit einem Stern zurückgehalten
+> worden war, meldete sich beim nächsten Nachlass doch. Das Tor misst einen
+> Sturz nun am vorhandenen Urteil; ein *neues* holt es dafür nie ein, denn das
+> Buch ist bereits beurteilt.
+
 ### Every discovery is rated once, and the rating is stored
 
 A discovered book is scored against `docs/leseprofil.md` on the 0-5 star scale

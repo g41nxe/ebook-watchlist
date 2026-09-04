@@ -431,3 +431,74 @@ def test_taking_her_stars_back_leaves_nothing_rather_than_a_zero(store: Store) -
     assert store.drop_rating("book:1", BY_READER) is True
     assert store.rating("book:1", 1, origin=BY_READER) is None
     assert store.drop_rating("book:1", BY_READER) is False
+
+
+def test_a_rejected_book_does_not_come_back_through_a_price_drop(store: Store) -> None:
+    """Streng an der Vordertür, offen an der Hintertür: ein Buch, das mit einem
+    Stern zurückgehalten wurde, meldete sich beim nächsten Nachlass doch."""
+    rater = StubRater(rating(1))
+    found = discovery(isbn="9783104911854", price_cents=399)
+    kept, _ = gate.apply(
+        [first_seen(found)], store=store, rater=rater, rubric_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+    assert kept == []
+
+    cheaper = discovery(isbn="9783104911854", price_cents=299)
+    kept, report = gate.apply(
+        [Delta(DeltaKind.PRICE_DROP, cheaper, found)],
+        store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW,
+    )
+
+    assert kept == []
+    assert report.held_back == 1
+    assert len(rater.calls) == 1  # der Sturz hat kein zweites Urteil gekostet
+
+
+def test_a_price_drop_of_a_passing_book_still_carries_its_reason(store: Store) -> None:
+    rater = StubRater(rating(4))
+    found = discovery(isbn="9783104911854", price_cents=399)
+    gate.apply(
+        [first_seen(found)], store=store, rater=rater, rubric_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+
+    cheaper = discovery(isbn="9783104911854", price_cents=299)
+    kept, report = gate.apply(
+        [Delta(DeltaKind.PRICE_DROP, cheaper, found)],
+        store=store, rater=rater, rubric_version=1, threshold=3, budget=10, now=NOW,
+    )
+
+    assert len(kept) == 1
+    assert report.judgements[cheaper.key].stars == 4
+    assert len(rater.calls) == 1
+
+
+def test_a_price_drop_without_a_judgement_is_shown(store: Store) -> None:
+    """Ein Fund von vor dem Tor hat keins. Ihn dafür zu verschlucken hieße,
+    das Schweigen zur Voreinstellung zu machen."""
+    found = discovery(isbn="9783104911854", price_cents=999)
+    kept, report = gate.apply(
+        [Delta(DeltaKind.PRICE_DROP, discovery(isbn="9783104911854", price_cents=899), found)],
+        store=store, rater=StubRater(rating(1)), rubric_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+
+    assert len(kept) == 1
+    assert report.held_back == 0
+
+
+def test_a_watchlist_price_drop_is_never_measured_against_a_judgement(store: Store) -> None:
+    store.put_rating("isbn:9783104911854", stars=1, confidence="teils", reason="",
+                     rubric_version=1, now=NOW, origin=BY_MODEL)
+    watched = discovery(isbn="9783104911854", price_cents=999,
+                        match_reason=MatchReason.WATCHLIST)
+
+    kept, report = gate.apply(
+        [Delta(DeltaKind.PRICE_DROP, watched, watched)],
+        store=store, rater=StubRater(rating(1)), rubric_version=1,
+        threshold=3, budget=10, now=NOW,
+    )
+
+    assert len(kept) == 1
+    assert report.held_back == 0

@@ -114,8 +114,21 @@ class HttpClient:
                     raise NotFound(f"{url} answered {response.status_code}")
                 if response.status_code >= 500:
                     last_error = FetchError(f"{url} answered {response.status_code}")
+                elif response.status_code >= 400:
+                    # Der Server hat verstanden und abgelehnt: 403, wenn ein
+                    # Shop uns aussperrt, 401 hinter einer Anmeldung, 451 aus
+                    # rechtlichen Gruenden. Kein zweiter Versuch — die Antwort
+                    # wird beim Wiederholen dieselbe sein, und noch einmal zu
+                    # klopfen waere genau die Unhoeflichkeit, gegen die diese
+                    # Klasse gebaut ist.
+                    #
+                    # Und ausdruecklich als FetchError, nicht als
+                    # requests.HTTPError: bis hierher entkam die einzige
+                    # Ausnahme, die keiner der Aufrufer faengt. Ein 403 auf ein
+                    # Titelbild riss damit einen ganzen Lauf ab, bevor eine
+                    # einzige Beobachtung geschrieben war.
+                    raise FetchError(f"{url} answered {response.status_code}")
                 else:
-                    response.raise_for_status()
                     return response
 
             if attempt == 0:

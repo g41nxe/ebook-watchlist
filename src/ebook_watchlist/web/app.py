@@ -185,6 +185,21 @@ def create_app() -> FastAPI:
     # (Ticket 10).
     launcher = RunLauncher()
 
+    @app.exception_handler(ConfigError)
+    def broken_configuration(request: Request, exc: ConfigError) -> HTMLResponse:
+        """Eine unlesbare ``profile.yaml`` ist eine Auskunft, kein Absturz.
+
+        Die Ansichtsseiten fingen das je einzeln ab, die Formulare gar nicht —
+        dort gab es einen Traceback statt der Seite, die den Grund nennt. Hier
+        gilt es für jede Route, auch für die, die es noch nicht gibt.
+        """
+        return TEMPLATES.TemplateResponse(
+            request,
+            "error.html",
+            {"message": str(exc), "asset_version": asset_version()},
+            status_code=500,
+        )
+
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request) -> HTMLResponse:
         try:

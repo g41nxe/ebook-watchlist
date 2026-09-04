@@ -33,23 +33,25 @@ def worth_announcing(observation: Observation, profile: Profile | None) -> bool:
     """Whether this item may reach the reader at all (ADR 19).
 
     A Watchlist Entry always may: the reader named this book, and the price is
-    not what makes it interesting. A discovery has to be a deal.
+    not what makes it interesting. **A discovery has to be a deal** — a new
+    title from a Reference Author on the same terms as one from a Thema.
 
-    The exception is deliberately temporary. Until the rating gate exists, the
-    price is the *only* sieve there is, and it sieves for the wrong thing:
-    applied to the shelves it left 106 titles of which nine were by one
-    English-language self-publisher and three were "Ich bin Heinz, der Metzger",
-    while a new Jo Nesbø at 11,99 € went silent. A Reference Author is someone
-    the reader already chose, so that channel is trusted until something better
-    can judge it. Once the gate is in, the threshold applies to both alike —
-    relevance is the gate's question, urgency is the price's.
+    Reference Authors carried an exception for a while, and it was written down
+    as temporary: until the rating gate existed, the price was the only sieve
+    there was, and it sieves for the wrong thing — applied to the shelves it
+    left 106 titles of which nine were by one English-language self-publisher,
+    while a new Jo Nesbø at 11,99 € went silent. The gate arrived with ticket 12
+    and the exception stayed, in the code, in its own test's name and against
+    what ADR 19 says in as many words. It ends here: relevance is the gate's
+    question, urgency is the price's, and this function only asks the second.
+
+    Nothing is thrown away. The Observation is stored either way, so a book
+    found at 14,99 € waits quietly and speaks up the day it drops.
     """
     if observation.match_reason is MatchReason.WATCHLIST:
         return True
     if is_junk(observation):
         return False
-    if observation.match_reason is MatchReason.PROFILE_AUTHOR:
-        return True
     return profile is not None and is_strong_deal(observation.price_cents, profile)
 
 

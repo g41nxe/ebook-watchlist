@@ -98,11 +98,35 @@ def apply(
 
     kept: list[Delta] = []
     for delta in deltas:
-        if not _is_discovery(delta):
+        if delta.current.match_reason is MatchReason.WATCHLIST:
+            # Von der Leserin selbst gewaehlt; sie gegen ihr eigenes Profil
+            # abzulehnen waere anmassend.
             kept.append(delta)
             continue
 
         subject = subject_of(delta.current)
+
+        if delta.kind is not DeltaKind.FIRST_SEEN:
+            # Ein Preissturz kostet nie ein neues Urteil — aber das vorhandene
+            # gilt weiter. Vorher lief er am Tor vorbei, und ein Buch, das mit
+            # einem Stern zurueckgehalten worden war, meldete sich beim
+            # naechsten Nachlass doch: streng an der Vordertuer, offen an der
+            # Hintertuer.
+            stored = _judgement(store, delta.current, subject, rubric_version)
+            if stored is None:
+                kept.append(delta)
+            elif stored.stars < threshold:
+                report.held_back += 1
+            else:
+                report.reused += 1
+                report.judgements[delta.current.key] = Rating(
+                    stars=stored.stars,
+                    reason=stored.reason,
+                    confidence=stored.confidence,
+                    rubric_version=stored.rubric_version,
+                )
+                kept.append(delta)
+            continue
 
         # Ein vorhandenes Urteil - auch das der Leserin - erspart den Aufruf.
         stored = _judgement(store, delta.current, subject, rubric_version)
@@ -156,11 +180,12 @@ def apply(
 
 
 def _is_discovery(delta: Delta) -> bool:
-    """Nur Erstsichtungen von Entdeckungen werden beurteilt.
+    """Die Erstsichtung einer Entdeckung — das, wofür ein Modell gefragt wird.
 
-    Ein Watchlist-Titel wurde von der Leserin selbst gewählt — ihn gegen ihr
-    eigenes Profil abzulehnen wäre anmassend. Und ein Preissturz betrifft ein
-    Buch, das schon einmal durchgelassen wurde.
+    Ein Watchlist-Titel wurde von der Leserin selbst gewählt; ihn gegen ihr
+    eigenes Profil abzulehnen wäre anmassend. Ein Preissturz wird ebenfalls
+    nicht *bewertet* — aber er wird sehr wohl am vorhandenen Urteil gemessen,
+    und das tut :func:`apply` an seiner eigenen Stelle.
     """
     return (
         delta.kind is DeltaKind.FIRST_SEEN

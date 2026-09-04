@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -158,3 +159,72 @@ def test_the_observations_survive_the_upgrade(tmp_path: Path) -> None:
     Store(path)
     with sqlite3.connect(path) as connection:
         assert connection.execute("SELECT count(*) FROM observation").fetchone()[0] == 1
+
+
+def test_the_rating_table_is_rebuilt_and_keeps_its_rows(tmp_path: Path) -> None:
+    """Die einzige Migration, die Daten umkopiert — und die einzige, die kein
+    Test berührte: die Aufwärtstests starten von einer Datenbank *heutiger*
+    Form, in der ``origin`` schon steht, und lösen damit nur den Frühausstieg
+    aus."""
+    path = tmp_path / "s.db"
+    with sqlite3.connect(path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE rating (
+                id INTEGER NOT NULL PRIMARY KEY,
+                subject VARCHAR NOT NULL UNIQUE,
+                stars INTEGER NOT NULL,
+                confidence VARCHAR NOT NULL,
+                reason VARCHAR NOT NULL,
+                rubric_version INTEGER NOT NULL,
+                rated_at DATETIME NOT NULL
+            );
+            INSERT INTO rating
+            VALUES (7, 'isbn:9783104911854', 4, 'teils', 'Achse D', 1, '2026-09-01');
+            PRAGMA user_version = 0;
+            """
+        )
+
+    Store(path)
+
+    with sqlite3.connect(path) as connection:
+        rows = connection.execute(
+            "SELECT id, subject, origin, stars, reason FROM rating"
+        ).fetchall()
+        # Die Zeile wandert mit, behält ihre id und gilt als Modellurteil —
+        # die einzige Herkunft, die es bis dahin gab.
+        assert rows == [(7, "isbn:9783104911854", "model", 4, "Achse D")]
+        assert "rating_old" not in {
+            name for (name,) in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+
+
+def test_after_the_rebuild_two_origins_stand_side_by_side(tmp_path: Path) -> None:
+    """Der Grund für den Neubau: der alte eindeutige Schlüssel lag auf
+    ``subject`` allein, und genau der musste fallen (ADR 17)."""
+    path = tmp_path / "s.db"
+    with sqlite3.connect(path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE rating (
+                id INTEGER NOT NULL PRIMARY KEY,
+                subject VARCHAR NOT NULL UNIQUE,
+                stars INTEGER NOT NULL,
+                confidence VARCHAR NOT NULL,
+                reason VARCHAR NOT NULL,
+                rubric_version INTEGER NOT NULL,
+                rated_at DATETIME NOT NULL
+            );
+            INSERT INTO rating VALUES (1, 'book:5', 2, 'teils', 'Modell', 1, '2026-09-01');
+            PRAGMA user_version = 0;
+            """
+        )
+
+    store = Store(path)
+    store.put_rating("book:5", stars=5, confidence="belegt", reason="", rubric_version=1,
+                     now=datetime(2026, 9, 4, 20, 0), origin="reader")
+
+    assert store.rating("book:5", 1, origin="model").stars == 2
+    assert store.rating("book:5", 1, origin="reader").stars == 5

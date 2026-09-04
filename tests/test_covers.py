@@ -5,6 +5,7 @@ Kein Test hier geht ins Netz.
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from ebook_watchlist.http import FetchError, NotFound, RateLimited
 from ebook_watchlist.sources.beam import parse as beam_parse
 
 BEAM = Path(__file__).parent / "fixtures" / "beam"
+NOW = datetime(2026, 9, 4, 20, 0)
 
 IMAGE = b"\xff\xd8\xff" + b"x" * MIN_BYTES  # gross genug, um kein Platzhalter zu sein
 
@@ -119,3 +121,57 @@ def test_throttling_is_passed_through(tmp_path: Path) -> None:
     store = CoverStore(tmp_path / "covers")
     with pytest.raises(RateLimited):
         store.fetch(StubClient(RateLimited("429")), 1, "https://example.invalid/a.jpg")
+
+
+# --- ein Bild darf keinen Lauf kosten (Review-Befund 3) ---------------------
+
+
+def test_a_refusal_by_the_shop_is_a_fetch_error(tmp_path: Path) -> None:
+    """403 ist die Antwort, mit der ein Shop aussperrt. Sie kam bis hierher als
+    ``requests.HTTPError`` an — den fängt dieser Weg nicht, und der Lauf starb
+    daran."""
+    store = CoverStore(tmp_path / "covers")
+    assert store.fetch(StubClient(FetchError("403")), 1, "https://example.invalid/a.jpg") is None
+
+
+def test_one_broken_image_does_not_stop_the_others(tmp_path: Path, monkeypatch) -> None:
+    """Dieselbe Überlegung wie bei einer einzelnen Quelle: was hier schiefgeht,
+    darf höchstens dieses eine Bild kosten."""
+    import requests
+
+    from ebook_watchlist import paths
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.run import _fetch_covers
+    from ebook_watchlist.store import Store
+
+    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+    store = Store(paths.db_path())
+    first = store.find_or_create_book(isbn=None, title="Eins", now=NOW)
+    second = store.find_or_create_book(isbn=None, title="Zwei", now=NOW)
+
+    class Blocking:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_bytes(self, url: str) -> bytes:
+            self.calls += 1
+            if self.calls == 1:
+                raise requests.HTTPError("403 Client Error")
+            return IMAGE
+
+    def seen(book_id: int) -> Observation:
+        return Observation(
+            source="beam",
+            source_item_id=str(book_id),
+            title="Egal",
+            match_reason=MatchReason.WATCHLIST,
+            book_id=book_id,
+            cover_url=f"https://example.invalid/{book_id}.jpg",
+        )
+
+    client = Blocking()
+    _fetch_covers(store, client, [seen(first.id), seen(second.id)])
+
+    assert client.calls == 2
+    assert store.book(first.id).cover_file is None
+    assert store.book(second.id).cover_file is not None

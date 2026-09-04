@@ -166,3 +166,15 @@ def test_a_fresh_checkout_can_build_its_assets(monkeypatch: pytest.MonkeyPatch) 
     module = importlib.import_module("ebook_watchlist.web.build")
 
     assert hasattr(module, "main")
+
+
+def test_a_broken_configuration_is_a_page_not_a_traceback_on_post(
+    client: TestClient, data_dir: Path
+) -> None:
+    """Die Ansichtsseiten fingen das je einzeln ab, die Formulare gar nicht."""
+    (data_dir / "profile.yaml").write_text("nicht: [eine, abbildung\n", encoding="utf-8")
+
+    response = client.post("/watchlist/add", data={"title": "Irgendwas"})
+
+    assert response.status_code == 500
+    assert "profile.yaml" in response.text
