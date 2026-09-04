@@ -58,6 +58,11 @@ Derived, not stored: Deltas (latest vs previous Observation of the same
     A standing 9,99 € does not qualify.
   - Any price decrease is still reported as a Delta regardless of tier. No
     per-entry price override in v1 (dropped for simplicity).
+  - **First sighting** of a Watchlist Entry is normally only the baseline the
+    next Run diffs against, with one exception: a title that is *already* below
+    `strong_deal_max_cents` is reported once, on sight. Waiting for a 3,99 €
+    title to get cheaper still would be a strange way to answer "tell me when it
+    is a bargain".
   - **beam-shop caveat** (research, ADR 11): German fixed-book-price law means
     beam-shop *never* shows a struck original price, so
     `original_price_cents` is always null for `source = beam`. The "deal" tier's
@@ -72,4 +77,6 @@ Derived, not stored: Deltas (latest vs previous Observation of the same
 
 - Price-over-time and "changed since when" are answerable.
 - Adding a Source needs no schema change — only a stable `source_item_id`.
-- Old Observation rows can be pruned later if size ever matters.
+- Old Observation rows can be pruned later if size ever matters; measured at
+  ~25 MB per three years of daily runs, so not soon (ADR 16).
+- Schema changes reach an existing database through migrations (ADR 16).

@@ -83,11 +83,10 @@ mkdir -p data && cp examples/*.yaml data/
 Daneben legt der Run dort `snapshots.db` und `digests/` an. Der Datenpfad lässt
 sich über `EBW_DATA_DIR` umbiegen.
 
-Solange v1 in Entwicklung ist, gibt es **keine Schema-Migrationen**: neue
-Tabellen legt der Run selbst an, neue Spalten in bestehenden Tabellen nicht.
-Wenn ein Update sich über eine fehlende Spalte beschwert, ist `snapshots.db`
-löschen der vorgesehene Weg — es geht dabei nur Historie verloren, keine
-Konfiguration.
+Schema-Änderungen wandern beim nächsten Start automatisch in eine bestehende
+`snapshots.db`; die Historie bleibt erhalten. Den Stand hält SQLites eingebautes
+`PRAGMA user_version`. Eine Datei, die von einer *neueren* Version geschrieben
+wurde, wird nicht geöffnet, sondern gemeldet.
 
 ## Benutzung
 
@@ -198,7 +197,7 @@ doppelt laufen. Beides ist unkritisch.
 ## Dokumentation
 
 - [CONTEXT.md](CONTEXT.md) — Glossar der Domänenbegriffe
-- [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–15)
+- [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–16)
 - [docs/research/](docs/research) — Rechercheergebnisse zu den Schnittstellen von
   VÖBB und beam-shop sowie zu Calibres Metadaten-Matching
 

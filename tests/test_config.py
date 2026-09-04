@@ -69,3 +69,31 @@ def test_shipped_examples_load(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("EBW_DATA_DIR", str(examples))
     assert load_profile().slug == "default"
     assert len(load_watchlist()) == 2
+
+
+def test_a_zero_discount_threshold_is_allowed(data_dir: Path) -> None:
+    """"Any drop inside the band counts" is a real setting, not a mistake."""
+    (data_dir / "profile.yaml").write_text(
+        "slug: t\nname: T\nmin_discount_pct: 0\nsources: {fake: {fixture: f.yaml}}\n",
+        encoding="utf-8",
+    )
+    assert load_profile().min_discount_pct == 0
+
+
+def test_a_discount_threshold_of_a_hundred_percent_is_rejected(data_dir: Path) -> None:
+    """Nothing can ever be 100% below its old price."""
+    (data_dir / "profile.yaml").write_text(
+        "slug: t\nname: T\nmin_discount_pct: 100\nsources: {fake: {fixture: f.yaml}}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="0 to 99"):
+        load_profile()
+
+
+def test_the_price_ceilings_still_have_to_be_positive(data_dir: Path) -> None:
+    (data_dir / "profile.yaml").write_text(
+        "slug: t\nname: T\nstrong_deal_max_cents: 0\nsources: {fake: {fixture: f.yaml}}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="positive integer"):
+        load_profile()

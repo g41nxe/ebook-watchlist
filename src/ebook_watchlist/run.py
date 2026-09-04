@@ -18,7 +18,13 @@ from filelock import FileLock, Timeout
 
 from . import paths
 from .config import ConfigError, load_dismissals, load_profile, load_watchlist
-from .diff import compute_deltas, keys_of, suppress_unseeded
+from .diff import (
+    DISCOVERY_REASONS,
+    compute_deltas,
+    discovery_scope,
+    keys_of,
+    suppress_unseeded,
+)
 from .digest import build_digest
 from .http import HttpClient, build_user_agent
 from .models import Observation, SourceFailure
@@ -126,6 +132,10 @@ def _write_html(digest, generated_at: datetime) -> Path:
     directory = paths.digests_dir()
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / f"digest-{generated_at:%Y-%m-%d}.html"
+    if target.exists():
+        # A second Run on the same day must not silently erase the first one's
+        # digest; the plain daily name stays the one a cron job produces.
+        target = directory / f"digest-{generated_at:%Y-%m-%d-%H%M}.html"
     target.write_text(render_html(digest), encoding="utf-8")
     return target
 
@@ -221,10 +231,18 @@ def _run(
     if sweep_extended and not failures:
         store.set_state(profile.slug, EXTENDED_SWEEP_KEY, started_at)
     previous = store.latest_observations(profile.slug, keys_of(observations))
-    known_scopes = store.known_discovery_scopes(profile.slug)
-    deltas = suppress_unseeded(compute_deltas(observations, previous), known_scopes)
+    seeded = store.seeded_scopes(profile.slug)
+    deltas = suppress_unseeded(compute_deltas(observations, previous, profile), seeded)
 
     store.append(run_id, profile.slug, observations, started_at)
+    store.mark_seeded(
+        profile.slug,
+        {
+            discovery_scope(observation)
+            for observation in observations
+            if observation.match_reason in DISCOVERY_REASONS
+        },
+    )
 
     last_run = store.last_finished_run(profile.slug, run_id)
     digest = build_digest(

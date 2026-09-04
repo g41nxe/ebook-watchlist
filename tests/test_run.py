@@ -9,6 +9,8 @@ import pytest
 from filelock import FileLock
 
 from ebook_watchlist import paths
+from ebook_watchlist.digest import build_digest
+from ebook_watchlist.models import SourceFailure
 from ebook_watchlist.run import EXIT_CONFIG_ERROR, EXIT_OK, EXIT_SOURCE_FAILURE, main
 
 
@@ -149,3 +151,25 @@ def test_run_journal_records_every_run(data_dir: Path) -> None:
         assert [run.status for run in runs] == ["ok", "ok"]
         assert all(run.finished_at is not None for run in runs)
         assert all(run.trigger == "cli" for run in runs)
+
+
+def test_a_second_digest_on_the_same_day_does_not_erase_the_first(data_dir: Path) -> None:
+    """A manual re-run must not silently overwrite what the cron job produced."""
+    from ebook_watchlist.run import _write_html
+
+    digests = data_dir / "digests"
+    digest = build_digest(
+        profile_name="T",
+        generated_at=datetime(2026, 9, 4, 6, 0),
+        since=None,
+        deltas=[],
+        failures=[SourceFailure(source="x", message="kaputt")],
+    )
+
+    first = _write_html(digest, datetime(2026, 9, 4, 6, 0))
+    second = _write_html(digest, datetime(2026, 9, 4, 18, 30))
+
+    assert first.name == "digest-2026-09-04.html"
+    assert second.name == "digest-2026-09-04-1830.html"
+    assert first.exists() and second.exists()
+    assert {p.name for p in digests.iterdir()} == {first.name, second.name}

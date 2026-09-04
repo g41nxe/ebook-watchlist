@@ -22,6 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
+from .migrations import migrate
 from .models import Availability, MatchReason, Observation
 
 
@@ -96,6 +97,24 @@ class ResolutionRow(Base):
     )
 
 
+class SeededScopeRow(Base):
+    """A discovery scope we have already looked at once.
+
+    Derived from the Observations in principle, but deriving it meant a DISTINCT
+    over the whole history on every Run — 1.3 seconds after three years, and
+    growing. There is only ever a handful of scopes, so they are recorded as
+    they are seen instead: constant cost, no scan.
+    """
+
+    __tablename__ = "seeded_scope"
+
+    profile_slug: Mapped[str] = mapped_column(String, primary_key=True)
+    source: Mapped[str] = mapped_column(String, primary_key=True)
+    match_reason: Mapped[str] = mapped_column(String, primary_key=True)
+    #: Empty string rather than NULL — it is part of the primary key.
+    category: Mapped[str] = mapped_column(String, primary_key=True, default="")
+
+
 class StateRow(Base):
     """Small bits of bookkeeping that belong to no other table."""
 
@@ -132,7 +151,7 @@ class Store:
         self.path = path
         path.parent.mkdir(parents=True, exist_ok=True)
         self._engine = create_engine(f"sqlite:///{path}")
-        Base.metadata.create_all(self._engine)
+        migrate(self._engine, Base.metadata)
 
     def session(self) -> Session:
         return Session(self._engine)
@@ -282,26 +301,46 @@ class Store:
             row.value = value
             session.commit()
 
-    def known_discovery_scopes(self, profile_slug: str) -> set[tuple[str, str, str]]:
+    def seeded_scopes(self, profile_slug: str) -> set[tuple[str, str, str]]:
         """Which ``(source, match_reason, category)`` scopes we have already seen.
 
         Asked *before* this Run's Observations are appended, so a shelf being
         followed for the first time is recognisable as such.
         """
         with self.session() as session:
-            stmt = (
-                select(
-                    ObservationRow.source,
-                    ObservationRow.match_reason,
-                    ObservationRow.category,
+            stmt = select(
+                SeededScopeRow.source,
+                SeededScopeRow.match_reason,
+                SeededScopeRow.category,
+            ).where(SeededScopeRow.profile_slug == profile_slug)
+            return {tuple(row) for row in session.execute(stmt)}  # type: ignore[misc]
+
+    def mark_seeded(self, profile_slug: str, scopes: Iterable[tuple[str, str, str]]) -> None:
+        with self.session() as session:
+            known = {
+                tuple(row)
+                for row in session.execute(
+                    select(
+                        SeededScopeRow.source,
+                        SeededScopeRow.match_reason,
+                        SeededScopeRow.category,
+                    ).where(SeededScopeRow.profile_slug == profile_slug)
                 )
-                .where(ObservationRow.profile_slug == profile_slug)
-                .distinct()
-            )
-            return {
-                (source, reason, category or "")
-                for source, reason, category in session.execute(stmt)
             }
+            for scope in scopes:
+                if scope in known:
+                    continue
+                source, reason, category = scope
+                session.add(
+                    SeededScopeRow(
+                        profile_slug=profile_slug,
+                        source=source,
+                        match_reason=reason,
+                        category=category,
+                    )
+                )
+                known.add(scope)
+            session.commit()
 
     def append(
         self,

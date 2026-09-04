@@ -18,6 +18,9 @@ Dashboard should not re-implement it.
 - Two renderers over that model:
   - **text** -> stdout / cron logs;
   - **HTML** -> `data/digests/digest-<date>.html`, and HTML email later.
+    A second Digest on the same day is written as `digest-<date>-<HHMM>.html`
+    rather than overwriting the first: the plain daily name stays the one a
+    cron job produces, and a manual re-run erases nothing.
 - Markdown is not produced.
 - Phase 2's Dashboard renders the same model with shared HTML partials.
 - An error-only Digest still renders; fully silent only when no Deltas and no

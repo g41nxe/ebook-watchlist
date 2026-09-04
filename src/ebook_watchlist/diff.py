@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from collections.abc import Container, Iterable, Mapping, Sequence
 
+from .config import Profile
+from .deals import is_strong_deal
 from .models import Availability, Delta, DeltaKind, MatchReason, Observation
 
 #: Kinds worth waking the reader for. Everything else is recorded but silent
@@ -26,10 +28,18 @@ DISCOVERY_REASONS: frozenset[MatchReason] = frozenset(
 )
 
 
-def compare(current: Observation, previous: Observation | None) -> list[Delta]:
+def compare(
+    current: Observation, previous: Observation | None, profile: Profile | None = None
+) -> list[Delta]:
     """Every change between two Observations of the same item, notifiable or not."""
     if previous is None:
         if current.match_reason in DISCOVERY_REASONS:
+            return [Delta(DeltaKind.FIRST_SEEN, current, None)]
+        # A Watchlist Entry's first sighting is normally just the baseline. The
+        # exception is a title that is already cheap: waiting for it to get
+        # cheaper still would be a strange way to answer "tell me when it is a
+        # bargain".
+        if profile is not None and is_strong_deal(current.price_cents, profile):
             return [Delta(DeltaKind.FIRST_SEEN, current, None)]
         return []
 
@@ -54,12 +64,13 @@ def compare(current: Observation, previous: Observation | None) -> list[Delta]:
 def compute_deltas(
     observations: Sequence[Observation],
     previous: Mapping[tuple[str, str], Observation],
+    profile: Profile | None = None,
 ) -> list[Delta]:
     """The notifiable Deltas for one Run's worth of Observations."""
     return [
         delta
         for observation in observations
-        for delta in compare(observation, previous.get(observation.key))
+        for delta in compare(observation, previous.get(observation.key), profile)
         if delta.kind in NOTIFIABLE
     ]
 
@@ -86,5 +97,6 @@ def suppress_unseeded(
         delta
         for delta in deltas
         if delta.kind is not DeltaKind.FIRST_SEEN
+        or delta.current.match_reason not in DISCOVERY_REASONS
         or discovery_scope(delta.current) in known_scopes
     ]

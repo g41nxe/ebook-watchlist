@@ -92,6 +92,15 @@ def _positive_int(mapping: dict[str, Any], key: str, default: int, what: str) ->
     return value
 
 
+def _percentage(mapping: dict[str, Any], key: str, default: int, what: str) -> int:
+    """A discount threshold. Zero is a real setting — "any drop in the band
+    counts" — so it is allowed here, unlike for the price ceilings."""
+    value = mapping.get(key, default)
+    if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value < 100:
+        raise ConfigError(f"{what}: {key!r} must be a whole percentage from 0 to 99, got {value!r}")
+    return value
+
+
 def _reference_authors(data: dict[str, Any], what: str) -> tuple[list[str], list[str]]:
     """``reference_authors`` is either a plain list or a core/extended split::
 
@@ -137,7 +146,7 @@ def load_profile(path: Path | None = None) -> Profile:
         name=str(_require(data, "name", what)),
         strong_deal_max_cents=_positive_int(data, "strong_deal_max_cents", 500, what),
         deal_max_cents=_positive_int(data, "deal_max_cents", 1000, what),
-        min_discount_pct=_positive_int(data, "min_discount_pct", 25, what),
+        min_discount_pct=_percentage(data, "min_discount_pct", 25, what),
         reference_authors=core_authors,
         extended_authors=extended_authors,
         extended_sweep_weekday=weekday,

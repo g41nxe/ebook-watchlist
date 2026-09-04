@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from ebook_watchlist.diff import compare, compute_deltas
+from ebook_watchlist.config import Profile
+from ebook_watchlist.diff import compare, compute_deltas, suppress_unseeded
 from ebook_watchlist.models import Availability, DeltaKind, MatchReason, Observation
 
 
@@ -71,3 +72,39 @@ def test_only_notifiable_kinds_reach_the_digest() -> None:
 def test_missing_field_on_one_side_is_not_a_delta() -> None:
     previous = observation(price_cents=None)
     assert compare(observation(price_cents=999), previous) == []
+
+
+# --- a watchlist title that is already cheap ------------------------------
+
+PROFILE = Profile(slug="t", name="T")  # Strong Deal unter 5,00 EUR
+
+
+def test_an_already_cheap_watchlist_title_is_reported_on_sight() -> None:
+    """Waiting for a 3,99 EUR title to get cheaper still would be a strange way
+    to answer 'tell me when it is a bargain'."""
+    deltas = compare(observation(price_cents=399), None, PROFILE)
+    assert [d.kind for d in deltas] == [DeltaKind.FIRST_SEEN]
+
+
+def test_a_normally_priced_watchlist_title_is_still_only_a_baseline() -> None:
+    assert compare(observation(price_cents=1499), None, PROFILE) == []
+
+
+def test_without_a_profile_nothing_changes_about_first_sightings() -> None:
+    assert compare(observation(price_cents=399), None) == []
+
+
+def test_the_cheap_title_is_reported_once_not_every_run() -> None:
+    cheap = observation(price_cents=399)
+    assert compare(cheap, cheap, PROFILE) == []
+
+
+def test_a_title_with_no_price_is_not_a_bargain() -> None:
+    assert compare(observation(price_cents=None), None, PROFILE) == []
+
+
+def test_seeding_never_swallows_a_watchlist_bargain() -> None:
+    """Discovery scopes are seeded quietly; a Watchlist Entry has no scope and
+    must not be silenced by that mechanism."""
+    deltas = compute_deltas([observation(price_cents=399)], {}, PROFILE)
+    assert suppress_unseeded(deltas, known_scopes=set()) == deltas
