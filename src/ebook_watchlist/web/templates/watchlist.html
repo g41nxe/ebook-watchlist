@@ -87,7 +87,9 @@
     {{ cover(entry) }}
 
     <div class="min-w-0 flex-1">
-      <p class="truncate font-serif text-base font-semibold tracking-tight">{{ entry.title }}</p>
+      <p class="truncate font-serif text-base font-semibold tracking-tight">
+        <a href="/book/{{ entry.book_id }}" class="hover:underline underline-offset-2"
+           >{{ entry.title }}</a></p>
       <p class="truncate text-sm text-soft">
         {{ entry.author or "unbekannt" }}{% if not entry.active %} · pausiert{% endif %}
       </p>

@@ -27,7 +27,7 @@ from ..config import ConfigError, load_profile
 from ..models import LinkOutcome
 from ..relations import RelationKind
 from ..store import RunRow, Store
-from . import watchlist
+from . import book, watchlist
 
 STATIC = Path(__file__).parent / "static"
 
@@ -291,6 +291,53 @@ def create_app() -> FastAPI:
             reason="von Hand bestätigt",
         )
         return RedirectResponse("/watchlist", status_code=303)
+
+    # --- Buchseite (Ticket 07) ---------------------------------------------
+
+    @app.get("/book/{book_id}", response_class=HTMLResponse)
+    def book_page(request: Request, book_id: int) -> HTMLResponse:
+        try:
+            profile = load_profile()
+        except ConfigError as exc:
+            return TEMPLATES.TemplateResponse(
+                request,
+                "error.html",
+                {"message": str(exc), "asset_version": asset_version()},
+                status_code=500,
+            )
+        page = book.build(_store_for(paths.db_path()), profile, book_id)
+        if page is None:
+            raise HTTPException(status_code=404, detail="kein solches Buch")
+        return TEMPLATES.TemplateResponse(
+            request,
+            "book.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "page": page,
+                "kinds": book.KINDS,
+                "price_points": book.price_points(page.history),
+            },
+        )
+
+    @app.post("/book/{book_id}/relation")
+    def book_relation(
+        book_id: int, kind: str = Form(...), active: str = Form("")
+    ) -> RedirectResponse:
+        """Eine Beziehung setzen oder stilllegen.
+
+        Stilllegen statt loeschen: dass ein Buch einmal beobachtet wurde, ist
+        selbst eine Auskunft (ADR 18).
+        """
+        book.set_relation(
+            _store_for(paths.db_path()),
+            load_profile(),
+            book_id,
+            kind,
+            active=active == "1",
+            now=datetime.now(),
+        )
+        return RedirectResponse(f"/book/{book_id}", status_code=303)
 
     @app.get("/digest/{name}", response_class=HTMLResponse)
     def digest(name: str) -> HTMLResponse:

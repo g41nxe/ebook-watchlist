@@ -444,6 +444,27 @@ class Store:
                     found[row.book_id] = _to_observation(row)
         return found
 
+    def observations_for_book(
+        self, profile_slug: str, book_id: int, limit: int = 200
+    ) -> list[Observation]:
+        """Die ganze Geschichte eines Buchs, neueste zuerst.
+
+        Der Snapshot ist anhaengend (ADR 5), also *ist* das die Geschichte —
+        sie muss nicht gesondert gefuehrt werden. Die Grenze schuetzt die Seite
+        vor einem Buch, das seit Jahren jeden Tag beobachtet wird.
+        """
+        with self.session() as session:
+            stmt = (
+                select(ObservationRow)
+                .where(
+                    ObservationRow.profile_slug == profile_slug,
+                    ObservationRow.book_id == book_id,
+                )
+                .order_by(ObservationRow.id.desc())
+                .limit(limit)
+            )
+            return [_to_observation(row) for row in session.scalars(stmt)]
+
     def get_state(self, profile_slug: str, key: str) -> datetime | None:
         with self.session() as session:
             row = session.get(StateRow, (profile_slug, key))
