@@ -191,3 +191,25 @@ def test_the_struck_price_is_always_absent_here() -> None:
     observation = beam.check(entry)
     assert observation is not None
     assert observation.original_price_cents is None
+
+
+# --- Klappentext (ADR 17) --------------------------------------------------
+
+
+def test_the_blurb_is_captured_from_the_listing_page() -> None:
+    """Vier von sieben Achsen des Maßstabs hängen daran, und er kostet keinen
+    eigenen Request — er liegt im HTML, das der Run ohnehin holt."""
+    tiles = parse.parse_tiles(fixture("category-new-arrivals.html"))
+
+    assert all(tile.blurb for tile in tiles)
+    starwars = next(tile for tile in tiles if tile.product_id == "1278797")
+    assert "Luke Skywalker" in starwars.blurb
+
+
+def test_a_tile_without_a_teaser_simply_has_none() -> None:
+    html = (
+        '<div class="listing"><div class="product--box" data-ordernumber="X">'
+        '<a class="product--title" href="/a/b/1/x" title="Titel"></a>'
+        '<button data-note-article="1"></button></div></div>'
+    )
+    assert parse.parse_tiles(html)[0].blurb is None

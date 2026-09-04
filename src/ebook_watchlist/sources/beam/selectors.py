@@ -32,6 +32,7 @@ TILE_AUTHOR = "a.product--author"
 TILE_PRICE = ".price--default"
 TILE_NOTE_BUTTON = "[data-note-article]"
 TILE_BADGE = ".product--badge"
+TILE_DESCRIPTION = ".product--description"
 
 ATTR_ORDER_NUMBER = "data-ordernumber"
 ATTR_CATEGORY_ID = "data-category-id"

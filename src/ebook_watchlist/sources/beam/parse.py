@@ -51,6 +51,8 @@ class Tile:
     price_cents: int | None
     url: str
     subtitle: str | None = None
+    #: Teaser von der Trefferseite - kostet keinen eigenen Request (ADR 17).
+    blurb: str | None = None
     category_id: str | None = None
     badges: frozenset[str] = frozenset()
 
@@ -122,6 +124,8 @@ def _parse_tile(tile: Tag, base: str) -> Tile | None:
     price_cents = parse_price(price_node.get_text(" ", strip=True)) if price_node else None
 
     category_id = tile.get(sel.ATTR_CATEGORY_ID)
+    description = tile.select_one(sel.TILE_DESCRIPTION)
+    blurb = description.get_text(" ", strip=True) if description else None
 
     return Tile(
         product_id=product_id,
@@ -131,6 +135,7 @@ def _parse_tile(tile: Tag, base: str) -> Tile | None:
         price_cents=price_cents,
         url=url,
         subtitle=subtitle,
+        blurb=blurb or None,
         category_id=category_id if isinstance(category_id, str) else None,
         # Badges repeat inside a tile once per layout slot.
         badges=frozenset(node.get_text(strip=True) for node in tile.select(sel.TILE_BADGE)),

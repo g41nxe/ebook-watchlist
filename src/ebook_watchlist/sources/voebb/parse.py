@@ -44,6 +44,9 @@ class Detail:
     available_copies: int
     reservations: int
     available_from: str | None
+    #: Die Onleihe benennt die Reihe ausdruecklich - eine der wenigen Quellen,
+    #: die das tut (ADR 17).
+    series: str | None = None
 
     @property
     def availability(self) -> Availability:
@@ -82,6 +85,7 @@ def parse_detail(html: str) -> Detail:
 
     return Detail(
         title=title,
+        series=_labelled_value(page, sel.LABEL_SERIES),
         author=_labelled_value(page, sel.LABEL_AUTHOR),
         copies=copies,
         available_copies=available,
@@ -99,6 +103,7 @@ class Candidate:
     subtitle: str | None
     medium: str | None
     url: str
+    blurb: str | None = None
 
 
 def _card_text(card: Tag, selector: str) -> str | None:
@@ -154,6 +159,7 @@ def parse_search_results(html: str, base: str = sel.BASE) -> list[Candidate] | N
                 title=title,
                 author=_card_text(card, sel.CARD_AUTHOR),
                 subtitle=_card_text(card, sel.CARD_SUBTITLE),
+                blurb=_card_text(card, sel.CARD_ABSTRACT),
                 medium=_medium_of(card),
                 url=urljoin(base, str(href)),
             )

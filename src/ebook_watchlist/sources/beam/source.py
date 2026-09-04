@@ -148,6 +148,8 @@ class BeamSource(ShopSource):
                     match_reason=MatchReason.PROFILE_AUTHOR,
                     price_cents=tile.price_cents,
                     original_price_cents=None,
+                    blurb=tile.blurb,
+                    subtitle=tile.subtitle,
                     url=tile.url,
                 )
             )
@@ -186,6 +188,8 @@ class BeamSource(ShopSource):
                         match_reason=MatchReason.GENRE_CATEGORY,
                         price_cents=tile.price_cents,
                         original_price_cents=None,
+                        blurb=tile.blurb,
+                        subtitle=tile.subtitle,
                         category=category_path,
                         url=tile.url,
                     )

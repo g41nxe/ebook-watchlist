@@ -49,6 +49,7 @@ MEDIUM_ICONS = frozenset(MEDIUM_BY_NAME.values())
 #: cannot tell them apart and every such entry would need a human — so a
 #: watchlist means ebooks unless it says otherwise.
 DEFAULT_MEDIA: tuple[str, ...] = ("ic_ebook",)
+CARD_ABSTRACT = '[test-id="cardAbstract"]'
 CARD_AVAILABILITY = '[test-id="cardAvailability"]'
 CARD_AVAILABILITY_LABEL = '[test-id="cardLabelAvailability"]'
 
@@ -70,6 +71,7 @@ SESSION_EXPIRED_MARKER = "Ihre Sitzung ist abgelaufen"
 LABEL_AVAILABLE_FROM = "Voraussichtlich verfügbar ab:"
 LABEL_AUTHOR = "Autor*in:"
 LABEL_YEAR = "Jahr:"
+LABEL_SERIES = "Reihe:"
 
 # --- doctor probe ---------------------------------------------------------
 

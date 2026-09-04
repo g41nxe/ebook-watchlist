@@ -187,3 +187,35 @@ def test_an_unkeyable_link_raises_rather_than_inventing_an_identity() -> None:
     )
     with pytest.raises(SourceStructureError, match="title id"):
         source.check(entry)
+
+
+# --- Klappentext und Reihe (ADR 17) ----------------------------------------
+
+
+def test_the_blurb_is_captured_from_the_result_card() -> None:
+    candidates = parse.parse_search_results(fixture("search-hits.html"))
+    assert candidates is not None
+    assert all(candidate.blurb for candidate in candidates)
+    assert "sieben Schwestern" in candidates[0].blurb
+
+
+def test_the_onleihe_names_the_series_outright() -> None:
+    """Eine der wenigen Quellen, die die Reihe ausdrücklich benennt statt sie
+    im Titel zu verstecken."""
+    assert parse.parse_detail(fixture("detail-unavailable.html")).series == "Die sieben Schwestern"
+
+
+def test_a_title_outside_a_series_has_none() -> None:
+    assert parse.parse_detail(fixture("detail-available.html")).series is None
+
+
+def test_check_carries_the_series_into_the_observation() -> None:
+    client = StubClient(fixture("detail-unavailable.html"))
+    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    entry = WatchlistEntry(
+        title="Die sieben Schwestern",
+        resolved_links={"voebb": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
+    )
+    observation = source.check(entry)
+    assert observation is not None
+    assert observation.series == "Die sieben Schwestern"

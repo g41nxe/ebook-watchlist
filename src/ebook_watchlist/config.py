@@ -38,6 +38,10 @@ class Profile:
     #: profile only sharpens as the list grows, so they are worth keeping from
     #: the first day.
     liked_books: list[str] = field(default_factory=list)
+    #: Die Gegenprobe. Ein Maßstab, der nur aus Zustimmung gebaut ist, weiß
+    #: nicht, wo seine Grenze verläuft — am wertvollsten ist hier ein Buch, das
+    #: auf dem Papier gepasst hätte (ADR 17). Ebenfalls dormant.
+    disliked_books: list[str] = field(default_factory=list)
     sources: dict[str, dict[str, Any]] = field(default_factory=dict)
     #: Appended to the outgoing User-Agent so a site operator can reach you.
     #: Opt-in — nothing personal is sent unless you put it here yourself.
@@ -159,6 +163,7 @@ def load_profile(path: Path | None = None) -> Profile:
         genre_categories=_str_list(data, "genre_categories", what),
         no_gos=_str_list(data, "no_gos", what),
         liked_books=_str_list(data, "liked_books", what),
+        disliked_books=_str_list(data, "disliked_books", what),
         sources=data.get("sources") or {},
         contact=str(data["contact"]) if data.get("contact") else None,
     )

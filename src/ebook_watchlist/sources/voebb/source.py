@@ -87,6 +87,7 @@ class VoebbSource(LibrarySource):
             author=detail.author or entry.author,
             match_reason=MatchReason.WATCHLIST,
             watchlist_key=entry.key,
+            series=detail.series,
             availability=detail.availability,
             reservation_count=detail.reservations,
             available_from=detail.available_from,

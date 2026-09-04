@@ -197,7 +197,9 @@ doppelt laufen. Beides ist unkritisch.
 ## Dokumentation
 
 - [CONTEXT.md](CONTEXT.md) — Glossar der Domänenbegriffe
-- [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–16)
+- [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–17)
+- [docs/leseprofil.md](docs/leseprofil.md) — der Maßstab für Buchbewertungen
+- [.agents/skills/](.agents/skills) — `buch-bewerten` und `leseprofil-schaerfen`
 - [docs/research/](docs/research) — Rechercheergebnisse zu den Schnittstellen von
   VÖBB und beam-shop sowie zu Calibres Metadaten-Matching
 

@@ -63,8 +63,21 @@ def _backfill_seeded_scopes(connection: Connection) -> None:
     )
 
 
+def _add_blurb_columns(connection: Connection) -> None:
+    """Room for the blurb, subtitle and series we had been discarding.
+
+    All three ride along on pages the Run already fetches, and they are the only
+    signal from which cat-and-mouse, isolated settings and tone can be read at
+    all (ADR 17). Existing rows stay NULL — history cannot be backfilled, which
+    is precisely why the columns arrive now rather than when the classifier is
+    built.
+    """
+    for column in ("blurb", "subtitle", "series"):
+        add_column(connection, "observation", column, "TEXT")
+
+
 #: Index ``n`` upgrades a database at version ``n``. Append only, never reorder.
-MIGRATIONS: tuple[Migration, ...] = (_backfill_seeded_scopes,)
+MIGRATIONS: tuple[Migration, ...] = (_backfill_seeded_scopes, _add_blurb_columns)
 
 SCHEMA_VERSION = len(MIGRATIONS)
 

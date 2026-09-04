@@ -51,6 +51,13 @@ class Observation:
     available_from: str | None = None
     category: str | None = None
     url: str | None = None
+    #: Der Klappentext-Teaser von der Trefferseite. Kostet keinen eigenen
+    #: Request und ist das einzige Signal, aus dem sich Katz-und-Maus,
+    #: isolierte Settings und Tonlage überhaupt ablesen lassen (ADR 17).
+    blurb: str | None = None
+    subtitle: str | None = None
+    #: Nur gesetzt, wo eine Source die Reihe ausdrücklich benennt.
+    series: str | None = None
     observed_at: datetime | None = None
 
     @property
