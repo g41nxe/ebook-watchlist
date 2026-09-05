@@ -135,7 +135,10 @@ class Scheme:
     ein Buch für ungültig zu erklären.
     """
 
+    #: Der ganze Dateiinhalt — für Menschen.
     text: str
+    #: Nur die Abschnitte, die das Modell etwas angehen.
+    prompt_text: str
     min_stars: int
     max_stars: int
     #: Stärkste zuerst.
@@ -147,6 +150,40 @@ class Scheme:
     def may_withhold(self) -> frozenset[str]:
         cut = self.confidences.index(self.withhold_from)
         return frozenset(self.confidences[: cut + 1])
+
+
+def _render(value, level: int = 0) -> str:
+    """YAML lesbar machen, ohne YAML zu bleiben.
+
+    Das Modell bekommt Anweisungen, keine Datenstruktur: Einrückungstiefe und
+    Listenstriche kosten Aufmerksamkeit, die dem Buch fehlt.
+    """
+    einzug = "  " * level
+    if isinstance(value, dict):
+        teile = []
+        for key, inner in value.items():
+            kopf = str(key).replace("_", " ").upper()
+            einzeilig = not isinstance(inner, dict | list) and "\n" not in str(inner).strip()
+            if einzeilig:
+                teile.append(f"{einzug}{kopf}: {str(inner).strip()}")
+            else:
+                teile.append(f"{einzug}{kopf}\n{_render(inner, level + 1)}")
+        return "\n\n".join(teile)
+    if isinstance(value, list):
+        return "\n".join(f"{einzug}- {_render(item, level + 1).strip()}" for item in value)
+    text = str(value).strip()
+    return "\n".join(f"{einzug}{line}" if line else "" for line in text.splitlines())
+
+
+def _for_the_rater(data: dict) -> str:
+    """Nur die Abschnitte, die das Dokument selbst dafür vorsieht.
+
+    Die Gegenprobe etwa betrifft die Pflege des Profils und nicht das Urteil
+    über ein Buch; sie im Prompt mitzuschicken hiesse, Aufmerksamkeit für etwas
+    auszugeben, das der Bewerter gar nicht tun soll.
+    """
+    wanted = data.get("fuer_den_bewerter") or [k for k in data if k != "fuer_den_bewerter"]
+    return _render({key: data[key] for key in wanted if key in data})
 
 
 def load_rating_scheme(path: Path | None = None) -> Scheme:
@@ -161,6 +198,7 @@ def load_rating_scheme(path: Path | None = None) -> Scheme:
         confidence = data["confidence"]
         return Scheme(
             text=text,
+            prompt_text=_for_the_rater(data),
             min_stars=int(sterne["von"]),
             max_stars=int(sterne["bis"]),
             confidences=tuple(str(entry["wert"]) for entry in confidence["werte"]),
@@ -177,10 +215,10 @@ def load_rating_scheme(path: Path | None = None) -> Scheme:
 #: lang genug ist.
 BATCH_SIZE = 20
 
-_HOW_TO_ANSWER = (
-    "Erfinde nichts. Was der Klappentext nicht hergibt, ist nicht belegt — "
-    "dann ist die confidence 'vermutet' und die Begründung sagt das."
-)
+# Die frühere Kurzfassung ("erfinde nichts, sonst confidence vermutet") ist
+# gefallen: das Verfahren sagt dasselbe ausführlicher und genauer, und zwei
+# Fassungen derselben Regel in einem Prompt sind schlechter als eine.
+_HOW_TO_ANSWER = "Kein Text außerhalb des JSON."
 
 
 def _answer_shape(scheme: Scheme) -> str:

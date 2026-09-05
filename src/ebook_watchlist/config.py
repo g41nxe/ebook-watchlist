@@ -29,6 +29,13 @@ class Profile:
     #: Entdeckungen; er soll ihn über Tage abarbeiten, nicht am Stück. Was das
     #: Budget übrig lässt, gilt als unbewertet und wird gezeigt.
     rating_budget: int = 40
+    #: Wieviele Bücher in einen Modellaufruf gehen. Profil und Verfahren sind
+    #: der weitaus größte Teil des Prompts, also spart ein Bündel den Großteil.
+    #: Aber ein Modell, das zwanzig Dinge in einer Antwort beurteilt, ankert
+    #: aneinander — deshalb einstellbar, damit sich das messen lässt.
+    rating_batch_size: int = 20
+    #: Welches Modell urteilt. ``None`` heißt: das voreingestellte kleine.
+    rating_model: str | None = None
     #: Swept every Run.
     reference_authors: list[str] = field(default_factory=list)
     #: Swept once a week — the long tail, where a missed day costs nothing.
@@ -180,6 +187,8 @@ def load_profile(path: Path | None = None) -> Profile:
         deal_max_cents=_positive_int(data, "deal_max_cents", 1000, what),
         min_discount_pct=_percentage(data, "min_discount_pct", 25, what),
         rating_budget=_positive_int(data, "rating_budget", 40, what),
+        rating_batch_size=_positive_int(data, "rating_batch_size", 20, what),
+        rating_model=str(data["rating_model"]) if data.get("rating_model") else None,
         reference_authors=core_authors,
         extended_authors=extended_authors,
         extended_sweep_weekday=weekday,

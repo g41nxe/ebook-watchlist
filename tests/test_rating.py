@@ -38,6 +38,7 @@ NOW = datetime(2026, 9, 4, 22, 0)
 LESEPROFIL = "Profilversion: 1\n\nHier stünde das Leseprofil."
 SCHEMA = Scheme(
     text="Hier stünde das Bewertungsschema.",
+    prompt_text="Hier stünde das Bewertungsschema.",
     min_stars=0,
     max_stars=5,
     confidences=("belegt", "teils", "vermutet"),
@@ -989,7 +990,7 @@ def test_the_prompt_asks_for_a_pitch() -> None:
 def test_the_answer_shape_comes_from_the_scheme() -> None:
     """Spanne und Werte standen ausgeschrieben im Prompt. Ein vierter
     confidence-Wert im Dokument hätte sie nicht erreicht."""
-    eigen = Scheme(text="x", min_stars=1, max_stars=9,
+    eigen = Scheme(text="x", prompt_text="x", min_stars=1, max_stars=9,
                    confidences=("sicher", "unsicher"), withhold_from="sicher")
 
     text = prompt_for(discovery(), LESEPROFIL, eigen)
@@ -1013,3 +1014,46 @@ def test_a_missing_pitch_does_not_cost_the_judgement() -> None:
     result = parse_answer('{"stars": 4, "confidence": "teils", "reason": "x"}', 1, SCHEMA)
 
     assert (result.stars, result.pitch) == (4, "")
+
+
+# --- was der Bewerter zu sehen bekommt (Review) -----------------------------
+
+
+def test_the_prompt_leaves_out_what_only_humans_need() -> None:
+    """Die Gegenprobe betrifft die Pflege des Profils, nicht das Urteil über
+    ein Buch. Sie mitzuschicken kostet Aufmerksamkeit für etwas, das der
+    Bewerter gar nicht tun soll."""
+    scheme = load_rating_scheme()
+
+    assert "GEGENPROBE" not in scheme.prompt_text
+    assert "gegenprobe" in scheme.text  # für Menschen steht sie weiterhin da
+    assert len(scheme.prompt_text) < len(scheme.text)
+
+
+def test_the_rendered_scheme_is_instructions_not_yaml() -> None:
+    """Einrückungstiefe und Listenstriche kosten Aufmerksamkeit, die dem Buch
+    fehlt."""
+    text = load_rating_scheme().prompt_text
+
+    assert "fuer_den_bewerter" not in text
+    assert "was_bewertet_wird" not in text
+    assert "WAS BEWERTET WIRD" in text
+    assert "STERNE" in text
+
+
+def test_the_scheme_shows_the_rater_what_a_good_pitch_looks_like() -> None:
+    """Für die Begründung gab es ein Beispiel und für den Pitch nur Verbote —
+    das war die Stelle mit dem klarsten Ertrag."""
+    text = load_rating_scheme().prompt_text
+
+    assert "GUT" in text
+    assert "SCHLECHT" in text
+    assert "Klappentext" in text
+
+
+def test_the_answer_rule_is_not_repeated_beside_the_scheme() -> None:
+    """Zwei Fassungen derselben Regel in einem Prompt sind schlechter als eine.
+    Die frühere Kurzfassung wiederholte, was das Verfahren genauer sagt."""
+    text = prompt_for(discovery(), LESEPROFIL, load_rating_scheme())
+
+    assert text.count("confidence 'vermutet'") == 0

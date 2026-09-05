@@ -11,14 +11,23 @@
 # Die Werte unter "sterne" und "confidence" liest auch der Code. Sie stehen
 # hier einmal und nicht noch einmal in Python.
 
+# Was in den Prompt geht. Alles andere in dieser Datei erklärt das Verfahren
+# für Menschen und hat beim Bewerter nichts verloren — die Gegenprobe etwa
+# betrifft die Pflege des Profils, nicht das Urteil über ein Buch.
+fuer_den_bewerter:
+  - was_bewertet_wird
+  - sterne
+  - confidence
+  - begruendung
+  - pitch
+  - nichts_erfinden
+
 was_bewertet_wird: |
   Die Passung zum Profil, nicht die Qualität des Buches. Ein hervorragender
   Roman, der nichts von dem trägt, was das Profil verlangt, bekommt wenige
   Sterne; das ist kein Urteil über das Buch, sondern über die Passung.
 
-  Es gibt EINE Skala. Auch der automatische Vorfilter vergibt Sterne, nicht
-  eine zweite Größe — sonst bedeutet dieselbe Zahl je nach Herkunft etwas
-  anderes.
+  Es gibt EINE Skala, gleichgültig wer urteilt.
 
 sterne:
   von: 0
@@ -66,8 +75,7 @@ confidence:
     jedes Urteil mit, worauf es ruht.
 
     "vermutet" heißt NICHT "ich habe nicht nachgesehen". Es heißt "ich habe
-    nachgesehen und es steht nirgends". Der Unterschied ist der, an dem dieses
-    Verfahren schon einmal gescheitert ist.
+    nachgesehen und es steht nirgends".
 
     Das Profil nennt zu jedem Abschnitt, woraus er sich belegen lässt. Liegt
     keine dieser Angaben vor, sage das ausdrücklich und rechne den Abschnitt
@@ -163,13 +171,22 @@ pitch:
 
     Keine Sternzahl und kein Achsenname im Pitch — die stehen daneben.
 
+  gut: |
+    Ein Profiler, der an seinen eigenen Fällen zerbricht, und eine Jagd, die
+    auf Seite eins beginnt.
+
+  schlecht:
+    - text: Ein packender Thriller, der von der ersten bis zur letzten Seite fesselt.
+      warum: Klingt zu jedem Buch. Sagt nichts über diese Leserin.
+    - text: Ein Serienmörder terrorisiert Los Angeles, bis Detective Hunter ihm auf die Spur kommt.
+      warum: Das ist der Klappentext. Der steht schon daneben.
+    - text: Trifft die Achse "Die Figur trägt alles" mit vier von fünf Sternen.
+      warum: Das ist die Begründung, nicht der Pitch. Und beides steht daneben.
+
 nichts_erfinden: |
   Ist unklar, was ein Buch trägt, wird NACHGESCHLAGEN, bevor bewertet wird —
   soweit die Lage das zulässt (siehe confidence). Unsicherheit zu etikettieren
-  statt sie aufzulösen hat sich als teurer Fehler erwiesen: bei der ersten
-  Bewertung eines Bestands waren drei von vier so markierten Büchern zu niedrig
-  eingestuft, und in einem Fall war die Autorin schlicht nicht ermittelt
-  worden.
+  statt sie aufzulösen ist ein teurer Fehler.
 
   Was auch nach der Recherche offen bleibt, wird BENANNT und nicht in die
   Bewertung eingerechnet. Eine Begründung, die eine Lücke verschweigt, ist

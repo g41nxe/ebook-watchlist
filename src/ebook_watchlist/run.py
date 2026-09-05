@@ -214,7 +214,7 @@ def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
     Ohne Schluessel gibt es kein Tor — dann bleibt alles unbewertet und wird
     gezeigt. Das ist der Zustand vor Ticket 12 und ausdruecklich erlaubt.
     """
-    rater = build_rater()
+    rater = build_rater(profile.rating_model)
     if rater is None:
         return deltas, gate.unrated_report(deltas)
     try:
@@ -230,6 +230,7 @@ def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
         profile_version=version,
         threshold=DEFAULT_THRESHOLD,
         budget=profile.rating_budget,
+        batch_size=profile.rating_batch_size,
         now=now,
     )
     if report.held_back or report.over_budget:

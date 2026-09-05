@@ -11,6 +11,12 @@ min_discount_pct: 25
 # Der erste Lauf mit einem ANTHROPIC_API_KEY trifft den ganzen Rückstand; er
 # arbeitet ihn über mehrere Läufe ab. Was übrig bleibt, gilt als unbewertet
 # und wird gezeigt.
+# Wieviele Bücher in einen Modellaufruf gehen. Ein Bündel spart den Großteil
+# des Prompts — aber ein Modell, das zwanzig Dinge in einer Antwort beurteilt,
+# ankert aneinander. Kleiner setzen, um das zu messen.
+rating_batch_size: 20
+# Welches Modell urteilt. Leer lassen für die Voreinstellung.
+rating_model:
 rating_budget: 40
 
 # Either a plain list, or split into a list swept every run and a long tail

@@ -112,6 +112,7 @@ def apply(
     threshold: int,
     budget: int,
     now: datetime,
+    batch_size: int = BATCH_SIZE,
 ) -> tuple[list[Delta], GateReport]:
     """Entdeckungen unter dem Schwellwert aussortieren.
 
@@ -141,7 +142,7 @@ def apply(
         if _is_discovery(delta)
         and _judgement(store, delta.current, subject_of(delta.current), profile_version) is None
     ][:budget]
-    fresh = rate_in_batches(rater, wanted, size=BATCH_SIZE) if wanted else {}
+    fresh = rate_in_batches(rater, wanted, size=batch_size) if wanted else {}
     attempted = {observation.key for observation in wanted}
 
     kept: list[Delta] = []
