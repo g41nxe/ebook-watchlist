@@ -19,6 +19,7 @@ from ..covers import CoverStore, file_name
 from ..deals import is_strong_deal
 from ..diff import worth_announcing
 from ..junk import is_junk
+from ..matching.bundles import looks_like_bundle, volume_titles
 from ..models import MatchReason, Observation
 from ..rating import DEFAULT_THRESHOLD
 from ..ratings import BY_MODEL, subject_of
@@ -76,6 +77,20 @@ class Suggestion:
     #: Klappentexts: der sagt, wovon das Buch handelt, der Pitch sagt, warum es
     #: für diese Leserin zählt (bewertungsschema.yaml).
     pitch: str | None = None
+
+    @property
+    def is_bundle(self) -> bool:
+        """Eine Sammelausgabe — mehrere Baende in einer Ausgabe (ADR 24).
+
+        Abgeleitet und nicht gespeichert: die Auskunft steckt im Titel, und
+        eine Spalte dafuer waere eine zweite Wahrheit, die veralten kann.
+        """
+        return looks_like_bundle(self.title)
+
+    @property
+    def baende(self) -> tuple[str, ...]:
+        """Die Bandtitel, wenn der Name sie nennt — sonst leer."""
+        return volume_titles(self.title)
 
     @property
     def key(self) -> str:

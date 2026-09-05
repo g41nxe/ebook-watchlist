@@ -435,3 +435,48 @@ def test_a_suggestion_with_a_fetched_cover_shows_it(client: TestClient, db: Stor
 
     body = client.get("/vorschlaege").text
     assert f"/covers/{file_name(url)}" in body
+
+
+# --- Sammelausgaben (ADR 24) ------------------------------------------------
+
+
+def test_a_bundle_says_so_and_names_its_volumes(client: TestClient, db: Store) -> None:
+    """Sonst sieht eine Sammelausgabe aus wie der gesuchte Einzelband — und
+    genau das war der Grund fuer ADR 24."""
+    found(db, title='Der Kruzifix-Killer / Der Vollstrecker', author='Chris Carter')
+
+    body = client.get('/vorschlaege').text
+
+    assert '2 Bände' in body
+    assert 'Der Kruzifix-Killer, Der Vollstrecker' in body
+
+
+def test_a_bundle_without_volume_titles_only_states_the_fact(
+    client: TestClient, db: Store
+) -> None:
+    """"3in1 Bundle" nennt keinen Bandtitel. Eine Zahl zu erfinden waere
+    schlimmer als die blosse Tatsache — gemessen liest ein Zaehler am Titel
+    mindestens drei von neunzehn falsch.
+
+    Als Fund einer Referenzautor:in, nicht vom Themenregal: dort ist ein
+    Buendel Ramsch und wird ausgeblendet (ADR 24, junk.py).
+    """
+    found(
+        db,
+        title='David Hunter: 3in1 Bundle',
+        author='Simon Beckett',
+        reason=MatchReason.PROFILE_AUTHOR,
+    )
+
+    body = client.get('/vorschlaege').text
+
+    assert 'Sammelausgabe' in body
+
+
+def test_an_ordinary_title_carries_no_bundle_badge(client: TestClient, db: Store) -> None:
+    found(db, title='Der Kruzifix-Killer', author='Chris Carter')
+
+    body = client.get('/vorschlaege').text
+
+    assert 'Sammelausgabe' not in body
+    assert 'Bände' not in body

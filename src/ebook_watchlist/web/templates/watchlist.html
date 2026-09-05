@@ -48,7 +48,12 @@
     <div class="min-w-0 flex-1">
       <p class="truncate font-serif text-base font-semibold tracking-tight">
         <a href="/book/{{ entry.book_id }}" class="hover:underline underline-offset-2"
-           >{{ entry.title }}</a></p>
+           >{{ entry.title }}</a>
+        {% if entry.is_bundle %}
+        <span class="ml-1 align-middle rounded bg-amber/15 px-1.5 py-0.5
+                     text-[11px] font-medium text-amber"
+              title="Mehrere Bände in einer Ausgabe">Sammelausgabe</span>
+        {% endif %}</p>
       <p class="truncate text-sm text-soft">
         {{ entry.author or "unbekannt" }}{% if not entry.active %} · pausiert{% endif %}
       </p>

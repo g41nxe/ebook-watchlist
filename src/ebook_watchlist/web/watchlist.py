@@ -12,6 +12,7 @@ from datetime import datetime
 
 from ..config import Profile
 from ..deals import is_strong_deal
+from ..matching.bundles import looks_like_bundle
 from ..models import Availability, LinkOutcome, Observation
 from ..relations import RelationKind
 from ..sources import registry
@@ -80,6 +81,11 @@ class Entry:
     #: Unter der Schnaeppchen-Grenze. Faerbt den Preis und setzt das
     #: Abzeichen aufs Cover — dieselbe Farbe bedeutet ueberall dasselbe.
     deal: bool = False
+
+    @property
+    def is_bundle(self) -> bool:
+        """Siehe ``triage.Suggestion.is_bundle`` — dieselbe Ableitung."""
+        return looks_like_bundle(self.title)
 
     @property
     def needs_attention(self) -> bool:

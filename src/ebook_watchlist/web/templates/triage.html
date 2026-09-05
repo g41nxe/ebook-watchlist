@@ -115,7 +115,19 @@
         </span>
 
         <span class="mt-0.5 block font-serif text-base font-semibold tracking-tight">
-          {{ item.title }}</span>
+          {{ item.title }}
+          {# Eine Sammelausgabe darf nicht aussehen wie der gesuchte Einzelband
+             (ADR 24). Nennt der Name die Bände, stehen sie dabei — sonst nur
+             die Tatsache, denn geraten wird hier nichts. #}
+          {% if item.is_bundle %}
+          <span class="ml-1 align-middle rounded bg-amber/15 px-1.5 py-0.5
+                       text-[11px] font-medium text-amber"
+                title="{% if item.baende %}Enthält: {{ item.baende | join(', ') }}
+                       {% else %}Mehrere Bände in einer Ausgabe{% endif %}">
+            {% if item.baende %}{{ item.baende | length }} Bände{% else %}Sammelausgabe{% endif %}
+          </span>
+          {% endif %}
+        </span>
 
         {# Der Pitch statt des Klappentexts: der sagt, wovon das Buch handelt,
            und das steht im Shop. Hier zählt, warum es für dich in Frage kommt. #}
