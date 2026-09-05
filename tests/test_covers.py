@@ -74,16 +74,18 @@ def test_a_page_without_an_image_simply_has_none() -> None:
 # --- ablegen ----------------------------------------------------------------
 
 
-def test_the_name_carries_the_book_and_the_address(tmp_path: Path) -> None:
-    name = file_name(17, "https://example.invalid/a/9783104911854_200x200.jpg")
-    assert name.startswith("17-")
+def test_the_name_is_the_address_hashed(tmp_path: Path) -> None:
+    name = file_name("https://example.invalid/a/9783104911854_200x200.jpg")
     assert name.endswith(".jpg")
+    # Keine Buch-Id im Namen: dasselbe Bild ist eine Datei, gleichgueltig ob
+    # es an einem Vorschlag oder an einer book-Zeile haengt.
+    assert "17" not in name.split(".")[0][:2]
 
 
 def test_a_changed_cover_becomes_a_new_file() -> None:
     """Sonst zeigte ein alter Verweis stillschweigend auf ein anderes Bild."""
-    first = file_name(17, "https://example.invalid/alt.jpg")
-    second = file_name(17, "https://example.invalid/neu.jpg")
+    first = file_name("https://example.invalid/alt.jpg")
+    second = file_name("https://example.invalid/neu.jpg")
     assert first != second
 
 
@@ -91,19 +93,19 @@ def test_it_is_fetched_once_and_then_read_from_disk(tmp_path: Path) -> None:
     store = CoverStore(tmp_path / "covers")
     client = StubClient()
 
-    name = store.fetch(client, 1, "https://example.invalid/a.jpg")
+    name = store.fetch(client, "https://example.invalid/a.jpg")
     assert name is not None
     assert store.has(name)
     assert len(client.calls) == 1
 
-    assert store.fetch(client, 1, "https://example.invalid/a.jpg") == name
+    assert store.fetch(client, "https://example.invalid/a.jpg") == name
     assert len(client.calls) == 1  # nicht noch einmal
 
 
 def test_a_placeholder_pixel_is_not_kept(tmp_path: Path) -> None:
     """Shopware liefert ein 1x1-Pixel, solange das echte Bild fehlt."""
     store = CoverStore(tmp_path / "covers")
-    assert store.fetch(StubClient(b"tiny"), 1, "https://example.invalid/a.jpg") is None
+    assert store.fetch(StubClient(b"tiny"), "https://example.invalid/a.jpg") is None
     assert not (tmp_path / "covers").exists() or not any((tmp_path / "covers").iterdir())
 
 
@@ -113,14 +115,14 @@ def test_a_missing_image_is_not_a_reason_to_fail_a_run(
 ) -> None:
     """Ein Buch ohne Bild ist ein Buch mit einem Platzhalter."""
     store = CoverStore(tmp_path / "covers")
-    assert store.fetch(StubClient(failure), 1, "https://example.invalid/a.jpg") is None
+    assert store.fetch(StubClient(failure), "https://example.invalid/a.jpg") is None
 
 
 def test_throttling_is_passed_through(tmp_path: Path) -> None:
     """Da hat der Shop ausdruecklich Halt gesagt — das gilt fuer alles Weitere."""
     store = CoverStore(tmp_path / "covers")
     with pytest.raises(RateLimited):
-        store.fetch(StubClient(RateLimited("429")), 1, "https://example.invalid/a.jpg")
+        store.fetch(StubClient(RateLimited("429")), "https://example.invalid/a.jpg")
 
 
 # --- ein Bild darf keinen Lauf kosten (Review-Befund 3) ---------------------
@@ -131,7 +133,7 @@ def test_a_refusal_by_the_shop_is_a_fetch_error(tmp_path: Path) -> None:
     ``requests.HTTPError`` an — den fängt dieser Weg nicht, und der Lauf starb
     daran."""
     store = CoverStore(tmp_path / "covers")
-    assert store.fetch(StubClient(FetchError("403")), 1, "https://example.invalid/a.jpg") is None
+    assert store.fetch(StubClient(FetchError("403")), "https://example.invalid/a.jpg") is None
 
 
 def test_one_broken_image_does_not_stop_the_others(tmp_path: Path, monkeypatch) -> None:
@@ -198,3 +200,17 @@ def test_the_cover_address_survives_the_snapshot(tmp_path: Path, monkeypatch) ->
     zurueck = store.latest_observations("t", [("beam", "1")])[("beam", "1")]
 
     assert zurueck.cover_url == beobachtung.cover_url
+
+
+def test_the_same_image_is_one_file_for_a_find_and_for_a_book(tmp_path: Path) -> None:
+    """Waere die Buch-Id Teil des Namens, wuerde dasselbe Cover ein zweites Mal
+    geholt, sobald aus dem Vorschlag ein Buch wird."""
+    store = CoverStore(tmp_path / "covers")
+    client = StubClient()
+    url = "https://example.invalid/9783104911854_200x200.jpg"
+
+    als_vorschlag = store.fetch(client, url)   # noch keine book-Zeile
+    als_buch = store.fetch(client, url)        # jetzt beobachtet
+
+    assert als_vorschlag == als_buch
+    assert len(client.calls) == 1

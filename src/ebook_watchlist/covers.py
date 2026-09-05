@@ -35,21 +35,25 @@ def _suffix(url: str) -> str:
     return _SUFFIXES.get((match.group(1) if match else "").lower(), ".jpg")
 
 
-def file_name(key: int | str, url: str) -> str:
-    """``17-3f9a2b.jpg`` — oder ``beam-632330-3f9a2b.jpg``.
+def file_name(url: str) -> str:
+    """``3f9a2b4c.jpg`` — der Name ist die Adresse, gehasht.
 
-    Der Schluessel macht die Datei auffindbar, der Hash der Adresse sorgt
-    dafuer, dass ein gewechseltes Cover eine neue Datei bekommt statt die alte
-    still zu ueberschreiben — und dass ein alter Verweis nie auf ein anderes
-    Bild zeigt.
+    **Keine Buch-Id im Namen**, und das ist der Punkt: dasselbe Bild ist eine
+    Datei, gleichgueltig ob es an einem Vorschlag oder an einer ``book``-Zeile
+    haengt. Ein Vorschlag hat keine Buch-Id (ADR 18) — waere sie Teil des
+    Namens, wuerde dasselbe Cover ein zweites Mal geholt, sobald aus dem
+    Vorschlag ein Buch wird.
 
-    Eine Buch-Id, wo es eine gibt; sonst ``quelle-nummer``. Eine Entdeckung hat
-    keine ``book``-Zeile (ADR 18), und der Name muss trotzdem eindeutig sein und
-    sich ohne Datenbank ausrechnen lassen: die Seite prueft damit einfach, ob
-    die Datei schon daliegt, statt den Namen irgendwo zu speichern.
+    Der Hash sorgt ausserdem dafuer, dass ein gewechseltes Cover eine neue
+    Datei bekommt statt die alte still zu ueberschreiben — und dass ein alter
+    Verweis nie auf ein anderes Bild zeigt.
+
+    Und weil der Name sich allein aus der Adresse ergibt, kann die Oberflaeche
+    ihn ausrechnen und nachsehen, ob die Datei daliegt, statt ihn fuer jede
+    Beobachtung zu speichern.
     """
-    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:6]
-    return f"{key}-{digest}{_suffix(url)}"
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:12]
+    return f"{digest}{_suffix(url)}"
 
 
 class CoverStore:
@@ -64,7 +68,7 @@ class CoverStore:
     def has(self, name: str) -> bool:
         return self.path(name).is_file()
 
-    def fetch(self, client: HttpClient, key: int | str, url: str) -> str | None:
+    def fetch(self, client: HttpClient, url: str) -> str | None:
         """Das Bild holen, falls es noch nicht daliegt. Gibt den Dateinamen zurueck.
 
         Ein fehlgeschlagener Bilddownload ist kein Grund, einen Lauf scheitern zu
@@ -72,7 +76,7 @@ class CoverStore:
         Drosselung wird durchgereicht: da hat der Shop ausdruecklich Halt gesagt,
         und das gilt fuer alles Weitere mit (ADR 7).
         """
-        name = file_name(key, url)
+        name = file_name(url)
         if self.has(name):
             return name
         try:

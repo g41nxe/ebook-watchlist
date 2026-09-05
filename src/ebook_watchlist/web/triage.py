@@ -113,14 +113,17 @@ class Pile:
 def _cover_file(observation: Observation) -> str | None:
     """Das Titelbild, falls es schon im Ordner liegt.
 
-    Nachgesehen statt gespeichert: der Name ist eine reine Funktion aus
-    Schlüssel und Adresse, und eine Entdeckung hat keine Zeile, an der er
-    stehen könnte. Die Oberfläche lädt nie selbst nach (ADR 3) — geholt wird
-    beim Bewerten, und zwar nur für das, was durchkommt.
+    Nachgesehen statt gespeichert: der Name ergibt sich allein aus der Adresse,
+    und eine Entdeckung hat keine ``book``-Zeile, an der er stehen könnte. Wird
+    aus dem Vorschlag später ein Buch, zeigt dessen ``cover_file`` auf dieselbe
+    Datei — das Bild wird kein zweites Mal geholt.
+
+    Die Oberfläche lädt nie selbst nach (ADR 3): geholt wird beim Bewerten, und
+    nur für das, was durchkommt.
     """
     if not observation.cover_url:
         return None
-    name = file_name(f"{observation.source}-{observation.source_item_id}", observation.cover_url)
+    name = file_name(observation.cover_url)
     return name if CoverStore(paths.covers_dir()).has(name) else None
 
 

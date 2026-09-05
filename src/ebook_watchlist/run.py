@@ -197,7 +197,7 @@ def _fetch_covers(store: Store, client: HttpClient, observations: Sequence[Obser
         if book is None or book.cover_file:
             continue
         try:
-            name = covers.fetch(client, book_id, url)
+            name = covers.fetch(client, url)
         except RateLimited:
             print("Titelbilder: der Shop drosselt — Rest übersprungen", file=sys.stderr)
             return
