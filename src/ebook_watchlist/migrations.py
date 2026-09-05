@@ -238,6 +238,18 @@ def _rename_rubric_version(connection: Connection) -> None:
     )
 
 
+def _add_rating_pitch(connection: Connection) -> None:
+    """Der Satz, der die Leserin hinsehen lässt — neben der Begründung.
+
+    Eine eigene Spalte und kein Anhängsel an ``reason``: die beiden haben
+    verschiedene Adressaten, und zusammengelegt hätte der Digest entweder ein
+    Protokoll gezeigt oder die Begründung ihre Prüfbarkeit verloren.
+    """
+    if not _has_table(connection, "rating"):
+        return
+    add_column(connection, "rating", "pitch", "VARCHAR NOT NULL DEFAULT ''")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -252,6 +264,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _add_run_pid_column,
     _add_rating_origin,
     _rename_rubric_version,
+    _add_rating_pitch,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

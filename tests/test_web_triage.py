@@ -243,3 +243,80 @@ def test_without_alpine_the_page_stays_a_plain_form(client: TestClient, db: Stor
 
     assert "x-cloak" in body
     assert '<form method="post" action="/vorschlaege/entscheiden"' in body
+
+
+# --- die Zeile wie in der Übersicht (Vorschlagsseite) -----------------------
+
+
+
+
+# --- die Zeile, wie in der Übersicht -----------------------------------------
+
+
+def urteil(db: Store, observation: Observation, *, stars: int, pitch: str) -> None:
+    from ebook_watchlist.ratings import BY_MODEL, subject_of
+
+    db.put_rating(subject_of(observation), stars=stars, confidence="teils",
+                  reason="Begründung zum Nachprüfen.", profile_version=1,
+                  now=NOW, origin=BY_MODEL, pitch=pitch)
+
+
+def test_the_pitch_replaces_the_blurb(client: TestClient, db: Store) -> None:
+    """Der Klappentext sagt, wovon das Buch handelt — der steht im Shop. Hier
+    zählt, warum es für diese Leserin in Frage kommt."""
+    beobachtet = found(db, title="Der Kannibalenhügel",
+                       blurb="Ein Schiff, allein im Dunkeln.")
+    urteil(db, beobachtet, stars=4, pitch="Ein Ermittler am Limit, und die Jagd beginnt sofort.")
+
+    body = client.get("/vorschlaege").text
+
+    assert "Ein Ermittler am Limit" in body
+    assert "Ein Schiff, allein im Dunkeln." not in body
+
+
+def test_without_a_judgement_the_blurb_still_shows(client: TestClient, db: Store) -> None:
+    """Solange das Tor nicht gelaufen ist, ist der Klappentext besser als
+    nichts."""
+    found(db, blurb="Ein Schiff, allein im Dunkeln.")
+
+    assert "Ein Schiff, allein im Dunkeln." in client.get("/vorschlaege").text
+
+
+def test_the_stars_of_the_gate_are_shown(client: TestClient, db: Store) -> None:
+    beobachtet = found(db, title="Der Kannibalenhügel")
+    urteil(db, beobachtet, stars=4, pitch="Kurz und knapp.")
+
+    body = client.get("/vorschlaege").text
+
+    assert "4 von 5" in body
+    assert "ic-star" in body
+
+
+def test_an_unjudged_find_shows_no_stars(client: TestClient, db: Store) -> None:
+    """Null Sterne wären eine Aussage. "Noch nicht bewertet" ist keine."""
+    found(db, title="Der Kannibalenhügel")
+
+    assert "von 5 — Urteil des Werkzeugs" not in client.get("/vorschlaege").text
+
+
+def test_the_row_carries_a_cover_and_the_source_symbol(client: TestClient, db: Store) -> None:
+    """Dieselbe Sprache wie auf der Watchlist: grün Bibliothek, bernstein Shop."""
+    found(db, title="Der Kannibalenhügel", price=399)
+
+    body = client.get("/vorschlaege").text
+
+    assert "ic-shop" in body
+    assert "ic-tag" in body  # Schnäppchen-Abzeichen auf dem Cover, 3,99 €
+    assert "text-amber" in body
+
+
+def test_the_page_shows_ten_not_fifty(client: TestClient, db: Store) -> None:
+    """Der Stapel wird vom Tor ohnehin neu erzeugt — gezeigt wird nur, was auch
+    bewertet werden muss."""
+    for number in range(15):
+        found(db, item_id=f"n{number}", title=f"Fund {number}")
+
+    pile = view.pending(db, load_profile())
+
+    assert len(pile.items) == view.PAGE_SIZE == 10
+    assert pile.total >= 15

@@ -17,6 +17,7 @@ from ..config import Profile
 from ..deals import is_strong_deal
 from ..junk import is_junk
 from ..models import MatchReason, Observation
+from ..ratings import BY_MODEL, subject_of
 from ..reasons import short_why, thema_name, why_shown
 from ..relations import RelationKind
 from ..sources import registry
@@ -33,7 +34,11 @@ ACTIONS: tuple[tuple[str, str], ...] = (
 #: Wie viele Zeilen eine Seite zeigt. Der Rückstand ist dreistellig, und eine
 #: Seite mit dreihundert Einträgen ist keine Aufgabe, sondern eine Strafe —
 #: der eigentliche Schnitt kommt aber vom Bewertungstor (ADR 19), nicht hier.
-PAGE_SIZE = 50
+#:
+#: Zehn, nicht fünfzig: solange der Stapel aus einem einmaligen Rückstand
+#: besteht, den das Tor ohnehin neu erzeugt, ist eine kurze Liste billiger —
+#: gezeigt wird nur, was auch bewertet werden muss.
+PAGE_SIZE = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +60,13 @@ class Suggestion:
     #: einer Stelle (Ticket 14).
     why: str
     why_short: str
+    #: Was das Bewertungstor von dem Buch hält — ``None``, solange es nicht
+    #: gelaufen ist.
+    stars: int | None = None
+    #: Ein Satz, warum das Buch in Frage kommt. Steht hier **statt** des
+    #: Klappentexts: der sagt, wovon das Buch handelt, der Pitch sagt, warum es
+    #: für diese Leserin zählt (bewertungsschema.yaml).
+    pitch: str | None = None
 
     @property
     def key(self) -> str:
@@ -81,7 +93,9 @@ class Pile:
         return not self.items
 
 
-def _suggestion(observation: Observation, profile: Profile) -> Suggestion:
+def _suggestion(
+    observation: Observation, profile: Profile, judgement=None
+) -> Suggestion:
     return Suggestion(
         source=observation.source,
         source_item_id=observation.source_item_id,
@@ -98,6 +112,8 @@ def _suggestion(observation: Observation, profile: Profile) -> Suggestion:
         source_category=registry.category(profile, observation.source),
         why=why_shown(observation),
         why_short=short_why(observation),
+        stars=judgement.stars if judgement else None,
+        pitch=(judgement.pitch or None) if judgement else None,
     )
 
 
@@ -116,10 +132,13 @@ def pending(
     """
     decided_items = store.decided_items(profile.slug)
     decided_isbns = set(store.books_with_relations(profile.slug))
+    found = store.latest_discoveries(profile.slug)
+    # Ein Zugriff für den ganzen Stapel, nicht einer je Zeile.
+    judgements = store.ratings_for(subject_of(observation) for observation in found)
 
     items: list[Suggestion] = []
     hidden_junk = 0
-    for observation in store.latest_discoveries(profile.slug):
+    for observation in found:
         if (observation.source, observation.source_item_id) in decided_items:
             continue
         if observation.isbn and observation.isbn in decided_isbns:
@@ -129,7 +148,13 @@ def pending(
             continue
         if reason and str(observation.match_reason) != reason:
             continue
-        items.append(_suggestion(observation, profile))
+        items.append(
+            _suggestion(
+                observation,
+                profile,
+                judgements.get((subject_of(observation), BY_MODEL)),
+            )
+        )
 
     return Pile(items=tuple(items[:limit]), total=len(items), hidden_junk=hidden_junk)
 

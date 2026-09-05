@@ -182,6 +182,10 @@ class RatingRow(Base):
     stars: Mapped[int] = mapped_column(Integer)
     confidence: Mapped[str] = mapped_column(String)
     reason: Mapped[str] = mapped_column(String)
+    #: Ein Satz für die Leserin, warum das Buch in Frage kommt — im Digest und
+    #: auf der Vorschlagsseite. Getrennt von ``reason``: die Begründung ist ein
+    #: Protokoll zum Nachprüfen und nennt auch, was fehlt.
+    pitch: Mapped[str] = mapped_column(String, default="")
     #: Die Fassung des Leseprofils, gegen die geurteilt wurde. Eine neue
     #: Fassung macht ein Maschinenurteil ungültig — das ist die eine Änderung,
     #: bei der ein erneuter Aufruf richtig ist. Eine Änderung am
@@ -913,6 +917,7 @@ class Store:
         profile_version: int,
         now: datetime,
         origin: str = "model",
+        pitch: str = "",
     ) -> None:
         """Ein Urteil festhalten.
 
@@ -936,6 +941,7 @@ class Store:
                 session.add(row)
             row.stars = stars
             row.confidence = confidence
+            row.pitch = pitch
             row.reason = reason
             row.profile_version = profile_version
             row.rated_at = now

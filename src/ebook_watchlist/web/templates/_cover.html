@@ -1,0 +1,46 @@
+{#
+  Ein Cover in Zeilengröße, mit Abzeichen an der Ecke.
+
+  Eine Stelle für Watchlist und Vorschläge: der gezeichnete Buchrücken stand
+  vorher zweimal im Repo, und die Abzeichen hätten beim nächsten Mal an einer
+  Seite gefehlt.
+
+  Farbe bedeutet überall dasselbe: grün = Bibliothek / ausleihbar,
+  bernstein = Shop / Schnäppchen.
+#}
+{% macro cover(title, cover_file=None, borrowable=False, deal=False) %}
+<div class="relative h-16 w-11 shrink-0">
+  <div class="h-full w-full overflow-hidden rounded-sm shadow-[0_1px_3px_rgba(0,0,0,.35)]">
+    {% if cover_file %}
+    <img src="/covers/{{ cover_file }}" alt="" class="h-full w-full object-cover">
+    {% else %}
+    {# Ein gezeichneter Buchrücken statt eines Textkastens. Der Farbton hängt am
+       Titel, damit dasselbe Buch immer gleich aussieht und sich zwei
+       nebeneinander unterscheiden lassen. #}
+    {% set hue = (title | sum_chars) % 360 %}
+    <svg viewBox="0 0 44 64" class="h-full w-full" aria-hidden="true">
+      <rect width="44" height="64" rx="2" fill="hsl({{ hue }} 24% 34%)"/>
+      <rect width="5" height="64" fill="hsl({{ hue }} 24% 24%)"/>
+      <rect x="12" y="16" width="22" height="1.5" rx="0.75" fill="hsl({{ hue }} 20% 62%)"/>
+      <rect x="12" y="21" width="16" height="1.5" rx="0.75" fill="hsl({{ hue }} 20% 55%)"/>
+      <rect x="12" y="40" width="12" height="1.5" rx="0.75" fill="hsl({{ hue }} 20% 48%)"/>
+    </svg>
+    {% endif %}
+  </div>
+  {# Die Abzeichen sitzen halb über der Kante und tragen einen Ring in der
+     Seitenfarbe — so bleiben sie auf jedem Cover lesbar. Kein Abzeichen heißt:
+     nichts zu melden. #}
+  {% if borrowable or deal %}
+  <span class="absolute -top-1 -right-1 flex flex-col gap-1">
+    {% if borrowable %}
+    <span title="in der Bibliothek ausleihbar" class="badge bg-accent">
+      <svg><use href="#ic-lib"/></svg></span>
+    {% endif %}
+    {% if deal %}
+    <span title="Schnäppchen" class="badge bg-amber">
+      <svg><use href="#ic-tag"/></svg></span>
+    {% endif %}
+  </span>
+  {% endif %}
+</div>
+{% endmacro %}
