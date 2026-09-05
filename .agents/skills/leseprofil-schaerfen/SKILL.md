@@ -10,7 +10,7 @@ einordnet. Ein Buch, das der Benutzer mochte und das schlecht bewertet wird, ist
 ein Befund über `docs/leseprofil.md` — nicht über das Buch.
 
 Geändert wird ausschließlich das **Profil**. Das Verfahren steht in
-`docs/bewertungsschema.md` und gehört nicht hierher: es ist nicht versioniert,
+`docs/bewertungsschema.yaml` und gehört nicht hierher: es ist nicht versioniert,
 und eine Änderung daran entwertet keine Bewertung (ADR 21). Fällt bei der Arbeit
 auf, dass das *Verfahren* nicht taugt, wird das gemeldet und nicht nebenbei
 umgeschrieben.

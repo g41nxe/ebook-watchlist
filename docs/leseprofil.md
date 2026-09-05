@@ -13,7 +13,7 @@ mit, gegen welche Fassung sie entstand. Nachbewertet wird **nicht** automatisch
 mit Beleg und Zustimmung je Änderung.
 
 Wie geurteilt wird, steht **nicht** hier, sondern in
-[`bewertungsschema.md`](bewertungsschema.md): Sterne, Begründungspflicht,
+[`bewertungsschema.yaml`](bewertungsschema.yaml): Sterne, Begründungspflicht,
 `confidence`, Gegenprobe. Das ist Verfahren und gilt für jedes Profil; eine
 Änderung dort entwertet keine Bewertung (ADR 21).
 

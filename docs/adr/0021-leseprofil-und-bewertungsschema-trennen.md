@@ -38,7 +38,7 @@ benutzt ein Gesprächsurteil ungeprüft weiter, als wäre es eines seiner eigene
 *Inhalt*, mit ihrer Gewichtung, in Prosa. Es ist versioniert, und diese Version
 bedeutet ab jetzt genau eine Sache: den Stand des Geschmacks der Leserin.
 
-**2. `docs/bewertungsschema.md` entsteht neu und bleibt stabil.** Es enthält,
+**2. `docs/bewertungsschema.yaml` entsteht neu und bleibt stabil.** Es enthält,
 was heute in den Abschnitten 3 bis 6 des Maßstabs steht: was ein Stern bedeutet,
 was eine Begründung leisten muss, was `confidence` bedeutet, die Gegenprobe,
 „nichts erfinden". Es nennt **keine einzige inhaltliche Achse** — es sagt nur,
@@ -83,3 +83,22 @@ ist und die Suchlisten stehengeblieben sind.
   billig; es oft zu schärfen ist es nicht.
 - Der Schnitt geht durch ein vorhandenes Dokument, nicht durch Neuland: die
   Abschnitte liegen bereits getrennt nebeneinander.
+
+> **Nachtrag: beide Dokumente sind strukturiert.** Angelegt wurden sie als
+> Markdown; beide sind inzwischen YAML. Der Grund ist bei jedem ein anderer.
+>
+> Beim **Profil** ist es die Bearbeitbarkeit: die Achsen sind eine geordnete
+> Liste, deren Reihenfolge die Gewichtung *ist*, die Genres sind zwei Listen,
+> die sich ändern, und jeder Abschnitt trägt `belegbar_aus` — woraus er sich
+> überhaupt beurteilen lässt. Das macht `confidence` zum ersten Mal ableitbar
+> statt geschätzt.
+>
+> Beim **Schema** ist es die Einzigkeit der Quelle: die drei
+> `confidence`-Werte standen viermal in Python und einmal als Prosa im
+> Dokument. Jetzt liest der Code Spanne und Werte aus der Datei, und ein
+> vierter Wert kostet eine Änderung statt fünf.
+>
+> Das Schema nennt außerdem selbst, welche Abschnitte in den Prompt gehören.
+> Die Gegenprobe etwa betrifft die Pflege des Profils und nicht das Urteil über
+> ein Buch — sie mitzuschicken kostet Aufmerksamkeit für etwas, das der
+> Bewerter gar nicht tun soll.

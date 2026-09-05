@@ -8,7 +8,7 @@ description: Bewertet Bücher mit 0-5 Sternen danach, wie gut sie zum Leseprofil
 Beantwortet die Frage „passt dieses Buch zu mir?" gegen zwei Dokumente statt
 gegen ein Bauchgefühl (ADR 21):
 
-- [`docs/bewertungsschema.md`](../../../docs/bewertungsschema.md) — **wie**
+- [`docs/bewertungsschema.yaml`](../../../docs/bewertungsschema.yaml) — **wie**
   geurteilt wird. Sterne, Begründungspflicht, `confidence`, Gegenprobe. Nicht
   versioniert, gilt für jedes Profil.
 - [`docs/leseprofil.md`](../../../docs/leseprofil.md) — **wonach**. Die
@@ -19,7 +19,7 @@ hatten Skill und Tor verschiedene Regeln bei derselben Sternskala.
 
 ## Ablauf
 
-1. **Beides laden.** Immer zuerst `docs/bewertungsschema.md` **und**
+1. **Beides laden.** Immer zuerst `docs/bewertungsschema.yaml` **und**
    `docs/leseprofil.md` vollständig lesen. Nichts davon aus dem Gedächtnis
    rekonstruieren — die Dateien sind die Wahrheit und ändern sich.
 
@@ -43,7 +43,7 @@ hatten Skill und Tor verschiedene Regeln bei derselben Sternskala.
    Eine Bewertung mit dem Vermerk „dazu kann ich nichts sagen" ist kein
    Ergebnis, sondern eine ausgelassene Arbeit.
 
-4. **Bewerten.** Sterne strikt nach der Tabelle in `docs/bewertungsschema.md`.
+4. **Bewerten.** Sterne strikt nach der Tabelle in `docs/bewertungsschema.yaml`.
    Für jedes Buch festhalten, welche Teile des Leseprofils tragen und welche
    nicht — das ist die Grundlage der Begründung und entscheidet die Sterne.
 
@@ -92,7 +92,7 @@ Erwartetes und erzeugtes Format einer Buchliste:
   author: Paul Schüler
   stars: 3            # 0-5, null nur solange unbewertet
   why: >
-    Begründung nach den vier Regeln aus docs/bewertungsschema.md.
+    Begründung nach den vier Regeln aus docs/bewertungsschema.yaml.
   confidence: belegt   # belegt | teils | vermutet
   profilversion: 1     # Version aus docs/leseprofil.md
   hinweis: optional - Unklarheiten, abweichende Titelvarianten, Rückfragen

@@ -131,7 +131,7 @@ zu bekommen.
 
 Ein Modell bewertet jede Entdeckung von 0 bis 5 gegen dein schriftlich
 festgehaltenes Leseprofil ([`leseprofil.md`](leseprofil.md)), nach dem Verfahren
-aus dem [Bewertungsschema](bewertungsschema.md), und begründet das Urteil. Unter
+aus dem [Bewertungsschema](bewertungsschema.yaml), und begründet das Urteil. Unter
 dem Schwellwert kommt sie nicht auf den Stapel — es sei denn, das Urteil ruht
 nur auf Vermutung, dann wird gezeigt statt verschwiegen. Höchstens 40 Urteile
 pro Lauf; gespeicherte kosten nichts.
@@ -168,7 +168,7 @@ hinzugefügte Autorin ihre gesamte Backlist als Neuzugänge.
 
 **Urteil** — Sterne, Begründung und Sicherheit, gegen eine nummerierte Fassung
 deines Leseprofils. Wie geurteilt wird, steht getrennt davon im
-[Bewertungsschema](bewertungsschema.md) und ist nicht versioniert (ADR 21).
+[Bewertungsschema](bewertungsschema.yaml) und ist nicht versioniert (ADR 21).
 Dazu die Herkunft, und die ist Teil des Schlüssels:
 
 > „Eine 4 von dir ist eine Tatsache. Eine 4 von einem Modell ist ein Vorschlag."
