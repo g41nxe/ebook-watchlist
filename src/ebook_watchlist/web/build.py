@@ -48,6 +48,9 @@ class Library:
         return VENDOR / self.name
 
 
+#: Fertige Dateien, die nur an ihren Platz muessen.
+ICONS = ("favicon.svg",)
+
 LIBRARIES = (
     Library(
         name="alpine.min.js",
@@ -91,8 +94,20 @@ def build_css() -> None:
     )
 
 
+def copy_icons() -> None:
+    """Was schon fertig ist, wird nur kopiert.
+
+    Es liegt trotzdem unter ``assets/``: ``static/`` ist Bauergebnis und nicht
+    im Repository, eine Datei dort waere also beim naechsten Klon weg.
+    """
+    STATIC.mkdir(parents=True, exist_ok=True)
+    for name in ICONS:
+        shutil.copyfile(ASSETS / name, STATIC / name)
+
+
 def main() -> int:
     build_css()
+    copy_icons()
     for library in LIBRARIES:
         digest = fetch(library)
         marker = "" if library.sha256 else "  (sha256 in build.py eintragen)"

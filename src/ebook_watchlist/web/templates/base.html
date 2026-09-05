@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}eBook-Watchlist{% endblock %}</title>
+<link rel="icon" href="{{ url_for('static', path='favicon.svg') }}?v={{ asset_version }}"
+      type="image/svg+xml">
 <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}?v={{ asset_version }}">
 {#
   Die Arbeitsteilung aus ADR 20: htmx fuer alles, was der Server weiss, Alpine
