@@ -5,9 +5,11 @@ wuerde dem Shop bei jedem Seitenaufruf mitteilen, welches Buch die Leserin
 gerade ansieht; ein einmal geholtes und lokal abgelegtes tut das nicht. Fuer
 den Shop ist das ausserdem *weniger* Verkehr, nicht mehr.
 
-Geholt wird nur fuer Buecher, die eine ``book``-Zeile haben — also fuer solche,
-zu denen die Leserin eine Beziehung hat (ADR 18). Fuer jede Entdeckung ein Bild
-zu ziehen waeren dreihundert Anfragen pro Lauf statt einer Handvoll.
+Geholt wird nur, wo es sich lohnt: fuer Buecher mit einer ``book``-Zeile, also
+solche, zu denen die Leserin eine Beziehung hat (ADR 18) — und fuer Entdeckungen
+erst, wenn das Bewertungstor sie durchgelassen hat. Fuer jede Entdeckung ein
+Bild zu ziehen waeren dreihundert Anfragen pro Lauf statt einer Handvoll; fuer
+die zwanzig, die uebrig bleiben, sind es zwanzig.
 """
 
 from __future__ import annotations
@@ -33,15 +35,21 @@ def _suffix(url: str) -> str:
     return _SUFFIXES.get((match.group(1) if match else "").lower(), ".jpg")
 
 
-def file_name(book_id: int, url: str) -> str:
-    """``17-3f9a2b.jpg``.
+def file_name(key: int | str, url: str) -> str:
+    """``17-3f9a2b.jpg`` — oder ``beam-632330-3f9a2b.jpg``.
 
-    Die Buch-Id macht die Datei auffindbar, der Hash der Adresse sorgt dafuer,
-    dass ein gewechseltes Cover eine neue Datei bekommt statt die alte still zu
-    ueberschreiben — und dass ein alter Verweis nie auf ein anderes Bild zeigt.
+    Der Schluessel macht die Datei auffindbar, der Hash der Adresse sorgt
+    dafuer, dass ein gewechseltes Cover eine neue Datei bekommt statt die alte
+    still zu ueberschreiben — und dass ein alter Verweis nie auf ein anderes
+    Bild zeigt.
+
+    Eine Buch-Id, wo es eine gibt; sonst ``quelle-nummer``. Eine Entdeckung hat
+    keine ``book``-Zeile (ADR 18), und der Name muss trotzdem eindeutig sein und
+    sich ohne Datenbank ausrechnen lassen: die Seite prueft damit einfach, ob
+    die Datei schon daliegt, statt den Namen irgendwo zu speichern.
     """
     digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:6]
-    return f"{book_id}-{digest}{_suffix(url)}"
+    return f"{key}-{digest}{_suffix(url)}"
 
 
 class CoverStore:
@@ -56,7 +64,7 @@ class CoverStore:
     def has(self, name: str) -> bool:
         return self.path(name).is_file()
 
-    def fetch(self, client: HttpClient, book_id: int, url: str) -> str | None:
+    def fetch(self, client: HttpClient, key: int | str, url: str) -> str | None:
         """Das Bild holen, falls es noch nicht daliegt. Gibt den Dateinamen zurueck.
 
         Ein fehlgeschlagener Bilddownload ist kein Grund, einen Lauf scheitern zu
@@ -64,7 +72,7 @@ class CoverStore:
         Drosselung wird durchgereicht: da hat der Shop ausdruecklich Halt gesagt,
         und das gilt fuer alles Weitere mit (ADR 7).
         """
-        name = file_name(book_id, url)
+        name = file_name(key, url)
         if self.has(name):
             return name
         try:

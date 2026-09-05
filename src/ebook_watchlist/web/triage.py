@@ -13,11 +13,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from .. import paths
 from ..config import Profile
+from ..covers import CoverStore, file_name
 from ..deals import is_strong_deal
 from ..diff import worth_announcing
 from ..junk import is_junk
 from ..models import MatchReason, Observation
+from ..rating import DEFAULT_THRESHOLD
 from ..ratings import BY_MODEL, subject_of
 from ..reasons import short_why, thema_name, why_shown
 from ..relations import RelationKind
@@ -64,6 +67,11 @@ class Suggestion:
     #: Was das Bewertungstor von dem Buch hält — ``None``, solange es nicht
     #: gelaufen ist.
     stars: int | None = None
+    #: Der Dateiname im Cover-Ordner, falls das Bild schon geholt wurde. Eine
+    #: Entdeckung hat keine ``book``-Zeile, an der er stehen könnte — er ergibt
+    #: sich aus Schlüssel und Adresse und wird deshalb nachgesehen, nicht
+    #: gespeichert.
+    cover_file: str | None = None
     #: Ein Satz, warum das Buch in Frage kommt. Steht hier **statt** des
     #: Klappentexts: der sagt, wovon das Buch handelt, der Pitch sagt, warum es
     #: für diese Leserin zählt (bewertungsschema.yaml).
@@ -88,6 +96,10 @@ class Pile:
     #: Wie viele es insgesamt sind, auch wenn die Seite weniger zeigt.
     total: int
     hidden_junk: int
+    #: Vom Bewertungstor unter dem Schwellwert einsortiert. Nicht verworfen:
+    #: das Urteil steht auf der Buchseite, und eine neue Profilversion holt sie
+    #: zurück.
+    hidden_weak: int = 0
     #: Weder Schnäppchen noch ausleihbar — würde nie gemeldet, steht also auch
     #: nicht im Stapel. Verschwunden ist nichts: fällt der Preis, ist das Buch
     #: wieder da (ADR 19).
@@ -96,6 +108,20 @@ class Pile:
     @property
     def is_empty(self) -> bool:
         return not self.items
+
+
+def _cover_file(observation: Observation) -> str | None:
+    """Das Titelbild, falls es schon im Ordner liegt.
+
+    Nachgesehen statt gespeichert: der Name ist eine reine Funktion aus
+    Schlüssel und Adresse, und eine Entdeckung hat keine Zeile, an der er
+    stehen könnte. Die Oberfläche lädt nie selbst nach (ADR 3) — geholt wird
+    beim Bewerten, und zwar nur für das, was durchkommt.
+    """
+    if not observation.cover_url:
+        return None
+    name = file_name(f"{observation.source}-{observation.source_item_id}", observation.cover_url)
+    return name if CoverStore(paths.covers_dir()).has(name) else None
 
 
 def _suggestion(
@@ -118,6 +144,7 @@ def _suggestion(
         why=why_shown(observation),
         why_short=short_why(observation),
         stars=judgement.stars if judgement else None,
+        cover_file=_cover_file(observation),
         pitch=(judgement.pitch or None) if judgement else None,
     )
 
@@ -144,6 +171,7 @@ def pending(
     items: list[Suggestion] = []
     hidden_junk = 0
     hidden_priced = 0
+    hidden_weak = 0
     for observation in found:
         if (observation.source, observation.source_item_id) in decided_items:
             continue
@@ -158,14 +186,17 @@ def pending(
         if not worth_announcing(observation, profile):
             hidden_priced += 1
             continue
+        # Dieselbe Schwelle wie im Digest: was das Tor zurückhält, ist keine
+        # Aufgabe. Ein Fund **ohne** Urteil bleibt — "noch nicht beurteilt" ist
+        # etwas anderes als "passt nicht".
+        judgement = judgements.get((subject_of(observation), BY_MODEL))
+        if judgement is not None and judgement.stars < DEFAULT_THRESHOLD:
+            hidden_weak += 1
+            continue
         if reason and str(observation.match_reason) != reason:
             continue
         items.append(
-            _suggestion(
-                observation,
-                profile,
-                judgements.get((subject_of(observation), BY_MODEL)),
-            )
+            _suggestion(observation, profile, judgement)
         )
 
     # Das Beste zuerst. Ohne das stehen oben die Funde, die zufaellig zuletzt
@@ -179,6 +210,7 @@ def pending(
         total=len(items),
         hidden_junk=hidden_junk,
         hidden_priced=hidden_priced,
+        hidden_weak=hidden_weak,
     )
 
 

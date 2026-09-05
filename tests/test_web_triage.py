@@ -324,22 +324,75 @@ def test_the_page_shows_ten_not_fifty(client: TestClient, db: Store) -> None:
 
 def test_the_best_stand_at_the_top(client: TestClient, db: Store) -> None:
     """Sonst faengt der Stapel mit dem an, was das Profil gerade abgelehnt hat."""
-    schwach = found(db, item_id="a", title="Schwacher Fund")
-    stark = found(db, item_id="b", title="Starker Fund")
-    urteil(db, schwach, stars=1, pitch="Kaum Beruehrung.")
+    schwaecher = found(db, item_id="a", title="Der schwaechere Fund")
+    stark = found(db, item_id="b", title="Der stärkere Fund")
+    urteil(db, schwaecher, stars=3, pitch="Traegt eine Sache.")
     urteil(db, stark, stars=4, pitch="Genau die kaputte Stimme.")
 
     titel = [item.title for item in view.pending(db, load_profile()).items]
 
-    assert titel.index("Starker Fund") < titel.index("Schwacher Fund")
+    assert titel.index("Der stärkere Fund") < titel.index("Der schwaechere Fund")
 
 
 def test_an_unjudged_find_sinks_below_the_judged(client: TestClient, db: Store) -> None:
     """Ohne Urteil ist es keine Empfehlung, sondern eine offene Frage."""
     found(db, item_id="a", title="Ohne Urteil")
-    schwach = found(db, item_id="b", title="Ein Stern")
-    urteil(db, schwach, stars=1, pitch="Kaum Beruehrung.")
+    bewertet = found(db, item_id="b", title="Mit Urteil")
+    urteil(db, bewertet, stars=3, pitch="Traegt eine Sache.")
 
     titel = [item.title for item in view.pending(db, load_profile()).items]
 
-    assert titel.index("Ein Stern") < titel.index("Ohne Urteil")
+    assert titel.index("Mit Urteil") < titel.index("Ohne Urteil")
+
+
+def test_what_the_gate_holds_back_is_not_a_task(client: TestClient, db: Store) -> None:
+    """Dieselbe Schwelle wie im Digest. Was dich nie erreicht, ist keine
+    Aufgabe — und die Seite sagt, wie viel sie deshalb verschweigt."""
+    schwach = found(db, item_id="a", title="Schwacher Fund")
+    stark = found(db, item_id="b", title="Starker Fund")
+    urteil(db, schwach, stars=2, pitch="Nur Genre-Naehe.")
+    urteil(db, stark, stars=3, pitch="Traegt eine Sache ueberzeugend.")
+
+    pile = view.pending(db, load_profile())
+    body = client.get("/vorschlaege").text
+
+    assert [item.title for item in pile.items] == ["Starker Fund"]
+    assert pile.hidden_weak == 1
+    assert "1 unter drei Sternen" in body
+    assert "Schwacher Fund" not in body
+
+
+def test_an_unjudged_find_is_never_hidden_as_weak(client: TestClient, db: Store) -> None:
+    """"Noch nicht beurteilt" ist etwas anderes als "passt nicht"."""
+    found(db, item_id="a", title="Ohne Urteil")
+
+    pile = view.pending(db, load_profile())
+
+    assert [item.title for item in pile.items] == ["Ohne Urteil"]
+    assert pile.hidden_weak == 0
+
+
+def test_the_page_uses_the_same_threshold_as_the_digest(client: TestClient, db: Store) -> None:
+    """Zwei Ansichten desselben Stapels mit zwei Schwellen waeren genau die
+    Drift, die dieses Projekt schon dreimal eingefangen hat."""
+    from ebook_watchlist.rating import DEFAULT_THRESHOLD
+
+    knapp = found(db, item_id="a", title="Genau an der Schwelle")
+    urteil(db, knapp, stars=DEFAULT_THRESHOLD, pitch="Gerade so.")
+
+    assert [i.title for i in view.pending(db, load_profile()).items] == ["Genau an der Schwelle"]
+
+
+def test_a_title_beginning_with_a_number_word_is_read_as_a_bundle(
+    client: TestClient, db: Store
+) -> None:
+    """Beim Schreiben dieser Tests selbst hineingelaufen: "Drei Sterne" trifft
+    das Bündelmuster, das für "Drei Gruselkrimis" gedacht ist. Ein echter Titel
+    wie "Drei Tage im Mai" verschwände genauso — hier festgehalten, damit die
+    Grenze des Filters sichtbar bleibt."""
+    found(db, item_id="a", title="Drei Sterne")
+
+    pile = view.pending(db, load_profile())
+
+    assert pile.items == ()
+    assert pile.hidden_junk == 1

@@ -26,7 +26,9 @@
     {% if pile.hidden_junk %}{{ pile.hidden_junk }} Sammelbände und Gratistitel{% endif %}
     {%- if pile.hidden_junk and pile.hidden_priced %}, {% endif %}
     {%- if pile.hidden_priced %}{{ pile.hidden_priced }} weder Schnäppchen noch
-    ausleihbar{% endif %} — ausgeblendet, nicht verworfen.</span>
+    ausleihbar{% endif %}
+    {%- if pile.hidden_weak %}, {{ pile.hidden_weak }} unter drei Sternen{% endif %}
+    — ausgeblendet, nicht verworfen.</span>
   {% endif %}
   {% endif %}
 </p>
@@ -76,6 +78,7 @@
     Gratistitel ausgeblendet{% endif %}
     {%- if pile.hidden_priced %} · {{ pile.hidden_priced }} weder Schnäppchen
     noch ausleihbar{% endif %}
+    {%- if pile.hidden_weak %} · {{ pile.hidden_weak }} unter drei Sternen{% endif %}
   </span>
 </div>
 
