@@ -11,12 +11,45 @@ Teil des Repositories.
 
 ## 1. Was fehlt oder noch nicht stimmt
 
-### Das Bewertungstor hat nie gelaufen
+### Das Bewertungstor: 109 echte Urteile (Ticket 27)
 
-Es ist gebaut, getestet und eingebunden — aber **kein einziges Mal ausgeführt**,
-weil kein `ANTHROPIC_API_KEY` gesetzt ist. Alles, was über sein Verhalten
-gesagt wird, ist aus Tests mit einem Stub belegt, nicht aus Betrieb. Der erste
-scharfe Lauf ist deshalb ein echtes Ereignis und kein Formsache.
+Gelaufen, gegen Profilversion 2, über die lokal angemeldete
+Claude-Code-Installation — ein Schlüssel wurde nicht gebraucht.
+
+| | |
+|---|---|
+| Verteilung | 5★ ×1, 4★ ×11, 3★ ×14, 2★ ×39, 1★ ×24, 0★ ×20 |
+| Sicherheit | belegt 41, teils 67, vermutet 1 |
+| zurückgehalten (unter 3, nicht `vermutet`) | 83 |
+| trotz Unsicherheit gezeigt | 0 |
+
+**Das Tor unterscheidet.** Es bewertet nicht alles gleich, und die Spitze ist
+dünn besetzt statt großzügig: ein einziger Fünfsterner (*Macbeth*, Jo Nesbø)
+unter 109. Als Kontrolle bekam *Die Verlorenen* — vom Leser gelesen und
+gemocht — 4 von 5. Die Skala trägt also oben und die Regale sind wirklich dünn.
+
+**Liest das Modell die Gewichtung aus der Prosa?** Nach Durchsicht
+zurückgehaltener Begründungen: ja. Sie nennen die Achsen beim Namen, in der
+Reihenfolge des Profils, und sie unterscheiden **belegt von erschlossen** —
+zu *Katz und Maus* steht ausdrücklich, dass der Reihenzusammenhang
+„erschlossen (nicht im Klappentext belegt)" ist. Zu *Die atmenden Schächte
+von Lugau*: „Ensemble statt einer Stimme" und „der Klappentext *listet*
+Jahreszahlen, Schächte, Spinnmühle — erklärte statt erzählter Welt".
+
+Damit bleibt **ADR 21 bei seiner Ablehnung eines Ableitungsschritts**: die
+Achsen aus der Prosa maschinell zu extrahieren wäre eine Lösung für ein
+Problem, das die Messung nicht zeigt.
+
+Zwei Einschränkungen, die dazugehören:
+
+- **Das Tor selbst hat im Lauf noch nichts entschieden.** Alle 109 Urteile
+  stammen aus `ebw rate` (dem Rückstandsweg). Der Lauf sieht nur
+  Erstsichtungen, und die Regale waren abgegrast — der scharfe Lauf erzeugte
+  null Deltas. Geprüft ist damit der Bewertungsweg, nicht `_decide`.
+- **Die Regel „ab `teils` darf zurückgehalten werden" hat nie gegriffen.**
+  Das einzige `vermutet` liegt *über* der Schwelle. Das Sicherheitsventil,
+  das ein unsicheres Urteil davon abhält, ein Buch zu verstecken, ist bisher
+  Theorie — 1 von 109.
 
 ### Die Metadatenquelle ist recherchiert, nicht angebunden
 
@@ -29,11 +62,18 @@ fehlt weiterhin:
   aber nicht auf `book.title` / `book.author` an)
 - Reihe und Bandnummer, und damit die Grundlage für Serien-Tracking
 
-### Cover: Mechanik ohne Bilder
+### Cover: da, aber der Name hängt an der Adresse
 
-Der Weg steht — Adresse aus der Kachel, einmal geholt, lokal abgelegt. Es liegt
-aber **keine einzige Datei** im Ordner, weil Bilder beim Lauf geholt werden und
-seitdem keiner lief. Die Oberfläche zeigt durchweg Platzhalter.
+Der Weg steht und der Stapel ist bebildert — 26 von 26. Der Dateiname ist ein
+Hash der **Bildadresse**, damit dasselbe Bild eine Datei ist, gleichgültig ob
+es an einem Vorschlag oder an einer `book`-Zeile hängt.
+
+Das hat einen Preis, der beim ersten Mal zugeschlagen hat: die Detailseite
+nennt ein 600x600-Bild, die Kachel ein 200x200. Wer zuletzt schreibt, gewinnt.
+Ein Lauf überschrieb drei frisch geholte Detailadressen mit Kacheladressen —
+und damit zeigte die Seite wieder Platzhalter, obwohl die Dateien dalagen. Sie
+waren nur nicht mehr unter dem berechneten Namen zu finden. Drei verwaiste
+Dateien, drei überflüssige Anfragen.
 
 Und der Punkt, an dem wir jetzt allein hängen, ist ungeprüft: **die
 Nutzungsbedingungen von beam für Produktbilder** hat niemand gelesen. Die
