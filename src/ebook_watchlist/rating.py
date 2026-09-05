@@ -593,6 +593,13 @@ def _cli_text(stdout: str) -> str:
     Die Hülle kann sich ändern; auf ihr Format zu bestehen hiesse, an einer
     fremden Version zu hängen. Fehlt sie oder sieht sie anders aus, geht der
     Text unverändert weiter und ``parse_answer`` sucht sich das JSON darin.
+
+    Eine Ausnahme: die Hülle sagt selbst, wenn etwas schiefging — dann steht in
+    ``result`` **die Fehlermeldung** und nicht die Antwort. Ohne diese Prüfung
+    wanderte "Failed to authenticate: OAuth session expired" als vermeintliches
+    Urteil weiter und scheiterte erst zwei Schritte später an "enthält kein
+    JSON". Gemessen an einer abgelaufenen Anmeldung, die genau so aussah — und
+    der Rückgabewert war dabei **null**.
     """
     try:
         envelope = json.loads(stdout)
@@ -600,6 +607,9 @@ def _cli_text(stdout: str) -> str:
         return stdout
     if isinstance(envelope, dict):
         result = envelope.get("result")
+        if envelope.get("is_error"):
+            grund = result if isinstance(result, str) and result else "ohne Angabe"
+            raise RatingUnavailable(f"Claude Code meldet einen Fehler: {grund}")
         if isinstance(result, str):
             return result
     return stdout

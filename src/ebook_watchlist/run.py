@@ -69,13 +69,17 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "command",
         nargs="?",
         default="run",
-        choices=["run", "doctor", "sources", "seed", "dismissals"],
+        choices=["run", "doctor", "sources", "seed", "dismissals", "rate"],
         help=(
             "'run' checks everything; 'doctor' only asks each Source whether it still "
             "parses; 'sources' lists them and can pause one; 'seed' imports the YAML "
             "files into the database once; 'dismissals' resolves the leftover product "
             "numbers from dismissed.yaml into Book Relations"
         ),
+    )
+    parser.add_argument(
+        "--anzahl", type=int, default=10, metavar="N",
+        help="wie viele Vorschläge 'rate' beurteilt (Voreinstellung 10)",
     )
     parser.add_argument("--enable", metavar="QUELLE", help="eine pausierte Quelle wieder aufnehmen")
     parser.add_argument("--disable", metavar="QUELLE", help="eine Quelle pausieren")
@@ -293,6 +297,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _seed(profile, watchlist)
         if args.command == "dismissals":
             return _dismissals(profile, sources)
+        if args.command == "rate":
+            return _rate(profile, args.anzahl)
         try:
             return _run(
                 profile,
@@ -348,6 +354,78 @@ def _dismissals(profile, sources) -> int:
         # Ein Rückgabewert ungleich null, damit ein Cron-Job nicht "fertig"
         # meldet, während eine Ablehnung unter den Tisch gefallen ist.
         return EXIT_SOURCE_FAILURE
+    return EXIT_OK
+
+
+def _rate(profile: Profile, wieviele: int) -> int:
+    """Den Rückstand beurteilen, ohne eine Quelle zu fragen (Ticket 19).
+
+    Das Tor im Lauf sieht nur **Erstsichtungen**. Was einmal im Snapshot steht,
+    erzeugt beim nächsten Lauf kein Delta mehr — der angesammelte Rückstand ist
+    für das Tor also unsichtbar, und ohne diesen Weg bliebe er es für immer.
+
+    Kein Netz außer dem Modell: die Bücher stehen bereits da, es wird nur
+    geurteilt. Das macht diesen Befehl zur ruhigen Stelle, an der sich Bündel-
+    größe und Modell messen lassen, ohne dass ein Shop etwas davon merkt.
+    """
+    from .rating import rate_in_batches
+    from .ratings import BY_MODEL, subject_of
+    from .web import triage
+
+    store = Store(paths.db_path())
+    rater = build_rater(profile.rating_model)
+    if rater is None:
+        print(
+            "Kein Bewerter: weder ANTHROPIC_API_KEY noch eine angemeldete "
+            "Claude-Code-Installation gefunden.",
+            file=sys.stderr,
+        )
+        return EXIT_CONFIG_ERROR
+
+    offen = [item for item in triage.pending(store, profile, limit=wieviele).items]
+    if not offen:
+        print("Nichts offen — es gibt keinen Vorschlag ohne Urteil.")
+        return EXIT_OK
+
+    keys = {item.key for item in offen}
+    beobachtungen = [
+        observation
+        for observation in store.latest_discoveries(profile.slug)
+        if f"{observation.source}:{observation.source_item_id}" in keys
+    ]
+
+    print(f"{len(beobachtungen)} Vorschläge, Bündel zu {profile.rating_batch_size} …")
+    urteile = rate_in_batches(rater, beobachtungen, size=profile.rating_batch_size)
+
+    now = datetime.now()
+    verteilung: dict[int, int] = {}
+    for observation in beobachtungen:
+        rating = urteile.get(observation.key)
+        if rating is None:
+            print(f"  ohne Urteil  {observation.title[:52]}")
+            continue
+        store.put_rating(
+            subject_of(observation),
+            stars=rating.stars,
+            confidence=rating.confidence,
+            reason=rating.reason,
+            profile_version=rating.profile_version,
+            now=now,
+            origin=BY_MODEL,
+            pitch=rating.pitch,
+        )
+        verteilung[rating.stars] = verteilung.get(rating.stars, 0) + 1
+        print(f"  {'★' * rating.stars}{'☆' * (5 - rating.stars)} {rating.confidence:<9}"
+              f" {observation.title[:52]}")
+        if rating.pitch:
+            print(f"            {rating.pitch}")
+
+    # Eine Bewertung, die nicht unterscheidet, ist wertlos — deshalb steht die
+    # Verteilung da und nicht nur die Zahl der Urteile.
+    gezaehlt = ", ".join(
+        f"{sterne}★ ×{anzahl}" for sterne, anzahl in sorted(verteilung.items(), reverse=True)
+    )
+    print(f"\n  Verteilung: {gezaehlt or 'keine'}")
     return EXIT_OK
 
 

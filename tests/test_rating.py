@@ -1060,3 +1060,27 @@ def test_the_answer_rule_is_not_repeated_beside_the_scheme() -> None:
     text = prompt_for(discovery(), LESEPROFIL, load_rating_scheme())
 
     assert text.count("confidence 'vermutet'") == 0
+
+
+def test_an_error_envelope_is_not_mistaken_for_an_answer() -> None:
+    """Gemessen an einer abgelaufenen Anmeldung: die Hülle trug exit 0, aber
+    is_error true, und in ``result`` stand "Failed to authenticate: OAuth
+    session expired". Ohne diese Prüfung wanderte das als Urteil weiter."""
+    from ebook_watchlist.rating import _cli_text
+
+    huelle = json.dumps({
+        "is_error": True,
+        "result": "Failed to authenticate: OAuth session expired and could not be refreshed",
+        "type": "result",
+    })
+
+    with pytest.raises(RatingUnavailable, match="OAuth session expired"):
+        _cli_text(huelle)
+
+
+def test_a_good_envelope_still_yields_its_result() -> None:
+    from ebook_watchlist.rating import _cli_text
+
+    huelle = json.dumps({"is_error": False, "result": '{"stars": 4}'})
+
+    assert _cli_text(huelle) == '{"stars": 4}'
