@@ -103,7 +103,7 @@ offen.
 - **Alpine.** Es wird geladen und trägt den Fall, den ADR 20 selbst nennt: der
   Vorschlagsstapel zählt, was angehakt ist, und kennt "alle" und "keine".
 - **`CONTEXT.md`.** Bewertungstor, Urteil (mit Herkunft), Maßstab und
-  Entdeckung stehen im Glossar.
+  Fund stehen im Glossar.
 - **Der `dismissals`-Befehl** achtet den Quellen-Schalter. Was ohne Anfrage
   geht, geht weiter; der Rest wird gemeldet statt still zu scheitern.
 
@@ -130,7 +130,7 @@ Identifikation — etwas ganz anderes.
 zweien: eines teilt die ISBN, eines nicht. Der Matcher-Rückfall ist der
 Normalfall, nicht der Randfall. ADR 18 trägt die Korrektur mit Zahlen.
 
-**316 Entdeckungen sind nicht der tägliche Stapel.** Ich hatte sie so
+**316 Funde sind nicht der tägliche Stapel.** Ich hatte sie so
 beschriftet. Es ist ein einmaliger Rückstand plus die Abrufmenge je Lauf; der
 tägliche Zuwachs war **null**.
 
@@ -163,7 +163,7 @@ als Gegenprobe im Test.
 letzten Trennung, weil der Name hinten steht — ein angehängter Bandzusatz sieht
 von hinten aus wie ein Name.
 
-**Die Preisregel tut nicht, was sie verspricht.** „Entdeckungen nur als Deal"
+**Die Preisregel tut nicht, was sie verspricht.** „Funde nur als Schnäppchen"
 heißt praktisch „unter 5,00 €", weil die Buchpreisbindung Streichpreise
 verbietet und ein neuer Fund keine Vorgeschichte hat. Angewandt ließ sie neun
 Titel eines Selfpublishers durch und schwieg zu einem neuen Nesbø.

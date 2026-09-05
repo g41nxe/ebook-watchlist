@@ -63,7 +63,7 @@ gespeicherte Beobachtung, nicht gegen „gestern". Was sich unterscheidet, ist e
 > Dadurch ist der Lauf gegenüber seinem Zeitplan gleichgültig: drei ausgefallene
 > Cron-Läufe kosten nichts, der nächste berichtet alles Angesammelte (ADR 4).
 
-**5. Alles Gesehene in den Snapshot schreiben.** Anhängend, nie überschreibend —
+**5. Alles Gesehene in die Aufzeichnung schreiben.** Anhängend, nie überschreibend —
 auch das, was du nie zu sehen bekommst.
 
 > Deshalb steht dieser Schritt *vor* allem, was noch schiefgehen kann: ein
@@ -73,12 +73,12 @@ auch das, was du nie zu sehen bekommst.
 zu denen du eine Beziehung hast. Für Vorschläge wären das hunderte Anfragen pro
 Lauf.
 
-> Dieser Schritt stand einmal *vor* dem Snapshot. Ein `403` auf ein Bild riss
+> Dieser Schritt stand einmal *vor* der Aufzeichnung. Ein `403` auf ein Bild riss
 > damit den ganzen Lauf ab, bevor eine einzige Beobachtung geschrieben war — und
 > `403` ist genau die Antwort, mit der ein Shop einen Bot aussperrt.
 
-**7. Das Bewertungstor, dann der Digest.** Was die Preisregel durchgelassen hat,
-wird gegen dein Leseprofil geprüft. Übrig bleibt der Digest — Text auf die
+**7. Das Bewertungstor, dann der Tagesbericht.** Was die Preisregel durchgelassen hat,
+wird gegen dein Leseprofil geprüft. Übrig bleibt der Tagesbericht — Text auf die
 Konsole, HTML nach `data/digests/`. Gibt es nichts zu sagen, sagt er nichts.
 
 ---
@@ -94,10 +94,10 @@ Das ist die wichtigste Regel des ganzen Werkzeugs (ADR 19).
 | **Referenzautor:in** — jemand, den du liest | nur als Schnäppchen | Lange galt hier eine Ausnahme: gemeldet zu jedem Preis. Sie war als vorläufig gedacht und ist beendet. |
 | **Thema** — ein Regal, dem du folgst | nur als Schnäppchen | Der schwächste Hinweis von allen: der Shop hat das Buch einsortiert, mehr weiß niemand. |
 
-> „Ein Watchlist-Titel wird immer gemeldet. Eine Entdeckung muss es sich
+> „Ein Watchlist-Titel wird immer gemeldet. Ein Fund muss es sich
 > verdienen."
 
-In der Praxis heißt „Schnäppchen" am Tag der Entdeckung **unter 5,00 €**: die
+In der Praxis heißt „Schnäppchen" am Tag des Fundes **unter 5,00 €**: die
 Buchpreisbindung verbietet dem Shop Streichpreise, und ein neuer Fund hat noch
 keine Vorgeschichte, gegen die sich ein Nachlass messen ließe.
 
@@ -112,10 +112,10 @@ fällt.
 
 ### 1. Die Preisregel
 
-Kostenlos. Entdeckungen unter 5,00 € gelten sofort; im Band von 5,00 bis 9,99 €
+Kostenlos. Funde unter 5,00 € gelten sofort; im Band von 5,00 bis 9,99 €
 braucht es mindestens 25 % Nachlass gegen einen früher beobachteten Preis.
 
-*Gemessen:* von 300 Entdeckungen eines echten Laufs lagen 65 bei 10 € oder mehr
+*Gemessen:* von 300 Funden eines echten Laufs lagen 65 bei 10 € oder mehr
 — die warten.
 
 ### 2. Der Ramschfilter
@@ -129,7 +129,7 @@ zu bekommen.
 
 ### 3. Das Bewertungstor — **noch nie gelaufen**
 
-Ein Modell bewertet jede Entdeckung von 0 bis 5 gegen dein schriftlich
+Ein Modell bewertet jeden Fund von 0 bis 5 gegen dein schriftlich
 festgehaltenes Leseprofil ([`leseprofil.yaml`](leseprofil.yaml)), nach dem Verfahren
 aus dem [Bewertungsschema](bewertungsschema.yaml), und begründet das Urteil. Unter
 dem Schwellwert kommt sie nicht auf den Stapel — es sei denn, das Urteil ruht
@@ -153,7 +153,7 @@ Verfügbarkeit, Titel, wie *sie* ihn schreibt. Nie das, was wir glauben. Wechsel
 ein Shop still die Ausgabe unter derselben Nummer, bleibt das dadurch sichtbar.
 
 **Buch** — ein Buch als Sache an sich, quellenunabhängig. **Eine Buchzeile
-entsteht nur dort, wo du eine Beziehung dazu hast**; eine bloße Entdeckung
+entsteht nur dort, wo du eine Beziehung dazu hast**; ein bloßer Fund
 bleibt eine Beobachtung. Sonst bestünde die Tabelle mehrheitlich aus ungeprüften
 Dubletten und verdiente ihren Namen nicht.
 
@@ -178,7 +178,7 @@ einander nie und sehen auf der Buchseite verschieden aus. Eine neue
 Profilversion entwertet Maschinenurteile — und nur die (ADR 17). Eine Änderung
 am Verfahren entwertet gar nichts.
 
-Die zwei Regeln, die zählen: **der Snapshot wird nur angehängt**, und **eine
+Die zwei Regeln, die zählen: **die Aufzeichnung wird nur angehängt**, und **eine
 Buchzeile entsteht nur, wo du eine Beziehung hast**.
 
 ---
@@ -193,7 +193,7 @@ sie stößt höchstens einen Lauf an (ADR 3).
 
 | Pfad | Was dort steht |
 | --- | --- |
-| `/` | Übersicht: Zustand der Quellen, die letzten Läufe, die Digests — und der Knopf „jetzt laufen" |
+| `/` | Übersicht: Zustand der Quellen, die letzten Läufe, die Tagesberichte — und der Knopf „jetzt laufen" |
 | `/watchlist` | Was du beobachtest, mit Preis und Ausleihstatus in einer Zeile |
 | `/book/{id}` | Alles über ein Buch: Beziehungen, Quellen, Preisverlauf, Urteile — und deine eigenen Sterne |
 | `/vorschlaege` | Der Stapel: ankreuzen, dann verwerfen, beobachten oder „habe ich" |

@@ -2,7 +2,13 @@
 
 ## Glossary
 
+Der Code und dieses Glossar sind englisch, alles Gelesene ist deutsch.
+Hinter jedem Namen steht deshalb sein deutsches Wort — genau eines
+(ADR 22).
+
 ### Profile
+*deutsch: Profil*
+
 A reader's taste definition: Reference Authors (a whitelist), Genre Categories,
 deal thresholds (`strong_deal_max_cents`, `deal_max_cents`, `min_discount_pct`),
 and no-gos (dormant in v1). A first-class, keyed entity. v1 runs with a single
@@ -10,34 +16,46 @@ profile, but nothing hard-codes that — the data model and code support multipl
 profiles.
 
 ### Watchlist
+*deutsch: Watchlist*
+
 The set of Watchlist Entries belonging to one Profile. Titles/authors actively
 watched regardless of whether they fit the Profile's genres.
 
 ### Watchlist Entry
+*deutsch: Watchlist-Eintrag*
+
 One watched item. From Phase 2 this is a Book Relation of kind `watching`
 (ADR 18) — the title and author live on the Book, the per-Source links in
 `book_source`, and current price/availability in the Snapshot as Observations.
 Never on the entry itself.
 
 ### Book
+*deutsch: Buch*
+
 A book as a thing in itself — title, author, ISBN, series — independent of any
 Source. A Book row exists **only where the reader has a relationship to it**
 (ADR 18); a bare discovery stays an Observation. Identity is the ISBN where one
 is available, otherwise title and author through the matcher.
 
 ### Book Relation
+*deutsch: Buchbeziehung*
+
 What a Profile has to do with a Book: `watching`, `owned`, `liked`, `disliked`,
 `dismissed`. Several hold at once — a book can be owned *and* have been watched.
 Relations are deactivated rather than deleted, so "watched until you bought it"
 stays visible.
 
 ### Interest
+*deutsch: Interesse*
+
 Where the tool should look for new books: a Reference Author or a Genre
 Category, unified into one concept because both answer the same question and
 produce the two discovery Match Reasons. Extensible by a free-text key —
 publisher, series, keyword — each needing a handler, not a migration.
 
 ### Hold
+*deutsch: Vormerkung*
+
 The user's reservation ("Vormerkung") on a Library Source title that is
 currently lent out. **v2 feature** (see ADR 6). A hold is *observed*, not set —
 v2 reads it off the authenticated account page — so it lives on the Observation
@@ -46,6 +64,8 @@ as `hold_state` (`none` → `placed` → `ready`) and `hold_expected_date`
 ordinary Delta, with history, rather than a mutable flag on an entry.
 
 ### Source
+*deutsch: Quelle*
+
 A place that is polled for data, behind a common interface. Two kinds in v1:
 
 - **Library Source** — reports availability/borrowable status for a title.
@@ -56,11 +76,15 @@ A place that is polled for data, behind a common interface. Two kinds in v1:
 More Sources of either kind can be added without changing the core.
 
 ### Snapshot
+*deutsch: Aufzeichnung*
+
 The stored history of Observations. A Run compares the latest Observation of an
 item against the previous one and reports only what changed. Append-only, not a
 single mutable current-state row.
 
 ### Observation
+*deutsch: Beobachtung*
+
 One recording of an item's state as seen by a Source during a Run: title,
 author, ISBN, blurb, series, price, availability status, hold state,
 `observed_at`, the Source, a stable `source_item_id` from that Source, the
@@ -71,12 +95,16 @@ believe. Title, author and ISBN are kept even when the Book is known, so that a
 source quietly switching editions under the same id stays detectable.
 
 ### Match Reason
+*deutsch: Anlass*
+
 Why an item is in the Snapshot: `watchlist` (hard title/author match),
 `profile_author` (the item's author is on the Profile's reference-author list),
 or `genre_category` (the item is a new arrival in one of the Profile's
 Genre Categories — a low-confidence suggestion).
 
 ### Genre Category
+*deutsch: Thema*
+
 A Shop Source category path listed in `profile.yaml`'s `genre_categories`. v1
 genre discovery trusts the shop's own shelving: new arrivals in this small
 curated set are surfaced as suggestions. Dismissed suggestions
@@ -91,13 +119,25 @@ shelving, not the reader's word for what interests them. The code keeps
 `reasons.py`.
 
 ### Discovery
+*deutsch: Fund*
+
 An item a Source turned up that the reader never asked for by name — its Match
 Reason is `profile_author` or `genre_category`, never `watchlist`. A Discovery
 stays an Observation and gets **no** Book row until the reader says something
 about it (ADR 18). It is the case every filtering rule in this tool exists for:
 a Watchlist title is always reported, a Discovery has to earn it.
 
+### Suggestion
+*deutsch: Vorschlag*
+
+A Discovery that is still waiting for a decision — one that got past the junk
+filter, the price rule and the Rating Gate and now sits on the pile. Not a
+synonym for Discovery: every Suggestion is a Discovery, but most Discoveries
+never become one (ADR 22).
+
 ### Rating Gate
+*deutsch: Bewertungstor*
+
 The step that decides whether a Discovery reaches the reader at all (ADR 19).
 It sits **behind** the Snapshot, so a failure costs a judgement and never
 history, and **behind** the price rule, so nothing is judged that would not be
@@ -110,6 +150,8 @@ suggestions beats a pile of poor ones, and an empty pile is a good result.
 **Reader-facing name: *Bewertungstor*.**
 
 ### Rating
+*deutsch: Urteil*
+
 What someone thinks of a book, on the Rubric's 0–5 scale, with a justification
 and a confidence (`belegt` | `teils` | `vermutet`).
 
@@ -131,6 +173,8 @@ that the reader sharpened their own taste is no reason to void what they said.
 A change to the Rating Scheme invalidates nothing at all (ADR 21).
 
 ### Reading Profile
+*deutsch: Leseprofil*
+
 A description of the books this reader likes — as detailed and as specific to
 them as it can be made, written in prose, produced by discussing *why* they like
 the books they like. It lives in the repository as `docs/leseprofil.md` and
@@ -150,6 +194,8 @@ procedure.
 **Reader-facing name: *Leseprofil*.**
 
 ### Rating Scheme
+*deutsch: Bewertungsschema*
+
 How a book is held against a Reading Profile and turned into stars: what a star
 means, what a justification has to contain, what `confidence` means and what a
 merely-suspected judgement may be used for, the counter-check, and the rule
@@ -167,6 +213,8 @@ allowed a suspected one.
 **Reader-facing name: *Bewertungsschema*.**
 
 ### Reference Author
+*deutsch: Referenzautor:in*
+
 An author on the Profile's whitelist. Any item by a Reference Author is a
 Profile Match, discovered even if not on the Watchlist.
 
@@ -174,10 +222,14 @@ Derived from the Reading Profile rather than standing on its own: a shop can be
 asked for a name, not for "a damaged narrator" (ADR 21).
 
 ### Strong Deal
+*deutsch: Schnäppchen*
+
 An item whose current price is below `strong_deal_max_cents` (default 5,00 €).
 No discount check — cheap outright is enough.
 
 ### Deal
+*deutsch: Schnäppchen im Mittelband*
+
 An item priced between `strong_deal_max_cents` and `deal_max_cents`
 (5,00-9,99 € by default) **and** genuinely discounted: at least
 `min_discount_pct` (default 25%) below its struck original price, or below the
@@ -186,21 +238,29 @@ shows a struck price (German Buchpreisbindung), so beam Deals can only be
 detected via an observed price drop, once history exists.
 
 ### Price Delta
+*deutsch: Preisänderung*
+
 Any decrease in an item's price versus the previous Observation. Always reported
 in the Digest, independent of whether it also qualifies as a Deal or Strong Deal.
 
 ### Delta
+*deutsch: Änderung*
+
 The umbrella term for a reportable change between the latest Observation and the
 previous one: an availability change (`not-available → available`), a Price
 Delta, or a new discovery appearing. Deal / Strong Deal are flags on a Delta,
 not separate things.
 
 ### Watchlist Match
+*deutsch: Watchlist-Treffer*
+
 A hard match: a scraped item resolves to a Watchlist Entry — by normalized
 title/author comparison, a fuzzy fallback above threshold, or a previously
 pinned per-Source link (see ADR 8).
 
 ### Profile Match
+*deutsch: Profiltreffer*
+
 A soft match for titles not on the Watchlist: the scraped item's author is on
 the Profile's Reference Author whitelist. LLM genre classification of
 unknown-author titles is out of scope for v1 (a possible v2 feature); v1 genre
@@ -208,6 +268,8 @@ discovery is category-based instead (see Genre Category). The Profile's `no_gos`
 stay dormant until keyword refinement or v2.
 
 ### Digest
+*deutsch: Tagesbericht*
+
 A structured object a Run produces when it finds one or more Deltas or a Source
 errored: an ordered list of sections (Bibliothek, Watchlist — Preise, Neue Titel
 deiner Autor:innen, Genre-Vorschläge (unsicher), ⚠️ Fehler — always last), each
@@ -219,6 +281,8 @@ letztem Check <date>", never "today". Fully silent only when there are no Deltas
 and no errors — an error-only Digest still renders.
 
 ### Run
+*deutsch: Lauf*
+
 One execution of the scrape-diff-report cycle for a Profile. Fired three ways
 against one entrypoint: cron (best-effort), the UI "Run now" button, or the CLI.
 A Run is stateless with respect to schedule: it diffs current reality against the
@@ -226,6 +290,8 @@ Snapshot whenever the Snapshot was last written, so skipped runs lose nothing �
 the next Run reports the accumulated Deltas. A lock serialises concurrent Runs.
 
 ### Seed file
+*deutsch: Saatgutdatei*
+
 An optional YAML file used to import/bootstrap a Profile and its Watchlist into
 the database. Not the live store — once imported, the database is the source of
 truth and edits happen through the UI.
