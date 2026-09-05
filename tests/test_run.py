@@ -44,9 +44,7 @@ def test_second_unchanged_run_stays_silent(
     assert digest_files(data_dir) == after_first
 
 
-def test_a_price_drop_produces_a_digest(
-    data_dir: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_a_price_drop_produces_a_digest(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
     main([])
     capsys.readouterr()
 
@@ -107,9 +105,7 @@ def test_a_broken_source_is_reported_not_swallowed(
     assert len(digest_files(data_dir)) == 1
 
 
-def test_missing_config_fails_loudly(
-    data_dir: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_missing_config_fails_loudly(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
     (data_dir / "profile.yaml").unlink()
     assert main([]) == EXIT_CONFIG_ERROR
     assert "config error" in capsys.readouterr().err
@@ -187,3 +183,67 @@ def test_a_second_digest_on_the_same_day_does_not_erase_the_first(data_dir: Path
     assert second.name == "digest-2026-09-04-1830.html"
     assert first.exists() and second.exists()
     assert {p.name for p in digests.iterdir()} == {first.name, second.name}
+
+
+# --- den Rueckstand beurteilen (Ticket 19) ---------------------------------
+
+
+def test_rating_the_backlog_asks_only_about_what_has_no_judgement(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Der Stapel ist bestbewertet-zuerst sortiert, Unbeurteiltes steht hinten.
+    Wer die erste Seite nimmt, bekommt genau die Buecher, die schon ein Urteil
+    haben — und die offenen nie."""
+    from ebook_watchlist import run as run_module
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.rating import Rating, load_leseprofil
+    from ebook_watchlist.ratings import BY_MODEL
+    from ebook_watchlist.store import Store
+
+    now = datetime(2026, 9, 5, 9, 0)
+    store = Store(paths.db_path())
+
+    def fund(item_id: str) -> Observation:
+        return Observation(
+            source="beam",
+            source_item_id=item_id,
+            title=f"Fund {item_id}",
+            author="Wer Auch Immer",
+            match_reason=MatchReason.GENRE_CATEGORY,
+            price_cents=399,
+            blurb="Ein Schiff, allein im Dunkeln. " * 20,
+            url=f"https://beam.invalid/{item_id}",
+        )
+
+    run_id = store.start_run("test", "cli", now)
+    store.append(run_id, "test", [fund("alt"), fund("neu")], now)
+    store.put_rating(
+        "item:beam:alt",
+        stars=4,
+        confidence="belegt",
+        reason="Passt.",
+        profile_version=load_leseprofil()[1],
+        now=now,
+        origin=BY_MODEL,
+        pitch="Kurz und gut.",
+    )
+
+    class Stub:
+        def __init__(self) -> None:
+            self.calls: list[Observation] = []
+
+        def rate(self, observation: Observation) -> Rating:
+            self.calls.append(observation)
+            return Rating(
+                stars=4,
+                reason="Passt.",
+                confidence="belegt",
+                profile_version=load_leseprofil()[1],
+                pitch="Kurz und gut.",
+            )
+
+    stub = Stub()
+    monkeypatch.setattr(run_module, "build_rater", lambda model: stub)
+
+    assert main(["rate"]) == EXIT_OK
+    assert [call.source_item_id for call in stub.calls] == ["neu"]

@@ -467,7 +467,7 @@ def _rate(profile: Profile, wieviele: int, sources, client: HttpClient) -> int:
     Detailseite trägt rund das Zehnfache. Eine Anfrage je Buch, und nur hier —
     beim Sammeln wären es dreihundert.
     """
-    from .rating import rate_in_batches
+    from .rating import load_leseprofil, rate_in_batches
     from .ratings import BY_MODEL, subject_of
     from .web import triage
 
@@ -481,17 +481,34 @@ def _rate(profile: Profile, wieviele: int, sources, client: HttpClient) -> int:
         )
         return EXIT_CONFIG_ERROR
 
-    offen = [item for item in triage.pending(store, profile, limit=wieviele).items]
-    if not offen:
-        print("Nichts offen — es gibt keinen Vorschlag ohne Urteil.")
-        return EXIT_OK
-
-    keys = {item.key for item in offen}
+    # Der ganze Stapel, nicht die erste Seite: er ist bestbewertet-zuerst
+    # sortiert, Unbeurteiltes steht hinten. Auf ``wieviele`` gekuerzt wird
+    # deshalb erst **nach** dem Aussortieren — sonst bekaeme dieser Weg genau
+    # die Buecher, die schon ein Urteil haben, und nie die offenen.
+    stapel = triage.pending(store, profile, limit=10_000).items
+    keys = {item.key for item in stapel}
     beobachtungen = [
         observation
         for observation in store.latest_discoveries(profile.slug)
         if f"{observation.source}:{observation.source_item_id}" in keys
     ]
+
+    # Ein Urteil zur aktuellen Profilversion steht; es noch einmal zu holen
+    # kostet eine Detailseite und einen Modellaufruf fuer dieselbe Antwort.
+    # Ein Urteil zu einer *aelteren* Version steht nicht mehr fuer den
+    # heutigen Geschmack — das wird neu beurteilt (Ticket 25).
+    version = load_leseprofil()[1]
+    vorhanden = store.ratings_for(subject_of(o) for o in beobachtungen)
+    beobachtungen = [
+        observation
+        for observation in beobachtungen
+        if (urteil := vorhanden.get((subject_of(observation), BY_MODEL))) is None
+        or urteil.profile_version != version
+    ]
+    if not beobachtungen:
+        print("Nichts offen — jeder Vorschlag im Stapel hat ein Urteil.")
+        return EXIT_OK
+    beobachtungen = beobachtungen[:wieviele]
 
     beobachtungen = _with_full_blurbs(store, profile, beobachtungen, sources)
     print(f"{len(beobachtungen)} Vorschläge, Bündel zu {profile.rating_batch_size} …")
