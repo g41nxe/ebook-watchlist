@@ -50,9 +50,7 @@ def author_slug(author: str) -> str:
 class BeamSource(ShopSource):
     name = SOURCE_NAME
 
-    def __init__(
-        self, client: HttpClient, name: str = SOURCE_NAME, base: str = sel.BASE
-    ) -> None:
+    def __init__(self, client: HttpClient, name: str = SOURCE_NAME, base: str = sel.BASE) -> None:
         self.client = client
         self.name = name
         self.base = base
@@ -83,10 +81,7 @@ class BeamSource(ShopSource):
 
         resolution = match(
             Query(title=entry.title, author=entry.author),
-            [
-                Candidate(title=tile.title, author=tile.author, payload=tile.url)
-                for tile in tiles
-            ],
+            [Candidate(title=tile.title, author=tile.author, payload=tile.url) for tile in tiles],
         )
         return resolution
 
@@ -193,7 +188,7 @@ class BeamSource(ShopSource):
                         blurb=tile.blurb,
                         subtitle=tile.subtitle,
                         isbn=tile.isbn,
-                    cover_url=tile.cover_url,
+                        cover_url=tile.cover_url,
                         category=category_path,
                         url=tile.url,
                     )
@@ -261,6 +256,7 @@ class BeamSource(ShopSource):
             # Datenbank, wo sie spaeter jemand als Link zu lesen bekommt.
             url=detail.url or url,
             blurb=detail.blurb,
+            cover_url=detail.cover_url,
         )
 
     def probe(self) -> None:

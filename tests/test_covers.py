@@ -110,9 +110,7 @@ def test_a_placeholder_pixel_is_not_kept(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("failure", [FetchError("weg"), NotFound("weg")])
-def test_a_missing_image_is_not_a_reason_to_fail_a_run(
-    tmp_path: Path, failure: Exception
-) -> None:
+def test_a_missing_image_is_not_a_reason_to_fail_a_run(tmp_path: Path, failure: Exception) -> None:
     """Ein Buch ohne Bild ist ein Buch mit einem Platzhalter."""
     store = CoverStore(tmp_path / "covers")
     assert store.fetch(StubClient(failure), "https://example.invalid/a.jpg") is None
@@ -190,7 +188,9 @@ def test_the_cover_address_survives_the_snapshot(tmp_path: Path, monkeypatch) ->
     monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
     store = Store(paths.db_path())
     beobachtung = Observation(
-        source="beam", source_item_id="1", title="Ein Fund",
+        source="beam",
+        source_item_id="1",
+        title="Ein Fund",
         match_reason=MatchReason.GENRE_CATEGORY,
         cover_url="https://beam.invalid/media/9783104911854_200x200.jpg",
     )
@@ -209,8 +209,94 @@ def test_the_same_image_is_one_file_for_a_find_and_for_a_book(tmp_path: Path) ->
     client = StubClient()
     url = "https://example.invalid/9783104911854_200x200.jpg"
 
-    als_vorschlag = store.fetch(client, url)   # noch keine book-Zeile
-    als_buch = store.fetch(client, url)        # jetzt beobachtet
+    als_vorschlag = store.fetch(client, url)  # noch keine book-Zeile
+    als_buch = store.fetch(client, url)  # jetzt beobachtet
 
     assert als_vorschlag == als_buch
     assert len(client.calls) == 1
+
+
+# --- der Stapel: nur fuer die, die stehen bleiben --------------------------
+
+
+def test_only_the_kept_suggestions_cost_an_image(tmp_path: Path, monkeypatch) -> None:
+    """Unter drei Sternen wird ein Vorschlag gar nicht gezeigt — ein Bild
+    dafuer zu holen waere eine Anfrage fuer etwas, das niemand sieht."""
+    from ebook_watchlist import paths
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.run import _fetch_suggestion_covers
+
+    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+
+    def fund(nummer: str) -> Observation:
+        return Observation(
+            source="beam",
+            source_item_id=nummer,
+            title=f"Fund {nummer}",
+            match_reason=MatchReason.GENRE_CATEGORY,
+            cover_url=f"https://example.invalid/{nummer}.jpg",
+        )
+
+    bleibt, faellt = fund("1"), fund("2")
+    client = StubClient()
+    _fetch_suggestion_covers(client, [bleibt, faellt], {bleibt.key})
+
+    assert client.calls == ["https://example.invalid/1.jpg"]
+    assert paths.covers_dir().joinpath(file_name(bleibt.cover_url or "")).exists()
+
+
+def test_a_suggestion_without_an_address_costs_nothing(tmp_path: Path, monkeypatch) -> None:
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.run import _fetch_suggestion_covers
+
+    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+    ohne = Observation(
+        source="beam",
+        source_item_id="1",
+        title="Ohne Bild",
+        match_reason=MatchReason.GENRE_CATEGORY,
+    )
+    client = StubClient()
+    _fetch_suggestion_covers(client, [ohne], {ohne.key})
+    assert client.calls == []
+
+
+def test_the_detail_page_cover_is_kept_when_the_blurb_is_fetched(data_dir: Path) -> None:
+    """Die Detailseite wird fuer den Klappentext ohnehin geholt und traegt das
+    groessere Bild. Es dort fallen zu lassen hiesse, dieselbe Seite spaeter ein
+    zweites Mal zu holen."""
+    from ebook_watchlist import paths
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.run import _with_full_blurbs
+    from ebook_watchlist.sources.base import Item
+    from ebook_watchlist.store import Store
+
+    store = Store(paths.db_path())
+    profile = load_profile()
+
+    beobachtung = Observation(
+        source="beam",
+        source_item_id="7",
+        title="Ein Fund",
+        match_reason=MatchReason.GENRE_CATEGORY,
+        blurb="Anriss …",
+        cover_url="https://beam.invalid/klein_200x200.jpg",
+    )
+
+    class Quelle:
+        name = "beam"
+
+        def item(self, source_item_id: str) -> Item:
+            return Item(
+                source_item_id=source_item_id,
+                title="Ein Fund",
+                blurb="Der ganze Klappentext, deutlich laenger als der Anriss.",
+                cover_url="https://beam.invalid/gross_600x600.jpg",
+            )
+
+    zurueck = _with_full_blurbs(store, profile, [beobachtung], [Quelle()])
+
+    assert zurueck[0].cover_url == "https://beam.invalid/gross_600x600.jpg"
+    gespeichert = store.latest_observations(profile.slug, [("beam", "7")])[("beam", "7")]
+    assert gespeichert.cover_url == "https://beam.invalid/gross_600x600.jpg"

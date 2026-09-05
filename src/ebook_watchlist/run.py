@@ -78,7 +78,10 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--anzahl", type=int, default=10, metavar="N",
+        "--anzahl",
+        type=int,
+        default=10,
+        metavar="N",
         help="wie viele Vorschläge 'rate' beurteilt (Voreinstellung 10)",
     )
     parser.add_argument("--enable", metavar="QUELLE", help="eine pausierte Quelle wieder aufnehmen")
@@ -298,7 +301,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "dismissals":
             return _dismissals(profile, sources)
         if args.command == "rate":
-            return _rate(profile, args.anzahl, sources)
+            return _rate(profile, args.anzahl, sources, client)
         try:
             return _run(
                 profile,
@@ -391,7 +394,15 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
             continue
         if item is None or not item.blurb:
             continue
-        voller = replace(observation, blurb=item.blurb, observed_at=now)
+        # Die Detailseite traegt auch das groessere Titelbild (600x600 statt
+        # 200x200 auf der Kachel). Sie ist schon geholt — es hier fallen zu
+        # lassen hiesse, sie fuer dasselbe Bild ein zweites Mal zu holen.
+        voller = replace(
+            observation,
+            blurb=item.blurb,
+            cover_url=item.cover_url or observation.cover_url,
+            observed_at=now,
+        )
         geholt[observation.key] = voller
         frisch.append(voller)
 
@@ -401,7 +412,44 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
     return [geholt.get(o.key, o) for o in observations]
 
 
-def _rate(profile: Profile, wieviele: int, sources) -> int:
+def _fetch_suggestion_covers(
+    client: HttpClient, observations: Sequence[Observation], keep: set[tuple[str, str]]
+) -> None:
+    """Titelbilder fuer den Stapel — nur fuer die, die stehen bleiben.
+
+    Anders als ``_fetch_covers``: eine Entdeckung hat keine ``book``-Zeile, an
+    der ein Dateiname haengen koennte. Der Name ergibt sich aus der Adresse
+    (``covers.file_name``), die Seite sieht ihn auf der Platte nach — geholt
+    werden muss er trotzdem einmal.
+
+    ``keep`` ist die Antwort auf "nur fuer die verbleibenden": alles unter der
+    Schwelle wird auf der Seite ohnehin nicht gezeigt, und ein Bild fuer ein
+    Buch, das niemand sieht, ist eine Anfrage zu viel.
+    """
+    covers = CoverStore(paths.covers_dir())
+    offen = [
+        observation.cover_url
+        for observation in observations
+        if observation.key in keep and observation.cover_url
+    ]
+    if not offen:
+        return
+
+    print(f"{len(offen)} Titelbilder …")
+    geholt = 0
+    for url in dict.fromkeys(offen):
+        try:
+            if covers.fetch(client, url):
+                geholt += 1
+        except RateLimited:
+            print("Titelbilder: der Shop drosselt — Rest übersprungen", file=sys.stderr)
+            return
+        except Exception as exc:  # noqa: BLE001 - bewusst: ein Bild ist Beiwerk
+            print(f"Titelbild: {type(exc).__name__}: {exc}", file=sys.stderr)
+    print(f"  {geholt} geholt")
+
+
+def _rate(profile: Profile, wieviele: int, sources, client: HttpClient) -> int:
     """Den Rückstand beurteilen, ohne eine Quelle zu fragen (Ticket 19).
 
     Das Tor im Lauf sieht nur **Erstsichtungen**. Was einmal im Snapshot steht,
@@ -467,8 +515,10 @@ def _rate(profile: Profile, wieviele: int, sources) -> int:
             pitch=rating.pitch,
         )
         verteilung[rating.stars] = verteilung.get(rating.stars, 0) + 1
-        print(f"  {'★' * rating.stars}{'☆' * (5 - rating.stars)} {rating.confidence:<9}"
-              f" {observation.title[:52]}")
+        print(
+            f"  {'★' * rating.stars}{'☆' * (5 - rating.stars)} {rating.confidence:<9}"
+            f" {observation.title[:52]}"
+        )
         # Ein fehlender Pitch kostet kein Urteil (die Sterne tragen für sich),
         # aber er wird genannt: still fehlend hiesse, eine Lücke auf der Seite
         # nie zu bemerken.
@@ -480,6 +530,15 @@ def _rate(profile: Profile, wieviele: int, sources) -> int:
         f"{sterne}★ ×{anzahl}" for sterne, anzahl in sorted(verteilung.items(), reverse=True)
     )
     print(f"\n  Verteilung: {gezaehlt or 'keine'}")
+
+    from .rating import DEFAULT_THRESHOLD
+
+    bleiben = {
+        observation.key
+        for observation in beobachtungen
+        if (urteil := urteile.get(observation.key)) and urteil.stars >= DEFAULT_THRESHOLD
+    }
+    _fetch_suggestion_covers(client, beobachtungen, bleiben)
     return EXIT_OK
 
 
@@ -541,9 +600,7 @@ def _sources(sources, *, enable: str | None, disable: str | None) -> int:
             state = "ok      " if row.last_probe_ok else "FEHLER  "
         seen = f"{row.last_probe_at:%d.%m. %H:%M}" if row.last_probe_at else "nie"
         streak = (
-            f"  seit {row.consecutive_failures} Prüfungen"
-            if row.consecutive_failures > 1
-            else ""
+            f"  seit {row.consecutive_failures} Prüfungen" if row.consecutive_failures > 1 else ""
         )
         print(f"  {state}  {source.name}  zuletzt {seen}{streak}")
         if row.last_error:

@@ -47,6 +47,10 @@ class Item:
     #: Der ganze Klappentext von der Detailseite. Die Kachel traegt nur einen
     #: Anriss, und das Bewertungstor urteilt sonst ueber 200 Zeichen.
     blurb: str | None = None
+    #: Das Titelbild von der Detailseite — groesser als das der Kachel. Die
+    #: Seite wird fuer den Klappentext ohnehin geholt; es hier fallen zu
+    #: lassen hiesse, sie fuer dasselbe Bild ein zweites Mal zu holen.
+    cover_url: str | None = None
 
 
 @dataclass(slots=True)
@@ -159,9 +163,7 @@ class RunContext:
             reason=reason,
         )
 
-    def needs_attention(
-        self, source: str, entry: WatchlistEntry, resolution: Resolution
-    ) -> None:
+    def needs_attention(self, source: str, entry: WatchlistEntry, resolution: Resolution) -> None:
         best = resolution.best
         self.attention.append(
             Attention(
@@ -213,9 +215,7 @@ class ResolvingSource(Source):
         """Search for ``entry``. ``None`` means a genuine "not in this catalogue"."""
         return None
 
-    def linked_entry(
-        self, entry: WatchlistEntry, context: RunContext
-    ) -> WatchlistEntry | None:
+    def linked_entry(self, entry: WatchlistEntry, context: RunContext) -> WatchlistEntry | None:
         """``entry`` with this Source's link filled in, or ``None`` to skip it."""
         if entry.resolved_links.get(self.name):
             return entry  # a hand-pinned link always wins
