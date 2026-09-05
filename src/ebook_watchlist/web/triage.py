@@ -168,6 +168,12 @@ def pending(
             )
         )
 
+    # Das Beste zuerst. Ohne das stehen oben die Funde, die zufaellig zuletzt
+    # gesehen wurden — und der Stapel faengt mit dem an, was das Profil gerade
+    # abgelehnt hat. Unbewertetes kommt ans Ende: es ist keine Empfehlung,
+    # sondern eine offene Frage.
+    items.sort(key=lambda item: (item.stars is not None, item.stars or 0), reverse=True)
+
     return Pile(
         items=tuple(items[:limit]),
         total=len(items),

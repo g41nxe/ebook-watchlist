@@ -320,3 +320,26 @@ def test_the_page_shows_ten_not_fifty(client: TestClient, db: Store) -> None:
 
     assert len(pile.items) == view.PAGE_SIZE == 10
     assert pile.total >= 15
+
+
+def test_the_best_stand_at_the_top(client: TestClient, db: Store) -> None:
+    """Sonst faengt der Stapel mit dem an, was das Profil gerade abgelehnt hat."""
+    schwach = found(db, item_id="a", title="Schwacher Fund")
+    stark = found(db, item_id="b", title="Starker Fund")
+    urteil(db, schwach, stars=1, pitch="Kaum Beruehrung.")
+    urteil(db, stark, stars=4, pitch="Genau die kaputte Stimme.")
+
+    titel = [item.title for item in view.pending(db, load_profile()).items]
+
+    assert titel.index("Starker Fund") < titel.index("Schwacher Fund")
+
+
+def test_an_unjudged_find_sinks_below_the_judged(client: TestClient, db: Store) -> None:
+    """Ohne Urteil ist es keine Empfehlung, sondern eine offene Frage."""
+    found(db, item_id="a", title="Ohne Urteil")
+    schwach = found(db, item_id="b", title="Ein Stern")
+    urteil(db, schwach, stars=1, pitch="Kaum Beruehrung.")
+
+    titel = [item.title for item in view.pending(db, load_profile()).items]
+
+    assert titel.index("Ein Stern") < titel.index("Ohne Urteil")
