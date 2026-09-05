@@ -475,12 +475,23 @@ class ModelRater:
             self.session = requests.Session()
 
     def rate(self, observation: Observation) -> Rating:
+        return parse_answer(
+            self.ask(prompt_for(observation, self.leseprofil, self.scheme)),
+            self.version,
+            self.scheme,
+        )
+
+    def ask(self, prompt: str, max_tokens: int = 300) -> str:
+        """Eine Frage, eine Antwort — ohne Leseprofil und ohne Schema.
+
+        Herausgeloest, damit derselbe Weg zum Modell auch fuer etwas anderes
+        als ein Urteil taugt: die Baende einer Sammelausgabe wiederzuerkennen
+        ist keine Bewertung (ADR 24).
+        """
         payload = {
             "model": self.model,
-            "max_tokens": 300,
-            "messages": [
-                {"role": "user", "content": prompt_for(observation, self.leseprofil, self.scheme)}
-            ],
+            "max_tokens": max_tokens,
+            "messages": [{"role": "user", "content": prompt}],
         }
         headers = {
             "x-api-key": self.api_key,
@@ -500,7 +511,7 @@ class ModelRater:
             text = "".join(block.get("text", "") for block in blocks)
         except (ValueError, KeyError, TypeError) as exc:
             raise RatingUnavailable(f"unerwartete Antwortform: {exc}") from exc
-        return parse_answer(text, self.version, self.scheme)
+        return text
 
 
 #: Der Weg ohne Schlüssel: Claude Code hat bereits eine Anmeldung, und ``-p``
@@ -567,6 +578,14 @@ class ClaudeCodeRater:
             return {}
         answer = self._ask(prompt_for_many(observations, self.leseprofil, self.scheme))
         return parse_many(answer, observations, self.version, self.scheme)
+
+    def ask(self, prompt: str, max_tokens: int = 300) -> str:
+        """Siehe :meth:`ModelRater.ask` — derselbe Weg, andere Leitung.
+
+        ``max_tokens`` steht nur der Form halber in der Signatur: die CLI
+        kennt keine solche Grenze.
+        """
+        return self._ask(prompt)
 
     def _ask(self, prompt: str) -> str:
         # Der Prompt geht ueber stdin, nicht als Argument: Windows begrenzt

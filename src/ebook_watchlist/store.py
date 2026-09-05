@@ -119,12 +119,36 @@ class BookRow(Base):
     title: Mapped[str] = mapped_column(String)
     author: Mapped[str | None] = mapped_column(String, nullable=True)
     series: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Nummer innerhalb der Reihe, aus MARC ``245 $n`` / ``490 $v``.
+    series_index: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Sprache, aus MARC ``041``. Keine Quelle nennt sie — ohne die DNB gibt
+    #: es sie nicht (Ticket 31, 39).
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Wann die DNB zuletzt gefragt wurde — **auch wenn sie nichts wusste**.
+    #: Neun von dreissig Buechern kennt sie nicht; ohne diesen Vermerk fragte
+    #: jeder Lauf sie erneut (Ticket 42).
+    dnb_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     #: Dateiname im Cover-Ordner, nicht die Adresse beim Shop: die Seite
     #: laedt nichts von einem Dritten nach (Ticket 15).
     cover_file: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
     __table_args__ = (Index("ix_book_title", "title"),)
+
+
+class BookContainsRow(Base):
+    """Welche Bände in einer Sammelausgabe stecken (ADR 24).
+
+    Aus MARC ``770 $i Enthält $z <ISBN>`` — die Entsprechung zu ONIX
+    "01 includes". Gespeichert wird die **ISBN**, nicht eine Buch-Id: der
+    enthaltene Band muss bei uns kein Buch sein, und die ISBN bleibt richtig,
+    auch wenn er nie eines wird.
+    """
+
+    __tablename__ = "book_contains"
+
+    book_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    isbn: Mapped[str] = mapped_column(String, primary_key=True)
 
 
 class BookSourceRow(Base):

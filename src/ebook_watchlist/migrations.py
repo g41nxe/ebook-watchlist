@@ -267,6 +267,27 @@ def _add_observation_cover_url(connection: Connection) -> None:
     add_column(connection, "observation", "cover_url", "TEXT")
 
 
+def _add_dnb_columns(connection: Connection) -> None:
+    """Platz für das, was nur die DNB weiß (Ticket 42).
+
+    ``dnb_checked_at`` hält auch ein *erfolgloses* Nachfragen fest: neun von
+    dreißig Büchern kennt die DNB nicht, und ohne diesen Vermerk würde jeder
+    Lauf sie erneut fragen.
+
+    ``book_contains`` bekommt keine Fremdschlüssel-Klausel: SQLite prüft sie
+    ohne ``PRAGMA foreign_keys`` ohnehin nicht. Für eine frische Datei legt
+    ``create_all`` die Tabelle an; hier steht sie für die bestehenden.
+    """
+    add_column(connection, "book", "series_index", "TEXT")
+    add_column(connection, "book", "language", "TEXT")
+    add_column(connection, "book", "dnb_checked_at", "DATETIME")
+    connection.exec_driver_sql(
+        "CREATE TABLE IF NOT EXISTS book_contains "
+        "(book_id INTEGER NOT NULL, isbn TEXT NOT NULL, "
+        "PRIMARY KEY (book_id, isbn))"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -283,6 +304,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _rename_rubric_version,
     _add_rating_pitch,
     _add_observation_cover_url,
+    _add_dnb_columns,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)
