@@ -413,24 +413,30 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
 
 
 def _fetch_suggestion_covers(
-    client: HttpClient, observations: Sequence[Observation], keep: set[tuple[str, str]]
+    store: Store, profile: Profile, client: HttpClient
 ) -> None:
-    """Titelbilder fuer den Stapel — nur fuer die, die stehen bleiben.
+    """Titelbilder fuer den Stapel — genau fuer die, die stehen bleiben.
 
     Anders als ``_fetch_covers``: eine Entdeckung hat keine ``book``-Zeile, an
     der ein Dateiname haengen koennte. Der Name ergibt sich aus der Adresse
     (``covers.file_name``), die Seite sieht ihn auf der Platte nach — geholt
     werden muss er trotzdem einmal.
 
-    ``keep`` ist die Antwort auf "nur fuer die verbleibenden": alles unter der
-    Schwelle wird auf der Seite ohnehin nicht gezeigt, und ein Bild fuer ein
-    Buch, das niemand sieht, ist eine Anfrage zu viel.
+    Gefragt wird der Stapel selbst, nicht die eben gefaellten Urteile: was
+    unter der Schwelle liegt, steht dort ohnehin nicht mehr drin (Ticket 19).
+    Damit haengen die Bilder am Stapel und nicht daran, dass gerade etwas zu
+    beurteilen war — sonst bekaeme ein vollstaendig beurteilter Stapel nie
+    seine Bilder.
     """
+    from .web import triage
+
     covers = CoverStore(paths.covers_dir())
+    keys = {item.key for item in triage.pending(store, profile, limit=10_000).items}
     offen = [
         observation.cover_url
-        for observation in observations
-        if observation.key in keep and observation.cover_url
+        for observation in store.latest_discoveries(profile.slug)
+        if f"{observation.source}:{observation.source_item_id}" in keys
+        and observation.cover_url
     ]
     if not offen:
         return
@@ -507,6 +513,7 @@ def _rate(profile: Profile, wieviele: int, sources, client: HttpClient) -> int:
     ]
     if not beobachtungen:
         print("Nichts offen — jeder Vorschlag im Stapel hat ein Urteil.")
+        _fetch_suggestion_covers(store, profile, client)
         return EXIT_OK
     beobachtungen = beobachtungen[:wieviele]
 
@@ -548,14 +555,7 @@ def _rate(profile: Profile, wieviele: int, sources, client: HttpClient) -> int:
     )
     print(f"\n  Verteilung: {gezaehlt or 'keine'}")
 
-    from .rating import DEFAULT_THRESHOLD
-
-    bleiben = {
-        observation.key
-        for observation in beobachtungen
-        if (urteil := urteile.get(observation.key)) and urteil.stars >= DEFAULT_THRESHOLD
-    }
-    _fetch_suggestion_covers(client, beobachtungen, bleiben)
+    _fetch_suggestion_covers(store, profile, client)
     return EXIT_OK
 
 

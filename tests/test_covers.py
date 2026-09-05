@@ -219,45 +219,73 @@ def test_the_same_image_is_one_file_for_a_find_and_for_a_book(tmp_path: Path) ->
 # --- der Stapel: nur fuer die, die stehen bleiben --------------------------
 
 
-def test_only_the_kept_suggestions_cost_an_image(tmp_path: Path, monkeypatch) -> None:
-    """Unter drei Sternen wird ein Vorschlag gar nicht gezeigt — ein Bild
-    dafuer zu holen waere eine Anfrage fuer etwas, das niemand sieht."""
+def test_only_the_pile_costs_an_image(data_dir: Path) -> None:
+    """Unter drei Sternen steht ein Vorschlag gar nicht mehr im Stapel — ein
+    Bild dafuer zu holen waere eine Anfrage fuer etwas, das niemand sieht."""
     from ebook_watchlist import paths
+    from ebook_watchlist.config import load_profile
     from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.rating import load_leseprofil
+    from ebook_watchlist.ratings import BY_MODEL
     from ebook_watchlist.run import _fetch_suggestion_covers
+    from ebook_watchlist.store import Store
 
-    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+    store, profile = Store(paths.db_path()), load_profile()
 
-    def fund(nummer: str) -> Observation:
+    def fund(item_id: str) -> Observation:
         return Observation(
             source="beam",
-            source_item_id=nummer,
-            title=f"Fund {nummer}",
+            source_item_id=item_id,
+            title=f"Fund {item_id}",
+            author="Wer Auch Immer",
             match_reason=MatchReason.GENRE_CATEGORY,
-            cover_url=f"https://example.invalid/{nummer}.jpg",
+            price_cents=399,
+            blurb="Ein Schiff, allein im Dunkeln.",
+            cover_url=f"https://example.invalid/{item_id}.jpg",
         )
 
-    bleibt, faellt = fund("1"), fund("2")
+    run_id = store.start_run(profile.slug, "cli", NOW)
+    store.append(run_id, profile.slug, [fund("bleibt"), fund("faellt")], NOW)
+    store.put_rating(
+        "item:beam:faellt",
+        stars=1,
+        confidence="belegt",
+        reason="Passt nicht.",
+        profile_version=load_leseprofil()[1],
+        now=NOW,
+        origin=BY_MODEL,
+        pitch="",
+    )
+
     client = StubClient()
-    _fetch_suggestion_covers(client, [bleibt, faellt], {bleibt.key})
+    _fetch_suggestion_covers(store, profile, client)
 
-    assert client.calls == ["https://example.invalid/1.jpg"]
-    assert paths.covers_dir().joinpath(file_name(bleibt.cover_url or "")).exists()
+    assert client.calls == ["https://example.invalid/bleibt.jpg"]
+    assert paths.covers_dir().joinpath(file_name(client.calls[0])).exists()
 
 
-def test_a_suggestion_without_an_address_costs_nothing(tmp_path: Path, monkeypatch) -> None:
+def test_a_suggestion_without_an_address_costs_nothing(data_dir: Path) -> None:
+    from ebook_watchlist import paths
+    from ebook_watchlist.config import load_profile
     from ebook_watchlist.models import MatchReason, Observation
     from ebook_watchlist.run import _fetch_suggestion_covers
+    from ebook_watchlist.store import Store
 
-    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+    store, profile = Store(paths.db_path()), load_profile()
     ohne = Observation(
         source="beam",
         source_item_id="1",
         title="Ohne Bild",
+        author="Wer Auch Immer",
         match_reason=MatchReason.GENRE_CATEGORY,
+        price_cents=399,
+        blurb="Ein Schiff, allein im Dunkeln.",
     )
+    run_id = store.start_run(profile.slug, "cli", NOW)
+    store.append(run_id, profile.slug, [ohne], NOW)
+
     client = StubClient()
-    _fetch_suggestion_covers(client, [ohne], {ohne.key})
+    _fetch_suggestion_covers(store, profile, client)
     assert client.calls == []
 
 
