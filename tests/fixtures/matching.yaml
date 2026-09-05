@@ -229,3 +229,24 @@
   candidates:
     - {title: 'Der Morgen', author: 'Raabe, Marc', identifier: '9783843729154'}
   expect: auto_accept
+
+# --- Ticket 29 / ADR 24: Sammelausgabe gegen Einzelband ---------------------
+
+- name: the single volume beats the omnibus
+  # Beide sind exakter Titel und exakter Autor. Vorher entschied allein die
+  # Reihenfolge der Shop-Treffer, und das Buendel stand vorn.
+  query: {title: Der Kruzifix-Killer, author: Chris Carter}
+  candidates:
+    - {title: 'Der Kruzifix-Killer / Der Vollstrecker', author: 'Carter, Chris'}
+    - {title: 'Der Kruzifix-Killer', author: 'Carter, Chris'}
+  expect: auto_accept
+  winner: Der Kruzifix-Killer
+
+- name: the omnibus alone is still a candidate
+  # Steht der Einzelband nicht zur Wahl, ist die Sammelausgabe besser als
+  # nichts — sie kommt zur Bestaetigung, nicht in den Papierkorb.
+  query: {title: Der Kruzifix-Killer, author: Chris Carter}
+  candidates:
+    - {title: 'Der Kruzifix-Killer / Der Vollstrecker', author: 'Carter, Chris'}
+  expect: auto_accept
+  winner: 'Der Kruzifix-Killer / Der Vollstrecker'

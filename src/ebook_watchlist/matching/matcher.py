@@ -20,6 +20,7 @@ from typing import Any
 
 from rapidfuzz import fuzz
 
+from .bundles import looks_like_bundle
 from .normalize import (
     NormalizedAuthor,
     normalize_authors,
@@ -89,15 +90,23 @@ class Scored:
     #: Indiz, sondern ein **Widerspruch** — das Gegenstueck zu Primos negativem
     #: Gewicht (docs/research/title-matching-practices.md).
     id_conflict: bool = False
+    #: Der Kandidat ist eine Sammelausgabe, die Anfrage nicht. Bisher waren
+    #: "Der Kruzifix-Killer" und "Der Kruzifix-Killer / Der Vollstrecker"
+    #: ununterscheidbar — beide exakter Titel, beide exakter Autor —, und wer
+    #: gewann, entschied die Reihenfolge der Shop-Treffer (ADR 24).
+    is_bundle: bool = False
 
     @property
-    def sort_key(self) -> tuple[int, int, int, int, int, int, int, int]:
+    def sort_key(self) -> tuple[int, ...]:
         """Ascending = better. Fuzzy scores go in five-point buckets so that
         near-ties fall through to the next criterion instead of being decided by
         a point of noise."""
         return (
             0 if self.id_match else 1,
             0 if self.title_exact else 1,
+            # Der gesuchte Einzelband schlaegt die Sammelausgabe: sie steht
+            # nicht auf der Watchlist, und sie ist ein eigenes Buch (ADR 24).
+            1 if self.is_bundle else 0,
             0 if self.title_contained else 1,
             -(self.title_fuzzy // 5),
             0 if self.author_exact else 1,
@@ -204,6 +213,7 @@ def score(query: Query, candidate: Candidate, source_rank: int = 0) -> Scored:
         source_rank=source_rank,
         title_contained=title_is_contained(query.title, candidate.title),
         volume_conflict=volumes_conflict(query.title, candidate.title),
+        is_bundle=looks_like_bundle(candidate.title) and not looks_like_bundle(query.title),
         id_conflict=bool(query.identifier)
         and bool(candidate.identifier)
         and query.identifier != candidate.identifier,
@@ -256,6 +266,10 @@ def _is_tied(best: Scored, runner_up: Scored) -> bool:
         abs(best.title_fuzzy - runner_up.title_fuzzy) <= TIE_MARGIN
         and best.author_fuzzy // 5 == runner_up.author_fuzzy // 5
         and best.title_exact == runner_up.title_exact
+        # Einzelband und Sammelausgabe sind nicht "gleich gut", sobald wir sie
+        # auseinanderhalten koennen — genau das war vorher der Muenzwurf
+        # (ADR 24).
+        and best.is_bundle == runner_up.is_bundle
     )
 
 
