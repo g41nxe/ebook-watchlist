@@ -29,7 +29,12 @@ DISCOVERY_REASONS: frozenset[MatchReason] = frozenset(
 )
 
 
-def worth_announcing(observation: Observation, profile: Profile | None) -> bool:
+def worth_announcing(
+    observation: Observation,
+    profile: Profile | None,
+    *,
+    bundle_advantage: object | None = None,
+) -> bool:
     """Whether this item may reach the reader at all (ADR 19).
 
     A Watchlist Entry always may: the reader named this book, and the price is
@@ -45,8 +50,16 @@ def worth_announcing(observation: Observation, profile: Profile | None) -> bool:
     what ADR 19 says in as many words. It ends here: relevance is the gate's
     question, urgency is the price's, and this function only asks the second.
 
-    Zwei Wege sind es, nicht einer: ein Schnaeppchen **oder** ein Buch, das die
-    Bibliothek gerade hergibt. Bei einer Ausleihe ist der Preis gleichgueltig.
+    Drei Wege sind es: ein Schnaeppchen, ein Buch, das die Bibliothek gerade
+    hergibt, **oder** eine Sammelausgabe, die gegenueber ihren Einzelbaenden
+    spart (ADR 24). Bei einer Ausleihe ist der Preis gleichgueltig; beim
+    Buendel ist der absolute Preis die falsche Frage, denn zwei Baende sind
+    nun einmal teurer als einer.
+
+    ``bundle_advantage`` rechnet dieser Weg nicht selbst aus — dafuer braeuchte
+    er die Preise anderer Buecher und damit die Datenbank. Der Aufrufer legt
+    das Ergebnis dazu; ``bundle_deal.advantage_for`` ist die eine Stelle, die
+    es ermittelt.
 
     Nothing is thrown away. The Observation is stored either way, so a book
     found at 14,99 € waits quietly and speaks up the day it drops.
@@ -58,6 +71,8 @@ def worth_announcing(observation: Observation, profile: Profile | None) -> bool:
     # Ausleihbar schlaegt jeden Preis: was die Bibliothek hergibt, kostet
     # nichts, und "unter 5,00 EUR" ist dann keine sinnvolle Huerde mehr.
     if observation.availability is Availability.AVAILABLE:
+        return True
+    if bundle_advantage is not None:
         return True
     return profile is not None and is_strong_deal(observation.price_cents, profile)
 

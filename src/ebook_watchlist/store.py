@@ -588,6 +588,41 @@ class Store:
             )
             return [_to_observation(row) for row in session.scalars(stmt)]
 
+    def latest_prices_by_title(self, profile_slug: str, source: str) -> dict[str, int]:
+        """Titel -> zuletzt gesehener Preis, fuer eine Quelle.
+
+        Die Auskunft, die der Buendelvorteil braucht: was kostet der Einzelband
+        (ADR 24). Ueber den **Titel** und nicht ueber eine Kennung, weil genau
+        das der Fall ist — "Der Kruzifix-Killer / Der Vollstrecker" nennt seine
+        Baende beim Namen und sonst nichts.
+
+        Nur diese eine Quelle: Preise zweier Shops zu addieren waere eine Summe,
+        die niemand bezahlen kann.
+        """
+        latest_ids = (
+            select(func.max(ObservationRow.id))
+            .where(
+                ObservationRow.profile_slug == profile_slug,
+                ObservationRow.source == source,
+                ObservationRow.price_cents.is_not(None),
+            )
+            .group_by(ObservationRow.source, ObservationRow.source_item_id)
+        )
+        with self.session() as session:
+            stmt = select(ObservationRow.title, ObservationRow.price_cents).where(
+                ObservationRow.id.in_(latest_ids)
+            )
+            preise: dict[str, int] = {}
+            for titel, preis in session.execute(stmt):
+                if not titel or preis is None or preis <= 0:
+                    continue
+                # Der guenstigste gewinnt: derselbe Titel kann als mehrere
+                # Ausgaben dastehen, und fuer den Vergleich zaehlt, was der
+                # Einzelband mindestens kostet.
+                if titel not in preise or preis < preise[titel]:
+                    preise[titel] = preis
+            return preise
+
     def decided_items(self, profile_slug: str) -> set[tuple[str, str]]:
         """``(Quelle, Item-Id)``, zu denen es schon ein Buch mit Beziehung gibt.
 

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .. import paths
+from ..bundle_deal import BundleAdvantage, advantage_for
 from ..config import Profile
 from ..covers import CoverStore, file_name
 from ..deals import is_strong_deal
@@ -77,6 +78,9 @@ class Suggestion:
     #: Klappentexts: der sagt, wovon das Buch handelt, der Pitch sagt, warum es
     #: für diese Leserin zählt (bewertungsschema.yaml).
     pitch: str | None = None
+    #: Was die Sammelausgabe gegenueber den Einzelbaenden spart — ``None``,
+    #: wenn es keine ist oder die Baende nicht bekannt sind (ADR 24).
+    bundle: BundleAdvantage | None = None
 
     @property
     def is_bundle(self) -> bool:
@@ -143,7 +147,7 @@ def _cover_file(observation: Observation) -> str | None:
 
 
 def _suggestion(
-    observation: Observation, profile: Profile, judgement=None
+    observation: Observation, profile: Profile, judgement=None, bundle=None
 ) -> Suggestion:
     return Suggestion(
         source=observation.source,
@@ -164,6 +168,7 @@ def _suggestion(
         stars=judgement.stars if judgement else None,
         cover_file=_cover_file(observation),
         pitch=(judgement.pitch or None) if judgement else None,
+        bundle=bundle,
     )
 
 
@@ -185,6 +190,9 @@ def pending(
     found = store.latest_discoveries(profile.slug)
     # Ein Zugriff für den ganzen Stapel, nicht einer je Zeile.
     judgements = store.ratings_for(subject_of(observation) for observation in found)
+    # Einmal fuer den ganzen Stapel: Titel -> guenstigster bekannter Preis.
+    # Der Buendelvorteil braucht die Preise *anderer* Buecher (ADR 24).
+    preise = store.latest_prices_by_title(profile.slug, 'beam')
 
     items: list[Suggestion] = []
     hidden_junk = 0
@@ -201,7 +209,8 @@ def pending(
         # Dieselbe Regel wie im Digest, aus einer Stelle: was dich nie
         # erreichen würde, ist keine Aufgabe. Und was hier nicht steht, kostet
         # weder eine Anfrage für den Klappentext noch ein Urteil.
-        if not worth_announcing(observation, profile):
+        vorteil = advantage_for(observation, profile, preise.get)
+        if not worth_announcing(observation, profile, bundle_advantage=vorteil):
             hidden_priced += 1
             continue
         # Dieselbe Schwelle wie im Digest: was das Tor zurückhält, ist keine
@@ -214,7 +223,7 @@ def pending(
         if reason and str(observation.match_reason) != reason:
             continue
         items.append(
-            _suggestion(observation, profile, judgement)
+            _suggestion(observation, profile, judgement, vorteil)
         )
 
     # Das Beste zuerst. Ohne das stehen oben die Funde, die zufaellig zuletzt

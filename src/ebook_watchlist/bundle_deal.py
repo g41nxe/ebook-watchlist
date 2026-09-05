@@ -1,0 +1,110 @@
+"""Der Vorteil einer Sammelausgabe gegenüber den Einzelbänden (ADR 24).
+
+Die dritte Art von Angebot. Ein **Schnäppchen** vergleicht einen Preis mit
+einer Grenze, ein **Preissturz** ein Produkt mit sich selbst — beides sieht
+eine Sammelausgabe nie, weil sie in absoluten Zahlen teurer ist als jeder
+Einzelband. Hier wird sie mit *anderen Produkten* verglichen:
+
+    Der Kruzifix-Killer / Der Vollstrecker   12,99 €
+    Der Kruzifix-Killer                      10,99 €
+    Der Vollstrecker                         10,99 €
+                                             -------
+    zusammen                                 21,98 €  →  41 % gespart
+
+Es braucht dafür **keine neue Schwelle**: ``min_discount_pct`` aus dem Profil
+tut es. Gemessen an den vier echten Sammelausgaben im Bestand liegen die
+Ersparnisse bei 25 bis 45 % — die 25 % von "Achtsam morden (5in1)" sind der
+Härtetest dafür, dass die Regel nicht großzügig ist.
+
+Zwei Bedingungen, beide aus ADR 24, beide aus dem Betrieb begründet:
+
+**Nichts wird geraten.** Sind nicht *alle* enthaltenen Bände mit Preis
+bekannt, gibt es keinen Vorteil — kein geschätzter Vergleichspreis, keine
+hochgerechnete Bandzahl. Ein erfundener Vergleich wäre schlimmer als keine
+Meldung.
+
+**Kein Ramsch vom Themenregal.** Von 19 Sammelausgaben im Bestand sind 14
+Massenware („5 Spuk Thriller", „2 Gruselkrimis"). Gemeldet wird nur, was an
+einem Watchlist-Titel oder einer Referenzautor:in hängt — dieselbe Linie, die
+``junk.py`` schon zieht.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from .config import Profile
+from .matching.bundles import looks_like_bundle, volume_titles
+from .models import MatchReason, Observation
+
+#: Anlässe, bei denen eine Sammelausgabe überhaupt gemeldet werden darf.
+REPORTABLE = frozenset({MatchReason.WATCHLIST, MatchReason.PROFILE_AUTHOR})
+
+
+@dataclass(frozen=True, slots=True)
+class BundleAdvantage:
+    """Was die Sammelausgabe gegenüber den Einzelbänden spart."""
+
+    volumes: tuple[str, ...]
+    #: Was die Bände einzeln zusammen kosten.
+    singles_cents: int
+    #: Was die Sammelausgabe kostet.
+    price_cents: int
+
+    @property
+    def saved_cents(self) -> int:
+        return self.singles_cents - self.price_cents
+
+    @property
+    def saved_pct(self) -> int:
+        return round(self.saved_cents * 100 / self.singles_cents)
+
+    @property
+    def summary(self) -> str:
+        """Ein Satz für Tagesbericht und Stapel."""
+        anzahl = len(self.volumes)
+        return (
+            f"{anzahl} Bände für {self.price_cents / 100:.2f} € "
+            f"statt {self.singles_cents / 100:.2f} € — {self.saved_pct} % gespart"
+        ).replace(".", ",")
+
+
+def advantage_for(
+    observation: Observation,
+    profile: Profile,
+    price_of: Callable[[str], int | None],
+) -> BundleAdvantage | None:
+    """Der Vorteil dieser Sammelausgabe — oder ``None``.
+
+    ``price_of`` schlägt den Einzelpreis zu einem Bandtitel nach. Als Funktion
+    übergeben, damit die Rechnung ohne Datenbank prüfbar bleibt und die eine
+    Stelle, die sucht, austauschbar ist.
+    """
+    if observation.match_reason not in REPORTABLE:
+        return None
+    if observation.price_cents is None or observation.price_cents <= 0:
+        return None
+    if not looks_like_bundle(observation.title):
+        return None
+
+    bände = volume_titles(observation.title)
+    if len(bände) < 2:
+        return None
+
+    preise = [price_of(titel) for titel in bände]
+    # Alle oder keiner: ein fehlender Einzelpreis macht die Summe zu einer
+    # Schätzung, und geschätzt wird hier nicht.
+    if any(preis is None or preis <= 0 for preis in preise):
+        return None
+
+    einzeln = sum(preis for preis in preise if preis is not None)
+    if einzeln <= observation.price_cents:
+        return None
+
+    vorteil = BundleAdvantage(
+        volumes=bände, singles_cents=einzeln, price_cents=observation.price_cents
+    )
+    if vorteil.saved_pct < profile.min_discount_pct:
+        return None
+    return vorteil

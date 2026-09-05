@@ -131,6 +131,13 @@
 
         {# Der Pitch statt des Klappentexts: der sagt, wovon das Buch handelt,
            und das steht im Shop. Hier zählt, warum es für dich in Frage kommt. #}
+        {# Der Bündelvorteil ist ein eigener Grund, hier zu stehen — weder
+           Schnäppchen noch Preissturz, sondern billiger als die Einzelbände
+           zusammen (ADR 24). Er steht über dem Pitch, weil er der Anlass ist. #}
+        {% if item.bundle %}
+        <span class="mt-1 block text-sm font-medium text-amber">
+          {{ item.bundle.summary }}</span>
+        {% endif %}
         {% if item.pitch %}
         <span class="mt-1 block text-sm text-ink/80">{{ item.pitch }}</span>
         {% elif item.blurb %}
