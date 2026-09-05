@@ -119,15 +119,6 @@ class BookRow(Base):
     title: Mapped[str] = mapped_column(String)
     author: Mapped[str | None] = mapped_column(String, nullable=True)
     series: Mapped[str | None] = mapped_column(String, nullable=True)
-    #: Nummer innerhalb der Reihe, aus MARC ``245 $n`` / ``490 $v``.
-    series_index: Mapped[str | None] = mapped_column(String, nullable=True)
-    #: Sprache, aus MARC ``041``. Keine Quelle nennt sie — ohne die DNB gibt
-    #: es sie nicht (Ticket 31, 39).
-    language: Mapped[str | None] = mapped_column(String, nullable=True)
-    #: Wann die DNB zuletzt gefragt wurde — **auch wenn sie nichts wusste**.
-    #: Neun von dreissig Buechern kennt sie nicht; ohne diesen Vermerk fragte
-    #: jeder Lauf sie erneut (Ticket 42).
-    dnb_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     #: Dateiname im Cover-Ordner, nicht die Adresse beim Shop: die Seite
     #: laedt nichts von einem Dritten nach (Ticket 15).
     cover_file: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -136,19 +127,44 @@ class BookRow(Base):
     __table_args__ = (Index("ix_book_title", "title"),)
 
 
-class BookContainsRow(Base):
-    """Welche Bände in einer Sammelausgabe stecken (ADR 24).
+class DnbRecordRow(Base):
+    """Was die DNB zu einer ISBN gesagt hat — auch das Schweigen (Ticket 42).
 
-    Aus MARC ``770 $i Enthält $z <ISBN>`` — die Entsprechung zu ONIX
-    "01 includes". Gespeichert wird die **ISBN**, nicht eine Buch-Id: der
-    enthaltene Band muss bei uns kein Buch sein, und die ISBN bleibt richtig,
-    auch wenn er nie eines wird.
+    An der **ISBN** und nicht an einem Buch: eine ``book``-Zeile entsteht erst
+    durch eine Entscheidung der Leserin (ADR 18), ein Fund hat keine. Die
+    Sammelausgabe "David Hunter: 3in1 Bundle" ist genau so ein Fund — an ein
+    Buch geknuepft waere die Auskunft ausgerechnet dort nicht speicherbar,
+    wofuer sie gebraucht wird.
+
+    ``found`` haelt fest, dass gefragt wurde und nichts kam. Neun von dreissig
+    Buechern kennt die DNB nicht; ohne diesen Vermerk fragte jeder Lauf sie
+    erneut.
     """
 
-    __tablename__ = "book_contains"
+    __tablename__ = "dnb_record"
 
-    book_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     isbn: Mapped[str] = mapped_column(String, primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(DateTime)
+    found: Mapped[bool] = mapped_column(Boolean, default=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    subtitle: Mapped[str | None] = mapped_column(String, nullable=True)
+    author: Mapped[str | None] = mapped_column(String, nullable=True)
+    series: Mapped[str | None] = mapped_column(String, nullable=True)
+    series_index: Mapped[str | None] = mapped_column(String, nullable=True)
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class DnbContainsRow(Base):
+    """Die ISBNs der Baende einer Sammelausgabe, aus MARC ``770 $i Enthaelt``.
+
+    Die Entsprechung zu ONIX "01 includes". Der enthaltene Band muss bei uns
+    kein Buch sein — die ISBN bleibt richtig, auch wenn er nie eines wird.
+    """
+
+    __tablename__ = "dnb_contains"
+
+    isbn: Mapped[str] = mapped_column(String, primary_key=True)
+    contained: Mapped[str] = mapped_column(String, primary_key=True)
 
 
 class BookSourceRow(Base):
@@ -645,6 +661,93 @@ class Store:
                 # Einzelband mindestens kostet.
                 if titel not in preise or preis < preise[titel]:
                     preise[titel] = preis
+            return preise
+
+    # --- was die DNB weiss (Ticket 42) -------------------------------------
+
+    def isbns_without_dnb(self, profile_slug: str, limit: int) -> list[str]:
+        """ISBNs, die wir gesehen, aber noch nie bei der DNB nachgeschlagen haben.
+
+        Nach ISBN und nicht nach Buch: eine ``book``-Zeile entsteht erst durch
+        eine Entscheidung, und ausgerechnet die Sammelausgabe, für die das
+        gebaut wurde, ist ein blosser Fund.
+
+        ``limit`` ist die Hoeflichkeit: die DNB dokumentiert keine zulaessige
+        Anfragefrequenz, also wird der Rueckstand ueber mehrere Laeufe
+        abgearbeitet statt an einem Tag.
+        """
+        with self.session() as session:
+            schon = select(DnbRecordRow.isbn)
+            stmt = (
+                select(ObservationRow.isbn)
+                .where(
+                    ObservationRow.profile_slug == profile_slug,
+                    ObservationRow.isbn.is_not(None),
+                    ObservationRow.isbn.not_in(schon),
+                )
+                .group_by(ObservationRow.isbn)
+                .order_by(func.max(ObservationRow.id).desc())
+                .limit(limit)
+            )
+            return [isbn for (isbn,) in session.execute(stmt) if isbn]
+
+    def save_dnb(self, isbn: str, record, now: datetime) -> None:
+        """Die Antwort festhalten — **auch wenn keine kam**.
+
+        ``record is None`` heisst "gefragt, nichts gewusst". Ohne diese Zeile
+        fragte jeder Lauf dieselben neun von dreissig erneut.
+        """
+        with self.session() as session:
+            zeile = session.get(DnbRecordRow, isbn)
+            if zeile is None:
+                zeile = DnbRecordRow(isbn=isbn)
+                session.add(zeile)
+            zeile.checked_at = now
+            zeile.found = record is not None
+            if record is not None:
+                zeile.title = record.title
+                zeile.subtitle = record.subtitle
+                zeile.author = record.author
+                zeile.series = record.series
+                zeile.series_index = record.series_index
+                zeile.language = record.language
+                for enthalten in record.contains:
+                    if session.get(DnbContainsRow, (isbn, enthalten)) is None:
+                        session.add(DnbContainsRow(isbn=isbn, contained=enthalten))
+            session.commit()
+
+    def contained_isbns(self, isbn: str) -> tuple[str, ...]:
+        """Die Baende einer Sammelausgabe, aus ``770 $i Enthaelt`` (ADR 24)."""
+        with self.session() as session:
+            stmt = select(DnbContainsRow.contained).where(DnbContainsRow.isbn == isbn)
+            return tuple(session.scalars(stmt))
+
+    def prices_by_isbn(self, profile_slug: str, source: str) -> dict[str, int]:
+        """ISBN -> guenstigster zuletzt gesehener Preis.
+
+        Der Gegenstueck zu :meth:`latest_prices_by_title`, nur exakt: wo die
+        DNB die enthaltenen Baende als ISBN nennt, gibt es nichts zu raten.
+        """
+        latest_ids = (
+            select(func.max(ObservationRow.id))
+            .where(
+                ObservationRow.profile_slug == profile_slug,
+                ObservationRow.source == source,
+                ObservationRow.isbn.is_not(None),
+                ObservationRow.price_cents.is_not(None),
+            )
+            .group_by(ObservationRow.source, ObservationRow.source_item_id)
+        )
+        with self.session() as session:
+            stmt = select(ObservationRow.isbn, ObservationRow.price_cents).where(
+                ObservationRow.id.in_(latest_ids)
+            )
+            preise: dict[str, int] = {}
+            for isbn_wert, preis in session.execute(stmt):
+                if not isbn_wert or preis is None or preis <= 0:
+                    continue
+                if isbn_wert not in preise or preis < preise[isbn_wert]:
+                    preise[isbn_wert] = preis
             return preise
 
     def decided_items(self, profile_slug: str) -> set[tuple[str, str]]:

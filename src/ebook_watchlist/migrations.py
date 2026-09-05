@@ -288,6 +288,37 @@ def _add_dnb_columns(connection: Connection) -> None:
     )
 
 
+def _dnb_is_keyed_by_isbn(connection: Connection) -> None:
+    """Die DNB-Auskunft gehört an die ISBN, nicht an ein Buch (Ticket 42).
+
+    Der Schritt davor war falsch, und der Fall, der ihn ausgelöst hat, zeigt
+    es: „David Hunter: 3in1 Bundle" ist bei uns **kein Buch**. Eine
+    ``book``-Zeile entsteht erst durch eine Entscheidung der Leserin (ADR 18),
+    ein Fund hat keine. ``book_contains(book_id, …)`` konnte damit ausgerechnet
+    die Sammelausgabe nicht speichern, für die es gebaut wurde.
+
+    Die DNB antwortet ohnehin über eine ISBN. Danach wird jetzt geschlüsselt —
+    dann gilt die Antwort für Bücher und Funde gleichermaßen.
+
+    Angehängt statt eingeschoben: eine Datei auf Version 13 muss denselben Weg
+    gehen wie eine neue (ADR 16).
+    """
+    connection.exec_driver_sql("DROP TABLE IF EXISTS book_contains")
+    for spalte in ("series_index", "language", "dnb_checked_at"):
+        if spalte in _columns(connection, "book"):
+            connection.exec_driver_sql(f"ALTER TABLE book DROP COLUMN {spalte}")
+    connection.exec_driver_sql(
+        "CREATE TABLE IF NOT EXISTS dnb_record ("
+        "isbn TEXT PRIMARY KEY, checked_at DATETIME NOT NULL, found INTEGER NOT NULL, "
+        "title TEXT, subtitle TEXT, author TEXT, series TEXT, series_index TEXT, "
+        "language TEXT)"
+    )
+    connection.exec_driver_sql(
+        "CREATE TABLE IF NOT EXISTS dnb_contains ("
+        "isbn TEXT NOT NULL, contained TEXT NOT NULL, PRIMARY KEY (isbn, contained))"
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -305,6 +336,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _add_rating_pitch,
     _add_observation_cover_url,
     _add_dnb_columns,
+    _dnb_is_keyed_by_isbn,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

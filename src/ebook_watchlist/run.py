@@ -215,6 +215,43 @@ def _fetch_covers(store: Store, client: HttpClient, observations: Sequence[Obser
             store.set_cover(book_id, name)
 
 
+def _ask_the_library(store: Store, client: HttpClient, profile: Profile) -> None:
+    """Die DNB nach dem fragen, was keine Quelle sagt (Ticket 42).
+
+    Einmal je ISBN und höchstens ``dnb_budget`` je Lauf. Der Rückstand von
+    388 ISBNs ist damit nach acht Läufen abgearbeitet, ohne dass ein einzelner
+    Lauf auffällt — dieselbe Bauweise wie ``rating_budget`` beim Tor.
+
+    Die Zurückhaltung hat keinen technischen Grund: die DNB dokumentiert
+    **keine** zulässige Anfragefrequenz. Wo niemand sagt, was erlaubt ist,
+    fragt man wenig — dieselbe Überlegung wie bei der Pause zwischen zwei
+    Shop-Anfragen.
+
+    Läuft **hinter** dem Snapshot, wie die Titelbilder: eine unerreichbare
+    Bibliothek darf keine Geschichte kosten.
+    """
+    from .dnb import Dnb
+
+    offen = store.isbns_without_dnb(profile.slug, profile.dnb_budget)
+    if not offen:
+        return
+
+    bibliothek = Dnb(client=client)
+    now = datetime.now()
+    gefunden = 0
+    for isbn in offen:
+        try:
+            datensatz = bibliothek.about(isbn)
+        except Exception as exc:  # noqa: BLE001 - eine Auskunft, nicht der Lauf
+            print(f"DNB {isbn}: {type(exc).__name__}: {exc}", file=sys.stderr)
+            break
+        # Auch das Schweigen wird festgehalten, sonst fragt der naechste Lauf
+        # dieselbe ISBN erneut.
+        store.save_dnb(isbn, datensatz, now)
+        gefunden += 1 if datensatz else 0
+    print(f"DNB: {len(offen)} gefragt, {gefunden} beantwortet")
+
+
 def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
     """Entdeckungen gegen das Leseprofil pruefen (ADR 19).
 
@@ -748,6 +785,7 @@ def _run(
     # Beobachtung geschrieben war — dieselbe Regel wie beim Tor eine Zeile
     # weiter unten: ein Ausfall kostet nie Geschichte.
     _fetch_covers(store, client, observations)
+    _ask_the_library(store, client, profile)
 
     # Das Tor sitzt hinter dem Snapshot: ein Ausfall kostet ein Urteil, nie
     # Geschichte. Und hinter der Preisregel: ein Buch zu bewerten, das ohnehin

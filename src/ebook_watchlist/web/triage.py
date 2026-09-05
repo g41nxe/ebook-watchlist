@@ -193,6 +193,9 @@ def pending(
     # Einmal fuer den ganzen Stapel: Titel -> guenstigster bekannter Preis.
     # Der Buendelvorteil braucht die Preise *anderer* Buecher (ADR 24).
     preise = store.latest_prices_by_title(profile.slug, 'beam')
+    # Wo die DNB die enthaltenen Baende als ISBN nennt, ist der Vergleich
+    # exakt statt namensbasiert (ADR 25).
+    preise_isbn = store.prices_by_isbn(profile.slug, 'beam')
 
     items: list[Suggestion] = []
     hidden_junk = 0
@@ -209,7 +212,13 @@ def pending(
         # Dieselbe Regel wie im Digest, aus einer Stelle: was dich nie
         # erreichen würde, ist keine Aufgabe. Und was hier nicht steht, kostet
         # weder eine Anfrage für den Klappentext noch ein Urteil.
-        vorteil = advantage_for(observation, profile, preise.get)
+        vorteil = advantage_for(
+            observation,
+            profile,
+            preise.get,
+            contained=store.contained_isbns,
+            price_of_isbn=preise_isbn.get,
+        )
         if not worth_announcing(observation, profile, bundle_advantage=vorteil):
             hidden_priced += 1
             continue

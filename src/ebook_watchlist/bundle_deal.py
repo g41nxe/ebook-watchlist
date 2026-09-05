@@ -74,6 +74,9 @@ def advantage_for(
     observation: Observation,
     profile: Profile,
     price_of: Callable[[str], int | None],
+    *,
+    contained: Callable[[str], tuple[str, ...]] | None = None,
+    price_of_isbn: Callable[[str], int | None] | None = None,
 ) -> BundleAdvantage | None:
     """Der Vorteil dieser Sammelausgabe — oder ``None``.
 
@@ -88,6 +91,22 @@ def advantage_for(
     if not looks_like_bundle(observation.title):
         return None
 
+    # Der beste Weg zuerst: sagt die DNB, welche ISBNs drinstecken, gibt es
+    # nichts zu raten und nichts zu vergleichen — die ISBN ist exakt
+    # (MARC 770, ADR 25). Erst wenn sie schweigt, wird der Name gelesen.
+    if contained is not None and price_of_isbn is not None and observation.isbn:
+        aus_der_bibliothek = contained(observation.isbn)
+        if len(aus_der_bibliothek) >= 2:
+            aus_preisen = [price_of_isbn(isbn) for isbn in aus_der_bibliothek]
+            if all(preis and preis > 0 for preis in aus_preisen):
+                return _vorteil(
+                    observation,
+                    profile,
+                    aus_der_bibliothek,
+                    sum(preis for preis in aus_preisen if preis),
+                )
+            return None
+
     bände = volume_titles(observation.title)
     if len(bände) < 2:
         return None
@@ -99,12 +118,19 @@ def advantage_for(
         return None
 
     einzeln = sum(preis for preis in preise if preis is not None)
-    if einzeln <= observation.price_cents:
-        return None
+    return _vorteil(observation, profile, bände, einzeln)
 
+
+def _vorteil(
+    observation: Observation,
+    profile: Profile,
+    bände: tuple[str, ...],
+    einzeln: int,
+) -> BundleAdvantage | None:
+    """Die Rechnung selbst — gleich, ob die Bände Titel oder ISBNs sind."""
+    if observation.price_cents is None or einzeln <= observation.price_cents:
+        return None
     vorteil = BundleAdvantage(
         volumes=bände, singles_cents=einzeln, price_cents=observation.price_cents
     )
-    if vorteil.saved_pct < profile.min_discount_pct:
-        return None
-    return vorteil
+    return vorteil if vorteil.saved_pct >= profile.min_discount_pct else None
