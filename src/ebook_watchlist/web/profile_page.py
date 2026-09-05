@@ -118,11 +118,15 @@ def build(store: Store, profile: Profile) -> Overview:
     )
 
     try:
-        leseprofil, version = load_leseprofil()
+        # Die Datei, wie sie auf der Platte liegt — nicht die für das Modell
+        # gerenderte Fassung. Geändert wird das Dokument, also gehört das
+        # Dokument auf die Seite.
+        _, version = load_leseprofil()
+        leseprofil = LESEPROFIL_PATH.read_text(encoding="utf-8")
     except RatingUnavailable:
         leseprofil, version = None, None
     try:
-        scheme = load_rating_scheme()
+        scheme = load_rating_scheme().text
     except RatingUnavailable:
         scheme = None
 

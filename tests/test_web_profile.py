@@ -88,8 +88,8 @@ def test_the_counts_cover_every_relation(client: TestClient, db: Store) -> None:
 
 def test_the_leseprofil_is_shown_with_its_version(client: TestClient) -> None:
     body = client.get("/profil").text
-    assert "Profilversion" in body
-    assert "Kernachsen" in body
+    assert "Profilversion" in body  # Beschriftung der Seite
+    assert "Die Figur trägt alles" in body
 
 
 def test_the_page_says_the_leseprofil_is_not_editable_here(client: TestClient) -> None:
@@ -120,3 +120,12 @@ def test_the_scheme_is_shown_beside_the_profile_and_without_a_version(
     assert "Das Leseprofil" in body
     assert "Das Bewertungsschema" in body
     assert "Ohne Version" in body
+
+
+def test_neither_document_is_shown_as_a_python_object(client: TestClient) -> None:
+    """Die Seite zeigte eine Weile Scheme(text='…', min_stars=0, …) — dasselbe
+    Datenobjekt, das schon einmal im Prompt gelandet war."""
+    body = client.get("/profil").text
+
+    assert "Scheme(" not in body
+    assert "withhold_from" not in body

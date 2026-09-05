@@ -231,7 +231,7 @@ doppelt laufen. Beides ist unkritisch.
   und wie es funktioniert, ohne den Code zu lesen
 - [CONTEXT.md](CONTEXT.md) — Glossar der Domänenbegriffe
 - [docs/adr/](docs/adr) — Architecture Decision Records (Nummer 1–21)
-- [docs/leseprofil.md](docs/leseprofil.md) — die Beschreibung des Lesegeschmacks
+- [docs/leseprofil.yaml](docs/leseprofil.yaml) — die Beschreibung des Lesegeschmacks
 - [docs/bewertungsschema.yaml](docs/bewertungsschema.yaml) — wie ein Buch dagegen
   gehalten und in Sterne übersetzt wird
 - [docs/offene-punkte.md](docs/offene-punkte.md) — was fehlt, und welche

@@ -35,7 +35,10 @@ from ebook_watchlist.ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_s
 from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 22, 0)
-LESEPROFIL = "Profilversion: 1\n\nHier stünde das Leseprofil."
+#: Wie das Profil im Prompt ankommt: gerendert, ohne Versionsfeld.
+LESEPROFIL = "EINLEITUNG: Hier stünde das Leseprofil."
+#: Der Dateiinhalt, aus dem die Version gelesen wird.
+LESEPROFIL_YAML = "version: 1\neinleitung: Hier stünde das Leseprofil.\n"
 SCHEMA = Scheme(
     text="Hier stünde das Bewertungsschema.",
     prompt_text="Hier stünde das Bewertungsschema.",
@@ -82,13 +85,13 @@ def rating(stars: int) -> Rating:
 
 
 def test_the_leseprofil_states_its_version() -> None:
-    assert leseprofil_version(LESEPROFIL) == 1
+    assert leseprofil_version(LESEPROFIL_YAML) == 1
 
 
 def test_a_leseprofil_without_a_version_is_refused() -> None:
     """Ohne Version stünden irgendwann Sterne aus drei Fassungen nebeneinander."""
     with pytest.raises(RatingUnavailable, match="Profilversion"):
-        leseprofil_version("Kein Hinweis auf eine Version.")
+        leseprofil_version("einleitung: Eine Datei ganz ohne Versionsfeld.\n")
 
 
 # --- der Prompt -------------------------------------------------------------
@@ -102,7 +105,7 @@ def test_the_prompt_carries_only_public_facts() -> None:
 
     assert "Max Barry" in text
     assert "Ein Schiff, allein." in text
-    assert "Profilversion" in text
+    assert LESEPROFIL in text
     assert "Bewertungsschema" in text
 
 
@@ -676,7 +679,7 @@ def test_the_leseprofil_goes_out_once_not_once_per_book() -> None:
     des Prompts, das Buch selbst sind ein paar Zeilen."""
     prompt = prompt_for_many(_books(5), LESEPROFIL, SCHEMA)
 
-    assert prompt.count("Profilversion: 1") == 1
+    assert prompt.count(LESEPROFIL) == 1
     assert prompt.count(SCHEMA.text) == 1
     for number in range(1, 6):
         assert f"--- BUCH {number} ---" in prompt

@@ -34,7 +34,7 @@ benutzt ein Gesprächsurteil ungeprüft weiter, als wäre es eines seiner eigene
 
 ## Decision
 
-**1. `docs/leseprofil.md` wird die Beschreibung.** Es trägt die Achsen als
+**1. `docs/leseprofil.yaml` wird die Beschreibung.** Es trägt die Achsen als
 *Inhalt*, mit ihrer Gewichtung, in Prosa. Es ist versioniert, und diese Version
 bedeutet ab jetzt genau eine Sache: den Stand des Geschmacks der Leserin.
 

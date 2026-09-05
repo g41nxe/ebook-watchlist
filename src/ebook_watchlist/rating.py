@@ -35,13 +35,10 @@ from .cleaning import is_truncated
 from .models import Observation
 from .reasons import THEMA, thema_name
 
-LESEPROFIL_PATH = Path(__file__).resolve().parents[2] / "docs" / "leseprofil.md"
+LESEPROFIL_PATH = Path(__file__).resolve().parents[2] / "docs" / "leseprofil.yaml"
 #: Das Verfahren, getrennt vom Profil (ADR 21). Nicht versioniert: eine
 #: Änderung hier entwertet keine gespeicherte Bewertung.
 SCHEME_PATH = Path(__file__).resolve().parents[2] / "docs" / "bewertungsschema.yaml"
-#: Ältere Fassungen hießen "Maßstabsversion" — der Name fiel mit ADR 21,
-#: weil er das Verfahren meinte und auf das Profil zeigte.
-_VERSION = re.compile(r"(?:Profilversion|Maßstabsversion):\s*(\d+)", re.IGNORECASE)
 
 #: Voreinstellung. Ein beschränktes Urteil gegen ein mitgeliefertes Profil —
 #: dafür ist das kleinste Modell das richtige.
@@ -107,19 +104,41 @@ class Rating:
 
 
 def leseprofil_version(text: str) -> int:
-    match = _VERSION.search(text)
-    if match is None:
-        raise RatingUnavailable("docs/leseprofil.md nennt keine Profilversion")
-    return int(match.group(1))
+    """Die Fassung, gegen die geurteilt wird.
+
+    Früher stand sie als Zeile "Profilversion: N" in einem Markdown-Dokument
+    und wurde per regulärem Ausdruck herausgefischt. Jetzt ist sie ein Feld —
+    und eine Datei ohne dieses Feld ist kein Profil, sondern ein Entwurf.
+    """
+    try:
+        version = yaml.safe_load(text)["version"]
+    except (yaml.YAMLError, KeyError, TypeError) as exc:
+        raise RatingUnavailable(
+            "docs/leseprofil.yaml nennt keine Profilversion"
+        ) from exc
+    return int(version)
 
 
 def load_leseprofil(path: Path | None = None) -> tuple[str, int]:
+    """Das Leseprofil, gerendert für den Prompt, mit seiner Version.
+
+    Gerendert und nicht roh: das Modell bekommt Anweisungen, keine
+    Datenstruktur. Was in der Datei ``belegbar_aus: [klappentext]`` heißt, liest
+    es als BELEGBAR AUS: klappentext — dieselbe Auskunft, ohne Einrückungstiefe
+    und Listenstriche, die Aufmerksamkeit kosten (wie beim Schema).
+    """
     target = path or LESEPROFIL_PATH
     try:
         text = target.read_text(encoding="utf-8")
     except OSError as exc:
         raise RatingUnavailable(f"Leseprofil nicht lesbar: {exc}") from exc
-    return text, leseprofil_version(text)
+    version = leseprofil_version(text)
+    try:
+        data = yaml.safe_load(text)
+        fuer_das_modell = {k: v for k, v in data.items() if k != "version"}
+    except (yaml.YAMLError, AttributeError) as exc:
+        raise RatingUnavailable(f"Leseprofil unbrauchbar: {exc}") from exc
+    return _render(fuer_das_modell), version
 
 
 @dataclass(frozen=True, slots=True)

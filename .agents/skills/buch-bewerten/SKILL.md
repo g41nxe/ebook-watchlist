@@ -11,7 +11,7 @@ gegen ein Bauchgefühl (ADR 21):
 - [`docs/bewertungsschema.yaml`](../../../docs/bewertungsschema.yaml) — **wie**
   geurteilt wird. Sterne, Begründungspflicht, `confidence`, Gegenprobe. Nicht
   versioniert, gilt für jedes Profil.
-- [`docs/leseprofil.md`](../../../docs/leseprofil.md) — **wonach**. Die
+- [`docs/leseprofil.yaml`](../../../docs/leseprofil.yaml) — **wonach**. Die
   Beschreibung des Geschmacks, versioniert.
 
 Dieselben zwei Dokumente benutzt das Bewertungstor im Lauf. Bevor es sie gab,
@@ -20,7 +20,7 @@ hatten Skill und Tor verschiedene Regeln bei derselben Sternskala.
 ## Ablauf
 
 1. **Beides laden.** Immer zuerst `docs/bewertungsschema.yaml` **und**
-   `docs/leseprofil.md` vollständig lesen. Nichts davon aus dem Gedächtnis
+   `docs/leseprofil.yaml` vollständig lesen. Nichts davon aus dem Gedächtnis
    rekonstruieren — die Dateien sind die Wahrheit und ändern sich.
 
    Ergänzend `data/profile.yaml` lesen (Reference Authors, `liked_books`,
@@ -94,7 +94,7 @@ Erwartetes und erzeugtes Format einer Buchliste:
   why: >
     Begründung nach den vier Regeln aus docs/bewertungsschema.yaml.
   confidence: belegt   # belegt | teils | vermutet
-  profilversion: 1     # Version aus docs/leseprofil.md
+  profilversion: 2     # Version aus docs/leseprofil.yaml
   hinweis: optional - Unklarheiten, abweichende Titelvarianten, Rückfragen
 ```
 

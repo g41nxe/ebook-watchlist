@@ -7,7 +7,7 @@ description: Überarbeitet das Leseprofil anhand neu genannter Bücher. Misst da
 
 Nimmt neu genannte Bücher entgegen und prüft, ob das **Leseprofil** sie richtig
 einordnet. Ein Buch, das der Benutzer mochte und das schlecht bewertet wird, ist
-ein Befund über `docs/leseprofil.md` — nicht über das Buch.
+ein Befund über `docs/leseprofil.yaml` — nicht über das Buch.
 
 Geändert wird ausschließlich das **Profil**. Das Verfahren steht in
 `docs/bewertungsschema.yaml` und gehört nicht hierher: es ist nicht versioniert,
@@ -63,7 +63,7 @@ selbst und misst nichts mehr.
 
 5. **Schreiben.**
    - Stufe 1 → `data/profile.yaml` (bleibt lokal, nichts davon ins Repo).
-   - Stufe 2 und 3 → `docs/leseprofil.md`, **Profilversion erhöhen**, und
+   - Stufe 2 und 3 → `docs/leseprofil.yaml`, **Profilversion erhöhen**, und
      committen. Die Commit-Nachricht nennt das Buch, das die Änderung ausgelöst
      hat. In einem halben Jahr ist das der Unterschied zwischen „warum steht das
      da" und `git log`.

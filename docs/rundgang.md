@@ -130,7 +130,7 @@ zu bekommen.
 ### 3. Das Bewertungstor — **noch nie gelaufen**
 
 Ein Modell bewertet jede Entdeckung von 0 bis 5 gegen dein schriftlich
-festgehaltenes Leseprofil ([`leseprofil.md`](leseprofil.md)), nach dem Verfahren
+festgehaltenes Leseprofil ([`leseprofil.yaml`](leseprofil.yaml)), nach dem Verfahren
 aus dem [Bewertungsschema](bewertungsschema.yaml), und begründet das Urteil. Unter
 dem Schwellwert kommt sie nicht auf den Stapel — es sei denn, das Urteil ruht
 nur auf Vermutung, dann wird gezeigt statt verschwiegen. Höchstens 40 Urteile
