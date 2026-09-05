@@ -223,6 +223,10 @@ class BeamSource(ShopSource):
             author=entry.author,
             isbn=detail.isbn,
             cover_url=detail.cover_url,
+            # Ausdruecklich **kein** Klappentext: das Tor beurteilt einen
+            # Watchlist-Titel nie, und sonst liest ihn niemand. Mitzuschreiben
+            # kostete rund zehn Megabyte im Jahr fuer Text, den nichts abruft
+            # — der Snapshot ist anhaengend, jeder Lauf schriebe ihn erneut.
             match_reason=MatchReason.WATCHLIST,
             watchlist_key=entry.key,
             price_cents=detail.price_cents,
@@ -256,6 +260,7 @@ class BeamSource(ShopSource):
             # Nummernadresse ist nur der Weg dorthin und gehoert nicht in die
             # Datenbank, wo sie spaeter jemand als Link zu lesen bekommt.
             url=detail.url or url,
+            blurb=detail.blurb,
         )
 
     def probe(self) -> None:

@@ -93,6 +93,7 @@ class FakeSource(Source):
                 title=str(row.get("title", "")),
                 author=row.get("author"),
                 isbn=row.get("isbn"),
+                blurb=row.get("detail_blurb") or row.get("blurb"),
                 url=row.get("url"),
             )
         return None

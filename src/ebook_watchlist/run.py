@@ -298,7 +298,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "dismissals":
             return _dismissals(profile, sources)
         if args.command == "rate":
-            return _rate(profile, args.anzahl)
+            return _rate(profile, args.anzahl, sources)
         try:
             return _run(
                 profile,
@@ -357,16 +357,67 @@ def _dismissals(profile, sources) -> int:
     return EXIT_OK
 
 
-def _rate(profile: Profile, wieviele: int) -> int:
+def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
+    """Den ganzen Klappentext holen — eine Anfrage je Buch, und nur hier.
+
+    Angehängt statt überschrieben: der Snapshot wird nie umgeschrieben
+    (ADR 5). Der Shop *hat* das gesagt, nur auf einer anderen Seite, und damit
+    ist es eine Beobachtung wie jede andere. Preis und Verfügbarkeit kommen
+    ebenfalls von dort — weicht der Preis ab, ist das eine echte Änderung und
+    keine erfundene.
+
+    Was schon einen ganzen Klappentext trägt, wird nicht noch einmal geholt.
+    """
+    from .cleaning import is_truncated
+
+    by_name = {source.name: source for source in sources}
+    offen = [o for o in observations if is_truncated(o.blurb) or not o.blurb]
+    if not offen:
+        return observations
+
+    print(f"{len(offen)} Klappentexte nachladen …")
+    now = datetime.now()
+    run_id = store.start_run(profile.slug, "cli", now, pid=os.getpid())
+    geholt: dict[tuple[str, str], Observation] = {}
+    frisch: list[Observation] = []
+    for observation in offen:
+        source = by_name.get(observation.source)
+        if source is None:
+            continue
+        try:
+            item = source.item(observation.source_item_id)
+        except Exception as exc:  # noqa: BLE001 - ein Buch, nicht der Stapel
+            print(f"  {observation.title[:44]}: {type(exc).__name__}", file=sys.stderr)
+            continue
+        if item is None or not item.blurb:
+            continue
+        voller = replace(observation, blurb=item.blurb, observed_at=now)
+        geholt[observation.key] = voller
+        frisch.append(voller)
+
+    if frisch:
+        store.append(run_id, profile.slug, frisch, now)
+    store.finish_run(run_id, status="ok", delta_count=0, finished_at=datetime.now())
+    return [geholt.get(o.key, o) for o in observations]
+
+
+def _rate(profile: Profile, wieviele: int, sources) -> int:
     """Den Rückstand beurteilen, ohne eine Quelle zu fragen (Ticket 19).
 
     Das Tor im Lauf sieht nur **Erstsichtungen**. Was einmal im Snapshot steht,
     erzeugt beim nächsten Lauf kein Delta mehr — der angesammelte Rückstand ist
     für das Tor also unsichtbar, und ohne diesen Weg bliebe er es für immer.
 
-    Kein Netz außer dem Modell: die Bücher stehen bereits da, es wird nur
-    geurteilt. Das macht diesen Befehl zur ruhigen Stelle, an der sich Bündel-
-    größe und Modell messen lassen, ohne dass ein Shop etwas davon merkt.
+    Beurteilt wird nur, was auch gemeldet würde — der Stapel folgt derselben
+    Regel wie der Digest (Schnäppchen oder ausleihbar). Von 358 offenen Funden
+    bleiben damit 107; die übrigen 251 kosten weder eine Anfrage noch ein
+    Urteil, denn sie erreichen die Leserin ohnehin nicht. Fällt ein Preis, sind
+    sie wieder da.
+
+    Für genau diese Bücher wird der **ganze** Klappentext nachgeladen. Die
+    Kachel trägt im Median 197 Zeichen und ist zu 85 % abgeschnitten; die
+    Detailseite trägt rund das Zehnfache. Eine Anfrage je Buch, und nur hier —
+    beim Sammeln wären es dreihundert.
     """
     from .rating import rate_in_batches
     from .ratings import BY_MODEL, subject_of
@@ -394,6 +445,7 @@ def _rate(profile: Profile, wieviele: int) -> int:
         if f"{observation.source}:{observation.source_item_id}" in keys
     ]
 
+    beobachtungen = _with_full_blurbs(store, profile, beobachtungen, sources)
     print(f"{len(beobachtungen)} Vorschläge, Bündel zu {profile.rating_batch_size} …")
     urteile = rate_in_batches(rater, beobachtungen, size=profile.rating_batch_size)
 
@@ -417,8 +469,10 @@ def _rate(profile: Profile, wieviele: int) -> int:
         verteilung[rating.stars] = verteilung.get(rating.stars, 0) + 1
         print(f"  {'★' * rating.stars}{'☆' * (5 - rating.stars)} {rating.confidence:<9}"
               f" {observation.title[:52]}")
-        if rating.pitch:
-            print(f"            {rating.pitch}")
+        # Ein fehlender Pitch kostet kein Urteil (die Sterne tragen für sich),
+        # aber er wird genannt: still fehlend hiesse, eine Lücke auf der Seite
+        # nie zu bemerken.
+        print(f"            {rating.pitch or 'OHNE PITCH'}")
 
     # Eine Bewertung, die nicht unterscheidet, ist wertlos — deshalb steht die
     # Verteilung da und nicht nur die Zahl der Urteile.

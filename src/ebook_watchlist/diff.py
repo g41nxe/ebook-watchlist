@@ -45,6 +45,9 @@ def worth_announcing(observation: Observation, profile: Profile | None) -> bool:
     what ADR 19 says in as many words. It ends here: relevance is the gate's
     question, urgency is the price's, and this function only asks the second.
 
+    Zwei Wege sind es, nicht einer: ein Schnaeppchen **oder** ein Buch, das die
+    Bibliothek gerade hergibt. Bei einer Ausleihe ist der Preis gleichgueltig.
+
     Nothing is thrown away. The Observation is stored either way, so a book
     found at 14,99 € waits quietly and speaks up the day it drops.
     """
@@ -52,6 +55,10 @@ def worth_announcing(observation: Observation, profile: Profile | None) -> bool:
         return True
     if is_junk(observation):
         return False
+    # Ausleihbar schlaegt jeden Preis: was die Bibliothek hergibt, kostet
+    # nichts, und "unter 5,00 EUR" ist dann keine sinnvolle Huerde mehr.
+    if observation.availability is Availability.AVAILABLE:
+        return True
     return profile is not None and is_strong_deal(observation.price_cents, profile)
 
 

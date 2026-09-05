@@ -15,6 +15,7 @@ from datetime import datetime
 
 from ..config import Profile
 from ..deals import is_strong_deal
+from ..diff import worth_announcing
 from ..junk import is_junk
 from ..models import MatchReason, Observation
 from ..ratings import BY_MODEL, subject_of
@@ -87,6 +88,10 @@ class Pile:
     #: Wie viele es insgesamt sind, auch wenn die Seite weniger zeigt.
     total: int
     hidden_junk: int
+    #: Weder Schnäppchen noch ausleihbar — würde nie gemeldet, steht also auch
+    #: nicht im Stapel. Verschwunden ist nichts: fällt der Preis, ist das Buch
+    #: wieder da (ADR 19).
+    hidden_priced: int = 0
 
     @property
     def is_empty(self) -> bool:
@@ -138,6 +143,7 @@ def pending(
 
     items: list[Suggestion] = []
     hidden_junk = 0
+    hidden_priced = 0
     for observation in found:
         if (observation.source, observation.source_item_id) in decided_items:
             continue
@@ -145,6 +151,12 @@ def pending(
             continue
         if is_junk(observation):
             hidden_junk += 1
+            continue
+        # Dieselbe Regel wie im Digest, aus einer Stelle: was dich nie
+        # erreichen würde, ist keine Aufgabe. Und was hier nicht steht, kostet
+        # weder eine Anfrage für den Klappentext noch ein Urteil.
+        if not worth_announcing(observation, profile):
+            hidden_priced += 1
             continue
         if reason and str(observation.match_reason) != reason:
             continue
@@ -156,7 +168,12 @@ def pending(
             )
         )
 
-    return Pile(items=tuple(items[:limit]), total=len(items), hidden_junk=hidden_junk)
+    return Pile(
+        items=tuple(items[:limit]),
+        total=len(items),
+        hidden_junk=hidden_junk,
+        hidden_priced=hidden_priced,
+    )
 
 
 def decide(

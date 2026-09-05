@@ -70,6 +70,9 @@ DETAIL_AUTHOR = 'a[href*="saltFieldLimitation=author"]'
 #: Die sprechende Adresse der Seite. Wer ueber die Produktnummer kommt, kennt
 #: sie nicht — die Seite selbst nennt sie.
 DETAIL_CANONICAL = 'link[rel="canonical"]'
+#: Der ganze Klappentext. Die Kachel traegt nur einen Anriss von rund 200
+#: Zeichen mit "... Mehr" am Ende; hier stehen im Median das Zehnfache.
+DETAIL_DESCRIPTION = "[itemprop=description]"
 
 # --- listing --------------------------------------------------------------
 

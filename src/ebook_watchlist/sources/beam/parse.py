@@ -218,6 +218,11 @@ class Detail:
     #: The speaking address the shop itself gives this page. Coming in through
     #: the numeric detail route, this is the only way to learn it.
     url: str | None = None
+    #: Der ganze Klappentext. Die Kachel traegt nur einen Anriss — gemessen
+    #: 197 Zeichen im Median gegen 1931 auf der Detailseite —, und 85 % der
+    #: Anrisse sind abgeschnitten. Er wurde hier bisher nicht gelesen, obwohl
+    #: die Seite fuer jeden Watchlist-Titel ohnehin geholt wird.
+    blurb: str | None = None
 
 
 def _isbn_from_order_number(order_number: str | None) -> str | None:
@@ -262,6 +267,9 @@ def parse_detail(html: str) -> Detail:
     author_node = scope.select_one(sel.DETAIL_AUTHOR)
     author = author_node.get_text(" ", strip=True) if author_node else None
 
+    # Der Klappentext steht ausserhalb des Produktblocks, deshalb ``page``.
+    description = page.select_one(sel.DETAIL_DESCRIPTION)
+
     # Die kanonische Adresse steht im Kopf der Seite, nicht im Produktblock.
     canonical = page.select_one(sel.DETAIL_CANONICAL)
     href = canonical.get("href") if canonical is not None else None
@@ -273,6 +281,7 @@ def parse_detail(html: str) -> Detail:
         cover_url=_cover_from(scope.select_one(sel.DETAIL_IMAGE)),
         author=author or None,
         url=canonical_url(href) if isinstance(href, str) and href else None,
+        blurb=description.get_text(" ", strip=True) if description else None,
     )
 
 

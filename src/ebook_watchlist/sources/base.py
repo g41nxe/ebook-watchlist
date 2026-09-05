@@ -44,6 +44,9 @@ class Item:
     author: str | None = None
     isbn: str | None = None
     url: str | None = None
+    #: Der ganze Klappentext von der Detailseite. Die Kachel traegt nur einen
+    #: Anriss, und das Bewertungstor urteilt sonst ueber 200 Zeichen.
+    blurb: str | None = None
 
 
 @dataclass(slots=True)

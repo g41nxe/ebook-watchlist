@@ -163,17 +163,28 @@ pitch:
     Buch handelt. Der Pitch sagt, warum es FÜR SIE in Frage kommt — die
     Verbindung, nicht die Zusammenfassung.
 
+    ES GIBT IMMER EINEN PITCH. Auch bei null Sternen. Ein Buch, das nicht
+    passt, bekommt keinen leeren Pitch, sondern einen, der in einem Satz sagt,
+    WAS es ist und WORAN es scheitert. "Nichts zu sagen" ist keine zulässige
+    Antwort — dann steht auf der Seite eine Lücke statt einer Auskunft.
+
     NICHTS ERFINDEN UND NICHTS SCHÖNREDEN. Dieselbe Grundlage wie die Sterne.
-    Trägt das Buch wenig, sagt der Pitch das, statt eine Formulierung zu
-    suchen. Ein Pitch, der zu einem Stern klingt wie zu fünf, ist wertlos.
+    Ein Pitch, der zu einem Stern klingt wie zu fünf, ist wertlos: bei wenigen
+    Sternen benennt er die Absage, bei vielen den Grund hinzusehen.
 
     NICHT SPOILERN. Ein Pitch, der die Wendung verrät, kostet ihr das Buch.
 
     Keine Sternzahl und kein Achsenname im Pitch — die stehen daneben.
 
+  # Zwei Beispiele, weil der Pitch beides können muss: zusagen und absagen.
   gut: |
-    Ein Profiler, der an seinen eigenen Fällen zerbricht, und eine Jagd, die
-    auf Seite eins beginnt.
+    Bei vielen Sternen — der Grund hinzusehen:
+    "Ein Profiler, der an seinen eigenen Fällen zerbricht, und eine Jagd, die
+    auf Seite eins beginnt."
+
+    Bei wenigen Sternen — die Absage, benannt statt verschwiegen:
+    "Landhausrätsel mit Nebel und Maskenball — freundlich, wo das Profil
+    dreckig und kompromisslos verlangt."
 
   schlecht:
     - text: Ein packender Thriller, der von der ersten bis zur letzten Seite fesselt.
