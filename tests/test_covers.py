@@ -175,3 +175,26 @@ def test_one_broken_image_does_not_stop_the_others(tmp_path: Path, monkeypatch) 
     assert client.calls == 2
     assert store.book(first.id).cover_file is None
     assert store.book(second.id).cover_file is not None
+
+
+def test_the_cover_address_survives_the_snapshot(tmp_path: Path, monkeypatch) -> None:
+    """Sie stand in der Kachel, wurde ausgelesen, gesetzt — und beim Speichern
+    weggeworfen, weil es die Spalte nicht gab. Für Watchlist-Titel fiel das nie
+    auf: dort holt derselbe Lauf das Bild. Für eine Entdeckung war sie weg."""
+    from ebook_watchlist import paths
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.store import Store
+
+    monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
+    store = Store(paths.db_path())
+    beobachtung = Observation(
+        source="beam", source_item_id="1", title="Ein Fund",
+        match_reason=MatchReason.GENRE_CATEGORY,
+        cover_url="https://beam.invalid/media/9783104911854_200x200.jpg",
+    )
+    run = store.start_run("t", "cli", NOW)
+    store.append(run, "t", [beobachtung], NOW)
+
+    zurueck = store.latest_observations("t", [("beam", "1")])[("beam", "1")]
+
+    assert zurueck.cover_url == beobachtung.cover_url

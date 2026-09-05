@@ -250,6 +250,23 @@ def _add_rating_pitch(connection: Connection) -> None:
     add_column(connection, "rating", "pitch", "VARCHAR NOT NULL DEFAULT ''")
 
 
+def _add_observation_cover_url(connection: Connection) -> None:
+    """Die Adresse des Titelbilds mitschreiben (Ticket 15, nachgereicht).
+
+    Der Parser liest sie seit jeher aus der Kachel, die Quelle setzt sie auf
+    die Beobachtung — und hier ging sie verloren, weil es die Spalte nicht gab.
+    Für Watchlist-Titel fiel das nicht auf: dort holt derselbe Lauf das Bild,
+    solange das Feld noch im Speicher steht. Für eine Entdeckung war sie nach
+    dem Lauf weg, und ein Bild liess sich nachträglich nur über die
+    Detailseite wiederfinden — eine Anfrage je Buch für etwas, das schon
+    dagewesen war.
+
+    Nicht rückwirkend zu füllen: was ein Shop vor drei Wochen als Bildadresse
+    nannte, weiss heute niemand mehr. Die nächsten Läufe tragen sie ein.
+    """
+    add_column(connection, "observation", "cover_url", "TEXT")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -265,6 +282,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _add_rating_origin,
     _rename_rubric_version,
     _add_rating_pitch,
+    _add_observation_cover_url,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

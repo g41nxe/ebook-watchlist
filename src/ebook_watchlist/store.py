@@ -81,6 +81,13 @@ class ObservationRow(Base):
     subtitle: Mapped[str | None] = mapped_column(String, nullable=True)
     isbn: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     series: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Die Adresse des Titelbilds beim Shop — **nicht** das Bild selbst und
+    #: nicht der lokale Dateiname. Die Kachel der Trefferliste trägt sie schon
+    #: mit, sie war nur nie gespeichert worden: bis hierher las der Parser sie
+    #: aus, die Quelle setzte sie, und der Store warf sie weg. Für einen
+    #: Watchlist-Titel fiel das nie auf, weil die Bilder im selben Lauf geholt
+    #: werden; für eine Entdeckung ging sie jedes Mal verloren (Ticket 15).
+    cover_url: Mapped[str | None] = mapped_column(String, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
 
     # Serves the max-id-per-item lookup that every diff starts with.
@@ -326,6 +333,7 @@ def _to_observation(row: ObservationRow) -> Observation:
         available_from=row.available_from,
         category=row.category,
         url=row.url,
+        cover_url=row.cover_url,
         observed_at=row.observed_at,
     )
 
@@ -1203,6 +1211,7 @@ class Store:
                     category=obs.category,
                     url=obs.url,
                     blurb=obs.blurb,
+                    cover_url=obs.cover_url,
                     subtitle=obs.subtitle,
                     isbn=obs.isbn,
                     series=obs.series,
