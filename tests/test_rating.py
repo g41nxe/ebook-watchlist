@@ -593,11 +593,15 @@ def test_a_nonzero_exit_names_what_the_cli_said(monkeypatch) -> None:
         ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate(discovery())
 
 
-def test_the_prompt_reaches_the_cli_and_carries_no_secret(monkeypatch) -> None:
-    seen: list[list[str]] = []
+def test_the_prompt_reaches_the_cli_over_stdin(monkeypatch) -> None:
+    """Nicht als Argument: Windows begrenzt eine Kommandozeile auf 32767
+    Zeichen, und ein Buendel aus Profil, Verfahren und drei ganzen
+    Klappentexten liegt darueber. Python meldet das als FileNotFoundError —
+    also ununterscheidbar von "claude ist nicht installiert"."""
+    seen: list[tuple[list[str], str | None]] = []
 
     def capture(command, **kwargs):
-        seen.append(command)
+        seen.append((command, kwargs.get("input")))
         return _completed(stdout=ANSWER)
 
     monkeypatch.setattr("ebook_watchlist.rating.subprocess.run", capture)
@@ -605,10 +609,10 @@ def test_the_prompt_reaches_the_cli_and_carries_no_secret(monkeypatch) -> None:
         discovery(title="Blindflug", author="Peter Watts")
     )
 
-    command = seen[0]
-    assert command[:2] == ["claude", "-p"]
-    assert "--output-format" in command and "json" in command
-    assert "Blindflug" in command[2]
+    command, prompt = seen[0]
+    assert command == ["claude", "-p", "--output-format", "json"]
+    assert prompt is not None and "Blindflug" in prompt
+    assert not any("Blindflug" in teil for teil in command)
 
 
 # --- welcher Bewerter gewählt wird ------------------------------------------

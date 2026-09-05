@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -436,13 +437,19 @@ def rate_in_batches(
         if many is not None:
             try:
                 ratings.update(many(chunk))
-            except RatingUnavailable:
+            except RatingUnavailable as exc:
+                # Genannt, nicht verschluckt: ein Buendel, das scheitert,
+                # kostet drei Urteile, und ohne den Grund steht spaeter nur
+                # "ohne Urteil" da — das sah nach einer Eigenart des Modells
+                # aus und war eine abgelaufene Anmeldung.
+                print(f"  Buendel ohne Urteil: {exc}", file=sys.stderr)
                 continue
             continue
         for observation in chunk:
             try:
                 ratings[observation.key] = rater.rate(observation)
-            except RatingUnavailable:
+            except RatingUnavailable as exc:
+                print(f"  {observation.title[:44]}: {exc}", file=sys.stderr)
                 continue
     return ratings
 
@@ -562,10 +569,17 @@ class ClaudeCodeRater:
         return parse_many(answer, observations, self.version, self.scheme)
 
     def _ask(self, prompt: str) -> str:
-        command = [self.executable, "-p", prompt, "--output-format", "json"]
+        # Der Prompt geht ueber stdin, nicht als Argument: Windows begrenzt
+        # eine Kommandozeile auf 32767 Zeichen, und ein Buendel aus Profil,
+        # Verfahren und drei ganzen Klappentexten liegt darueber. Python
+        # meldete das als FileNotFoundError — woraus hier "claude nicht
+        # gefunden" wurde, und zwoelf Buecher fielen mit dieser falschen
+        # Begruendung aus dem Lauf.
+        command = [self.executable, "-p", "--output-format", "json"]
         try:
             completed = subprocess.run(  # noqa: S603 - fester Befehl, kein Shell
                 command,
+                input=prompt,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
