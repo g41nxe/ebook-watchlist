@@ -114,9 +114,7 @@ def test_a_watchlist_title_is_not_a_suggestion(client: TestClient, db: Store) ->
 def test_a_decision_creates_the_book_and_the_relation(client: TestClient, db: Store) -> None:
     found(db, item_id="7", title="Der Kannibalenhügel", author="Viktor Sauer")
 
-    client.post(
-        "/vorschlaege/entscheiden", data={"kind": "owned", "keys": ["beam:7"]}
-    )
+    client.post("/vorschlaege/entscheiden", data={"kind": "owned", "keys": ["beam:7"]})
 
     book = next(b for b in db.books() if b.title == "Der Kannibalenhügel")
     kinds = {row.kind for row in db.relations_of("test", book.id) if row.active}
@@ -157,9 +155,7 @@ def test_several_finds_are_decided_at_once(client: TestClient, db: Store) -> Non
     assert "Fund 0" not in body and "Fund 2" not in body
 
 
-def test_an_existing_book_is_matched_rather_than_duplicated(
-    client: TestClient, db: Store
-) -> None:
+def test_an_existing_book_is_matched_rather_than_duplicated(client: TestClient, db: Store) -> None:
     """Jede Buchanlage sucht zuerst — sonst verteilen sich die Beziehungen
     eines Buchs auf zwei Zeilen (ADR 18)."""
     before = len(db.books())
@@ -248,24 +244,28 @@ def test_without_alpine_the_page_stays_a_plain_form(client: TestClient, db: Stor
 # --- die Zeile wie in der Übersicht (Vorschlagsseite) -----------------------
 
 
-
-
 # --- die Zeile, wie in der Übersicht -----------------------------------------
 
 
 def urteil(db: Store, observation: Observation, *, stars: int, pitch: str) -> None:
     from ebook_watchlist.ratings import BY_MODEL, subject_of
 
-    db.put_rating(subject_of(observation), stars=stars, confidence="teils",
-                  reason="Begründung zum Nachprüfen.", profile_version=1,
-                  now=NOW, origin=BY_MODEL, pitch=pitch)
+    db.put_rating(
+        subject_of(observation),
+        stars=stars,
+        confidence="teils",
+        reason="Begründung zum Nachprüfen.",
+        profile_version=1,
+        now=NOW,
+        origin=BY_MODEL,
+        pitch=pitch,
+    )
 
 
 def test_the_pitch_replaces_the_blurb(client: TestClient, db: Store) -> None:
     """Der Klappentext sagt, wovon das Buch handelt — der steht im Shop. Hier
     zählt, warum es für diese Leserin in Frage kommt."""
-    beobachtet = found(db, title="Der Kannibalenhügel",
-                       blurb="Ein Schiff, allein im Dunkeln.")
+    beobachtet = found(db, title="Der Kannibalenhügel", blurb="Ein Schiff, allein im Dunkeln.")
     urteil(db, beobachtet, stars=4, pitch="Ein Ermittler am Limit, und die Jagd beginnt sofort.")
 
     body = client.get("/vorschlaege").text
@@ -363,7 +363,7 @@ def test_what_the_gate_holds_back_is_not_a_task(client: TestClient, db: Store) -
 
 
 def test_an_unjudged_find_is_never_hidden_as_weak(client: TestClient, db: Store) -> None:
-    """"Noch nicht beurteilt" ist etwas anderes als "passt nicht"."""
+    """ "Noch nicht beurteilt" ist etwas anderes als "passt nicht"."""
     found(db, item_id="a", title="Ohne Urteil")
 
     pile = view.pending(db, load_profile())
@@ -396,3 +396,42 @@ def test_a_title_beginning_with_a_number_word_is_read_as_a_bundle(
 
     assert pile.items == ()
     assert pile.hidden_junk == 1
+
+
+def test_a_suggestion_with_a_fetched_cover_shows_it(client: TestClient, db: Store) -> None:
+    """Die Vorlage uebergab fest ``none`` als Bilddatei — der Stapel konnte
+    kein Cover zeigen, gleichgueltig was in den Daten stand. Aufgefallen ist es
+    erst, als 25 geholte Bilder auf der Seite unsichtbar blieben."""
+    from ebook_watchlist import paths
+    from ebook_watchlist.covers import file_name
+
+    url = "https://beam.invalid/media/9783104911854_200x200.jpg"
+    found(db, title="Mit Bild", blurb="Ein Schiff, allein im Dunkeln.")
+    db.session()  # noqa: B018 - nur damit die Datei nach dem Anlegen entsteht
+    ordner = paths.covers_dir()
+    ordner.mkdir(parents=True, exist_ok=True)
+    (ordner / file_name(url)).write_bytes(b"x")
+
+    # Die Adresse muss an der Beobachtung stehen, sonst kann die Seite den
+    # Namen gar nicht ausrechnen.
+    run_id = db.start_run("test", "cli", NOW)
+    db.append(
+        run_id,
+        "test",
+        [
+            Observation(
+                source="beam",
+                source_item_id="1",
+                title="Mit Bild",
+                author="Wer Auch Immer",
+                match_reason=MatchReason.GENRE_CATEGORY,
+                price_cents=399,
+                blurb="Ein Schiff, allein im Dunkeln.",
+                cover_url=url,
+            )
+        ],
+        NOW,
+    )
+
+    body = client.get("/vorschlaege").text
+    assert f"/covers/{file_name(url)}" in body
