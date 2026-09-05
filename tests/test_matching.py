@@ -130,14 +130,16 @@ def test_year_breaks_a_tie_only_after_everything_else() -> None:
     near = score(query, Candidate(title="Faust", author="Goethe, Johann Wolfgang", year=2015))
     far = score(query, Candidate(title="Faust", author="Goethe, Johann Wolfgang", year=1999))
     assert near.sort_key < far.sort_key
-    assert near.sort_key[:5] == far.sort_key[:5]
+    # Alles bis zum Jahr ist gleich; das Jahr steht an Stelle 6, seit
+    # 'Enthaltensein' als eigenes Kriterium dazugekommen ist (Ticket 36).
+    assert near.sort_key[:6] == far.sort_key[:6]
 
 
 def test_fuzzy_scores_are_bucketed_so_a_single_point_does_not_decide() -> None:
     query = Query(title="Der Schwarm", author="Frank Schätzing")
     scored = score(query, Candidate(title="Der Schwarm", author="Frank Schätzing"))
     assert scored.title_fuzzy == 100
-    assert scored.sort_key[2] == -20  # 100 // 5
+    assert scored.sort_key[3] == -20  # 100 // 5, hinter id/exakt/enthalten
 
 
 def test_source_order_is_the_last_resort_tie_break() -> None:

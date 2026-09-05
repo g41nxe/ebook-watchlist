@@ -70,6 +70,11 @@ class Profile:
 class WatchlistEntry:
     title: str
     author: str | None = None
+    #: Die ISBN des Buches, sofern eine bekannt ist. Sie entsteht **aus** einer
+    #: gelungenen Zuordnung und kann eine offene deshalb nicht lösen — gemessen:
+    #: die vier Watchlist-Bücher mit ISBN sind genau die vier aufgelösten. Ihr
+    #: Nutzen ist der Widerspruch: eine andere ISBN heißt anderes Buch.
+    isbn: str | None = None
     check_library: bool = True
     check_shop: bool = True
     active: bool = True

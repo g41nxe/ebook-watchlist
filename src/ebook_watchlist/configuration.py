@@ -75,6 +75,7 @@ def load(store: Store, settings: Profile) -> Configured:
             WatchlistEntry(
                 title=book.title,
                 author=book.author,
+                isbn=book.isbn,
                 # "library" und "shop" statt Quellennamen: wie eine Quelle
                 # heisst, entscheidet die Konfiguration (Ticket 05, Review).
                 check_library=restrict in (None, "library"),

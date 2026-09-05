@@ -177,3 +177,55 @@
     - {title: Faust, author: "Goethe, Johann Wolfgang von", year: 1999}
     - {title: Faust, author: "Goethe, Johann Wolfgang von", year: 2015}
   expect: provisional
+
+# --- Ticket 36: Untertitel im Titel, Bandangabe, widersprechende Kennung ---
+
+- name: a subtitle glued into the title still finds the book
+  # Gemessen am echten Shop: die Kachel heisst so, das subtitle-Feld traegt
+  # nur "Roman". Vorher fiel der Titel mit 56 von 85 durch.
+  query: {title: Dark Matter, author: Blake Crouch}
+  candidates:
+    - {title: 'Dark Matter. Der Zeitenläufer', author: 'Crouch, Blake'}
+  expect: provisional
+
+- name: containment never accepts unattended
+  # Dreizehn von fuenfzehn Watchlist-Titeln haben hoechstens zwei Token.
+  # "Morgen" steckt in sehr vielen Titeln — deshalb nie automatisch.
+  query: {title: Der Morgen, author: Marc Raabe}
+  candidates:
+    - {title: 'Der Morgen des Krieges', author: 'Raabe, Marc'}
+  expect: provisional
+
+- name: a volume hidden in the subtitle is no longer absorbed
+  # Der Untertitel-Schnitt entfernte "Band 2", danach war der Titel exakt
+  # gleich und wurde automatisch angenommen. Das war ein echter Fehler.
+  query: {title: Der Schwarm, author: Frank Schätzing}
+  candidates:
+    - {title: 'Der Schwarm - Band 2', author: 'Schätzing, Frank'}
+  expect: provisional
+
+- name: a genuine subtitle is still accepted unattended
+  query: {title: Der Schwarm, author: Frank Schätzing}
+  candidates:
+    - {title: 'Der Schwarm - Die Rückkehr', author: 'Schätzing, Frank'}
+  expect: auto_accept
+
+- name: a number that belongs to the title is not a volume
+  query: {title: Fahrenheit 451, author: Ray Bradbury}
+  candidates:
+    - {title: 'Fahrenheit 451', author: 'Bradbury, Ray'}
+  expect: auto_accept
+
+- name: contradicting identifiers are not a match
+  # Primos negatives Gewicht in unserer Bauweise: eine abweichende ISBN ist
+  # kein fehlendes Indiz, sondern ein Widerspruch.
+  query: {title: Der Morgen, author: Marc Raabe, identifier: '9783843729154'}
+  candidates:
+    - {title: 'Der Morgen', author: 'Raabe, Marc', identifier: '9781234567897'}
+  expect: provisional
+
+- name: the same identifier settles it
+  query: {title: Ganz anderer Titel, author: Marc Raabe, identifier: '9783843729154'}
+  candidates:
+    - {title: 'Der Morgen', author: 'Raabe, Marc', identifier: '9783843729154'}
+  expect: auto_accept

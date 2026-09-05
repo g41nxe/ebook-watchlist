@@ -117,6 +117,67 @@ def normalize_title(title: str) -> str:
     return " ".join(tokens)
 
 
+#: Bandangaben mit Wort davor. ``bd.`` und ``tl.`` kommen im Handel vor.
+_VOLUME_WORD = re.compile(
+    r"\b(?:band|bd|teil|tl|folge|vol|volume|book)\s*\.?\s*(\d{1,3})\b"
+)
+#: Eine nachgestellte Zahl im *Kopf* des Titels — vor dem Untertitel.
+_VOLUME_TRAILING = re.compile(r"(?:^|\s)(\d{1,3})\s*$")
+#: Ab hier ist eine Zahl keine Bandnummer mehr, sondern gehoert zum Titel:
+#: "Fahrenheit 451", "Passagier 23", "Zimmer 1408". Gemessen an keiner
+#: Stichprobe, sondern gesetzt — und deshalb ausdruecklich eine Annahme.
+MAX_VOLUME = 20
+
+
+def volume_of(title: str) -> int | None:
+    """Die Bandnummer, wenn der Titel eine nennt.
+
+    Herausgeloest statt mitverglichen: die Fachwelt haelt die Bandnummer in
+    einem eigenen Feld (MARC ``245 $n``, ONIX ``SequenceNumber``, Calibres
+    ``series_index``), weil ein Aehnlichkeitswert sie nicht von einem
+    Untertitel unterscheiden kann.
+
+    Gelesen wird der **ganze** Titel, nicht der auf den Untertitel gekuerzte:
+    "Der Schwarm - Band 2" kuerzt sich zu "schwarm" und wurde deshalb bisher
+    als der gesuchte Band automatisch angenommen.
+
+    Eine nackte Zahl am Ende zaehlt nur, wenn noch etwas anderes dasteht und
+    sie klein ist: "1984" ist kein Band, "Fahrenheit 451" auch nicht.
+    """
+    text = fold(title)
+    treffer = _VOLUME_WORD.search(text)
+    if treffer:
+        return int(treffer.group(1))
+
+    kopf = _SUBTITLE.split(text, maxsplit=1)[0].strip()
+    treffer = _VOLUME_TRAILING.search(kopf)
+    if not treffer:
+        return None
+    zahl = int(treffer.group(1))
+    rest = kopf[: treffer.start()].strip()
+    if not rest or zahl > MAX_VOLUME:
+        return None
+    return zahl
+
+
+def volumes_conflict(left: str, right: str) -> bool:
+    """Nennen beide Seiten einen Band, und einen verschiedenen?
+
+    Nennt nur **eine** Seite einen, ist das kein Widerspruch: eine Watchlist
+    fuehrt "Der Schwarm", der Shop kann daraus "Der Schwarm - Band 1" machen.
+    Ein Widerspruch entsteht erst, wenn beide etwas sagen und es sich
+    unterscheidet — oder wenn die gesuchte Seite **keinen** Band nennt und die
+    andere einen **spaeteren**: wer Band 1 sucht, sagt das selten dazu, und
+    "Der Schwarm 2" ist dann nicht gemeint.
+    """
+    hier, dort = volume_of(left), volume_of(right)
+    if hier is not None and dort is not None:
+        return hier != dort
+    if hier is None and dort is not None:
+        return dort > 1
+    return False
+
+
 def title_tokens(title: str) -> list[str]:
     """Normalized tokens with join words dropped — the looser comparison form."""
     return [token for token in normalize_title(title).split() if token not in _JOIN_TOKENS]

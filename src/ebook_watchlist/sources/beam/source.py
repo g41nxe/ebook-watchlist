@@ -79,9 +79,21 @@ class BeamSource(ShopSource):
         if not tiles:
             return None
 
+        # Die ISBN steht in jeder Bestellnummer und kostet nichts extra. Sie
+        # loest keinen offenen Titel — sie entsteht erst aus einer gelungenen
+        # Zuordnung —, aber sie deckt Widersprueche auf: zwei verschiedene
+        # ISBNs heisst zwei verschiedene Buecher (Ticket 36).
         resolution = match(
-            Query(title=entry.title, author=entry.author),
-            [Candidate(title=tile.title, author=tile.author, payload=tile.url) for tile in tiles],
+            Query(title=entry.title, author=entry.author, identifier=entry.isbn),
+            [
+                Candidate(
+                    title=tile.title,
+                    author=tile.author,
+                    identifier=tile.isbn,
+                    payload=tile.url,
+                )
+                for tile in tiles
+            ],
         )
         return resolution
 

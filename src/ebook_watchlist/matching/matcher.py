@@ -20,7 +20,13 @@ from typing import Any
 
 from rapidfuzz import fuzz
 
-from .normalize import NormalizedAuthor, normalize_authors, normalize_title
+from .normalize import (
+    NormalizedAuthor,
+    normalize_authors,
+    normalize_title,
+    title_tokens,
+    volumes_conflict,
+)
 
 #: Below this, nothing is a match.
 NO_MATCH_BELOW = 85
@@ -71,15 +77,28 @@ class Scored:
     author_fuzzy: int
     year_delta: int
     source_rank: int
+    #: Der gesuchte Titel steckt vollstaendig im Kandidaten — "Dark Matter" in
+    #: "Dark Matter. Der Zeitenlaeufer". Ein eigenes Signal und nicht Teil von
+    #: ``title_fuzzy``: es darf einen Kandidaten aus dem Nichts holen, aber nie
+    #: allein eine Annahme tragen (Ticket 36).
+    title_contained: bool = False
+    #: Beide Seiten nennen einen Band, und einen verschiedenen — oder der
+    #: Kandidat nennt einen spaeteren, wo die Anfrage keinen nennt.
+    volume_conflict: bool = False
+    #: Beide Seiten tragen eine Kennung, und eine verschiedene. Kein fehlendes
+    #: Indiz, sondern ein **Widerspruch** — das Gegenstueck zu Primos negativem
+    #: Gewicht (docs/research/title-matching-practices.md).
+    id_conflict: bool = False
 
     @property
-    def sort_key(self) -> tuple[int, int, int, int, int, int, int]:
+    def sort_key(self) -> tuple[int, int, int, int, int, int, int, int]:
         """Ascending = better. Fuzzy scores go in five-point buckets so that
         near-ties fall through to the next criterion instead of being decided by
         a point of noise."""
         return (
             0 if self.id_match else 1,
             0 if self.title_exact else 1,
+            0 if self.title_contained else 1,
             -(self.title_fuzzy // 5),
             0 if self.author_exact else 1,
             -(self.author_fuzzy // 5),
@@ -134,6 +153,33 @@ def title_similarity(left: str, right: str) -> int:
     )
 
 
+def title_is_contained(query: str, candidate: str) -> bool:
+    """Steckt der gesuchte Titel vollstaendig im Titel des Kandidaten?
+
+    Der Fall, den ``title_similarity`` nicht sehen kann: der Shop haengt einen
+    Untertitel an den Titel, statt ihn in ein eigenes Feld zu schreiben —
+    "Dark Matter. Der Zeitenlaeufer". Das Minimum aus Mengen- und Sortiermass
+    bestraft jedes zusaetzliche Wort gleich hart, und der Titel faellt mit 56
+    von noetigen 85 durch.
+
+    Deshalb ein **eigenes Signal** statt einer gesenkten Schwelle. Es sagt nur,
+    dass es sich lohnt hinzusehen; entschieden wird an anderer Stelle. Genau
+    diese Trennung — billiger Kandidatenschluessel, teure Entscheidung — ist,
+    was Primo und die Record-Linkage-Literatur empfehlen
+    (docs/research/title-matching-practices.md).
+
+    Ein Wort allein reicht nicht: von fuenfzehn Watchlist-Titeln haben
+    dreizehn hoechstens zwei Token, und "Morgen" steckt in sehr vielen Titeln.
+    """
+    wanted = title_tokens(query)
+    if not wanted:
+        return False
+    found = title_tokens(candidate)
+    if len(found) <= len(wanted):
+        return False
+    return set(wanted).issubset(found)
+
+
 def score(query: Query, candidate: Candidate, source_rank: int = 0) -> Scored:
     query_title = normalize_title(query.title)
     candidate_title = normalize_title(candidate.title)
@@ -156,6 +202,11 @@ def score(query: Query, candidate: Candidate, source_rank: int = 0) -> Scored:
         author_fuzzy=author_fuzzy,
         year_delta=year_delta,
         source_rank=source_rank,
+        title_contained=title_is_contained(query.title, candidate.title),
+        volume_conflict=volumes_conflict(query.title, candidate.title),
+        id_conflict=bool(query.identifier)
+        and bool(candidate.identifier)
+        and query.identifier != candidate.identifier,
     )
 
 
@@ -212,10 +263,40 @@ def _confidence(query: Query, ranked: Sequence[Scored]) -> tuple[Confidence, str
     best = ranked[0]
 
     if best.id_match:
-        return Confidence.AUTO_ACCEPT, "identifier matched"
+        return Confidence.AUTO_ACCEPT, "Kennung stimmt überein"
 
     if best.title_fuzzy < NO_MATCH_BELOW:
-        return Confidence.NO_MATCH, f"best title score {best.title_fuzzy} below {NO_MATCH_BELOW}"
+        # Der gesuchte Titel steckt ganz im gefundenen: das ist zu wenig fuer
+        # eine Annahme und zu viel zum Wegwerfen. Es kommt der Leserin zur
+        # Bestaetigung vor — ein Klick, und die Zuordnung heisst danach
+        # "von Hand bestaetigt" (Ticket 36, ADR 9).
+        if best.title_contained:
+            return (
+                Confidence.PROVISIONAL,
+                "der gesuchte Titel steckt im gefundenen — bitte bestätigen",
+            )
+        return (
+            Confidence.NO_MATCH,
+            f"bester Titelwert {best.title_fuzzy} liegt unter {NO_MATCH_BELOW}",
+        )
+
+    # Ein anderer Band ist ein anderes Buch — aber nicht *kein* Buch. Bisher
+    # wurde "Der Schwarm - Band 2" als "Der Schwarm" automatisch angenommen,
+    # weil der Untertitel-Schnitt die Bandangabe entfernte, bevor sie jemand
+    # sah. Jetzt kommt der Fall zur Bestaetigung statt durchzurutschen — und
+    # nicht in den Papierkorb: wegwerfen hiesse, der Leserin einen Kandidaten
+    # zu verschweigen, den nur sie beurteilen kann (ADR 9).
+    #
+    # Steht **nach** der Titelschwelle: sonst wuerde ein voellig fremdes Buch
+    # mit einer 2 im Titel zum Kandidaten.
+    if best.volume_conflict:
+        return Confidence.PROVISIONAL, "der Treffer nennt einen anderen Band der Reihe"
+
+    # Dieselbe Überlegung eine Stufe härter: eine abweichende ISBN ist kein
+    # fehlendes Indiz, sondern ein Widerspruch. Bisher wog sie gar nichts — nur
+    # eine *übereinstimmende* Kennung zählte, eine widersprechende nicht.
+    if best.id_conflict:
+        return Confidence.PROVISIONAL, "die Kennungen widersprechen sich"
 
     runner_up = ranked[1] if len(ranked) > 1 else None
     tied = runner_up is not None and _is_tied(best, runner_up)
@@ -225,25 +306,28 @@ def _confidence(query: Query, ranked: Sequence[Scored]) -> tuple[Confidence, str
             best.title_fuzzy >= STRONG_TITLE and best.author_exact
         )
         if confident and tied:
-            return Confidence.PROVISIONAL, "two candidates score the same"
+            return Confidence.PROVISIONAL, "zwei Kandidaten sind gleich gut"
         if confident:
-            return Confidence.AUTO_ACCEPT, "title and author both agree"
+            return Confidence.AUTO_ACCEPT, "Titel und Autor stimmen beide"
         return (
             Confidence.PROVISIONAL,
-            f"title {best.title_fuzzy}, author {best.author_fuzzy} — not conclusive",
+            f"Titel {best.title_fuzzy}, Autor {best.author_fuzzy} — nicht eindeutig",
         )
 
     # No author to corroborate with: an exact, unrivalled title is the only
     # thing we will accept unattended.
     if best.title_exact and not tied:
-        return Confidence.AUTO_ACCEPT, "exact title, no competing hit, no author given"
-    return Confidence.PROVISIONAL, "no author on the entry to confirm the title with"
+        return (
+            Confidence.AUTO_ACCEPT,
+            "exakter Titel, kein konkurrierender Treffer, kein Autor angegeben",
+        )
+    return Confidence.PROVISIONAL, "kein Autor am Eintrag, mit dem sich der Titel bestätigen ließe"
 
 
 def match(query: Query, candidates: Sequence[Candidate]) -> Resolution:
     """Rank ``candidates`` against ``query`` and say how much to trust the winner."""
     if not candidates:
-        return Resolution(confidence=Confidence.NO_MATCH, reason="no candidates")
+        return Resolution(confidence=Confidence.NO_MATCH, reason="keine Kandidaten")
 
     ranked = tuple(
         sorted(
