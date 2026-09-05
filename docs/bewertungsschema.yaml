@@ -1,0 +1,176 @@
+# Bewertungsschema — wie ein Buch gegen ein Leseprofil gehalten wird.
+#
+# Das VERFAHREN, nicht der Inhalt. Was jemand mag, steht im Leseprofil; hier
+# steht nur, wie man ein Buch dagegen hält. Für eine andere Leserin mit einem
+# anderen Profil bliebe diese Datei unverändert brauchbar — kommt hier ein
+# Begriff aus einem bestimmten Geschmack vor, ist das ein Fehler.
+#
+# Nicht versioniert: eine Änderung hier entwertet keine gespeicherte Bewertung.
+# Nur eine Änderung am Leseprofil tut das (ADR 21).
+#
+# Die Werte unter "sterne" und "confidence" liest auch der Code. Sie stehen
+# hier einmal und nicht noch einmal in Python.
+
+was_bewertet_wird: |
+  Die Passung zum Profil, nicht die Qualität des Buches. Ein hervorragender
+  Roman, der nichts von dem trägt, was das Profil verlangt, bekommt wenige
+  Sterne; das ist kein Urteil über das Buch, sondern über die Passung.
+
+  Es gibt EINE Skala. Auch der automatische Vorfilter vergibt Sterne, nicht
+  eine zweite Größe — sonst bedeutet dieselbe Zahl je nach Herkunft etwas
+  anderes.
+
+sterne:
+  von: 0
+  bis: 5
+
+  # Das Profil benennt selbst, was ihm am wichtigsten ist. Diese Tabelle
+  # spricht deshalb vom "Kern" des Profils und nicht von einer festen Liste
+  # von Kriterien — welche das sind und wie sie wiegen, entscheidet das Profil.
+  bedeutung:
+    5: Trifft den Kern des Profils, und keine wesentliche Erwartung wird verfehlt.
+    4: Trifft den Kern, mit EINER klar benennbaren Lücke.
+    3: Trifft eine Sache überzeugend, sonst nur Genre-Nähe.
+    2: Nur Genre-Nähe. Nichts, was das Profil ausdrücklich verlangt.
+    1: Kaum Berührung mit dem Profil.
+    0: Eine Gegenanzeige des Profils greift.
+
+  regeln: |
+    Eine Gegenanzeige schlägt alles. Sie zieht auf null, gleichgültig wie viel
+    sonst passt. Sonst ist sie keine.
+
+    Vier ist kein Trostpreis. Der Unterschied zwischen fünf und vier ist eine
+    Lücke, die sich BENENNEN lässt. Findet sich keine, sind es fünf.
+
+    Wenn eine Bewertung keine Bücher unter vier Sternen kennt, unterscheidet
+    sie nicht mehr, sondern bestätigt nur. Das ist ein Befund über das
+    Verfahren, nicht über die Bücher.
+
+confidence:
+
+  # Reihenfolge ist Stärke: das Erste ruht am festesten.
+  werte:
+    - wert: belegt
+      bedeutung: Alles, was das Urteil trägt, ist aus Daten oder geprüfter Quelle nachgewiesen.
+    - wert: teils
+      bedeutung: Mindestens eines ist erschlossen — die Begründung sagt, welches.
+    - wert: vermutet
+      bedeutung: Ruht überwiegend auf Ableitung.
+
+  # Ab welcher Stärke ein Urteil ein Buch aus dem Digest nehmen darf.
+  darf_zurueckhalten_ab: teils
+
+  text: |
+    Manches, was ein Profil verlangt, steht in keinen Metadaten und oft nicht
+    einmal im Klappentext; dass er dazu schweigt, beweist nichts. Deshalb trägt
+    jedes Urteil mit, worauf es ruht.
+
+    "vermutet" heißt NICHT "ich habe nicht nachgesehen". Es heißt "ich habe
+    nachgesehen und es steht nirgends". Der Unterschied ist der, an dem dieses
+    Verfahren schon einmal gescheitert ist.
+
+    Das Profil nennt zu jedem Abschnitt, woraus er sich belegen lässt. Liegt
+    keine dieser Angaben vor, sage das ausdrücklich und rechne den Abschnitt
+    nicht ein.
+
+    WAS EIN VERMUTETES URTEIL DARF: ein Buch durchlassen und einordnen, ja. Ein
+    Buch zurückhalten, nein. Der Grund ist eine Asymmetrie — ein zu Unrecht
+    gezeigtes Buch kostet eine Zeile, die die Leserin überspringt; ein zu
+    Unrecht verschwiegenes ist unsichtbar, sie erfährt nie davon und kann den
+    Fehler nicht bemerken. Wo geraten werden muss, wird zugunsten des Zeigens
+    geraten.
+
+    WANN RECHERCHIERT WERDEN MUSS: wer recherchieren kann, muss es. Ein Mensch
+    mit einer Websuche schlägt nach, bis mindestens "teils" erreicht ist; dort
+    ist "vermutet" ein Fehler und keine Auskunft. Ein automatischer Lauf kann
+    das nicht — bei hundert Funden kann er nicht hundertmal nachschlagen. Für
+    ihn ist "vermutet" zulässig, und die Regel darüber sagt, was daraus folgen
+    darf.
+
+gegenprobe: |
+  Ein Profil, das nur aus Zustimmung gebaut ist, weiß nicht, wo seine Grenze
+  verläuft. Wird alles zwischen drei und fünf Sternen bewertet, bestätigt die
+  Skala nur.
+
+  Deshalb gehören Bücher, die ENTTÄUSCHT haben, ebenso ins Profil wie die
+  gemochten — jeweils mit dem Grund. Am wertvollsten ist dabei nicht das Buch,
+  das ohnehin an einer Gegenanzeige scheitert, sondern eines, das auf dem
+  Papier perfekt passte und trotzdem verloren hat. Genau das trennt ein Profil
+  von einem Genre-Filter.
+
+  Und die Richtung der Schlussfolgerung steht fest: ein gemochtes Buch, das
+  schlecht bewertet wird, ist ein Befund über das Profil — nicht über das Buch.
+  Ein Widerspruch wird nie dadurch aufgelöst, dass das Buch nachträglich
+  schlechtgeredet wird.
+
+begruendung:
+
+  anforderungen: |
+    Vier Dinge. Fehlt eines, ist die Begründung unbrauchbar.
+
+    1. WELCHER TEIL DES PROFILS getroffen oder verfehlt wird — benannt, nicht
+       angedeutet. Mit den Worten des Profils.
+    2. WORAN IM BUCH das festzumachen ist: die konkrete Figur, Konstellation
+       oder Situation. Nicht das Etikett.
+    3. WAS DEN STERN KOSTET, bei allem unter fünf. Ausdrücklich.
+
+  verboten:
+    - untugend: Tatsache statt Grund
+      beispiel: Band 1 einer Reihe um Margarete von Brühl.
+    - untugend: Zirkelschluss
+      beispiel: Trifft den Kern. / Passt gut zum Profil.
+    - untugend: Genre-Etikett allein
+      beispiel: Cyberpunk-Dystopie.
+    - untugend: Verstecktes Nichtwissen
+      beispiel: Zur Erzählweise kann ich nichts sagen. → stattdessen nachschlagen
+
+  # Illustration, gemessen an einem Profil, das eine tragende, beschädigte
+  # Erzählstimme und enge Konstellationen verlangt. Der Inhalt gehört diesem
+  # Beispiel, nicht diesem Dokument.
+  beispiel: |
+    1942 – Das Labor · Paul Schüler — 3 Sterne
+
+    Eine Physikerin sabotiert die Uranmaschine, an der sie selbst gebaut hat,
+    während die Gestapo ihr im Nacken sitzt: ein Duell mit tödlichem Einsatz,
+    bei dem beide Seiten handeln — nur mit vertauschten Rollen, gejagt statt
+    jagend. Zwei Sterne kostet, dass die Erzählstimme keine der Bruchstellen
+    hat, die dieses Profil verlangt, und dass das historische Setting keine der
+    engen Konstellationen aufbaut, aus denen die Handlung sonst ihren Druck
+    bezieht.
+
+    Der Unterschied zum Verbotenen: es steht da, WAS IM BUCH PASSIERT und
+    WELCHE ERWARTUNG DES PROFILS das bedient — und der fehlende Stern ist
+    begründet, nicht bloß vergeben.
+
+pitch:
+
+  laenge: ein bis zwei Sätze, höchstens 200 Zeichen
+
+  regeln: |
+    Der Pitch ist NICHT die Begründung. Die Begründung ist ein Protokoll zum
+    Nachprüfen; der Pitch ist der Satz, der die Leserin hinsehen lässt. Er
+    steht im Digest und in der Vorschlagsliste, wo sie überfliegt.
+
+    NICHT DEN KLAPPENTEXT WIEDERHOLEN. Der steht daneben und sagt, WOVON das
+    Buch handelt. Der Pitch sagt, warum es FÜR SIE in Frage kommt — die
+    Verbindung, nicht die Zusammenfassung.
+
+    NICHTS ERFINDEN UND NICHTS SCHÖNREDEN. Dieselbe Grundlage wie die Sterne.
+    Trägt das Buch wenig, sagt der Pitch das, statt eine Formulierung zu
+    suchen. Ein Pitch, der zu einem Stern klingt wie zu fünf, ist wertlos.
+
+    NICHT SPOILERN. Ein Pitch, der die Wendung verrät, kostet ihr das Buch.
+
+    Keine Sternzahl und kein Achsenname im Pitch — die stehen daneben.
+
+nichts_erfinden: |
+  Ist unklar, was ein Buch trägt, wird NACHGESCHLAGEN, bevor bewertet wird —
+  soweit die Lage das zulässt (siehe confidence). Unsicherheit zu etikettieren
+  statt sie aufzulösen hat sich als teurer Fehler erwiesen: bei der ersten
+  Bewertung eines Bestands waren drei von vier so markierten Büchern zu niedrig
+  eingestuft, und in einem Fall war die Autorin schlicht nicht ermittelt
+  worden.
+
+  Was auch nach der Recherche offen bleibt, wird BENANNT und nicht in die
+  Bewertung eingerechnet. Eine Begründung, die eine Lücke verschweigt, ist
+  schlimmer als eine, die sie ausspricht: die erste sieht aus wie ein Ergebnis.

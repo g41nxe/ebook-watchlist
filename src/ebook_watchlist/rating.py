@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Protocol
 
 import requests
+import yaml
 
 from .cleaning import is_truncated
 from .models import Observation
@@ -37,7 +38,7 @@ from .reasons import THEMA, thema_name
 LESEPROFIL_PATH = Path(__file__).resolve().parents[2] / "docs" / "leseprofil.md"
 #: Das Verfahren, getrennt vom Profil (ADR 21). Nicht versioniert: eine
 #: Änderung hier entwertet keine gespeicherte Bewertung.
-SCHEME_PATH = Path(__file__).resolve().parents[2] / "docs" / "bewertungsschema.md"
+SCHEME_PATH = Path(__file__).resolve().parents[2] / "docs" / "bewertungsschema.yaml"
 #: Ältere Fassungen hießen "Maßstabsversion" — der Name fiel mit ADR 21,
 #: weil er das Verfahren meinte und auf das Profil zeigte.
 _VERSION = re.compile(r"(?:Profilversion|Maßstabsversion):\s*(\d+)", re.IGNORECASE)
@@ -81,6 +82,10 @@ class Rating:
     #: über ein gelesenes Buch.
     confidence: str
     profile_version: int
+    #: Ein Satz für die Leserin: warum das Buch in Frage kommt. Nicht die
+    #: Begründung — die ist ein Protokoll zum Nachprüfen und nennt auch, was
+    #: fehlt (bewertungsschema.yaml, "pitch").
+    pitch: str = ""
 
     def passes(self, threshold: int) -> bool:
         return self.stars >= threshold
@@ -94,6 +99,10 @@ class Rating:
         kostet eine Zeile, ein zu Unrecht verschwiegenes ist unsichtbar, und
         die Leserin kann den Fehler nie bemerken.
         """
+        # Die Regel steht als ``darf_zurueckhalten_ab`` im Schema; hier steht
+        # sie ein zweites Mal, damit ``Rating`` das Dokument nicht kennen muss.
+        # ``test_the_code_agrees_with_the_scheme_about_withholding`` hält die
+        # beiden zusammen.
         return not self.passes(threshold) and self.confidence != VERMUTET
 
 
@@ -113,17 +122,52 @@ def load_leseprofil(path: Path | None = None) -> tuple[str, int]:
     return text, leseprofil_version(text)
 
 
-def load_rating_scheme(path: Path | None = None) -> str:
+@dataclass(frozen=True, slots=True)
+class Scheme:
     """Das Bewertungsverfahren — für jedes Profil dasselbe (ADR 21).
+
+    ``text`` geht in den Prompt, die übrigen Felder in den Code. Sie standen
+    einmal an vier Stellen in Python und einmal als Prosa im Dokument; ein
+    fünfter Wert hätte fünf Änderungen gekostet und die Prosa wäre die sechste
+    gewesen, die niemand prüft.
 
     Ohne Version: eine Änderung am Verfahren ist kein Grund, ein Urteil über
     ein Buch für ungültig zu erklären.
     """
+
+    text: str
+    min_stars: int
+    max_stars: int
+    #: Stärkste zuerst.
+    confidences: tuple[str, ...]
+    #: Ab dieser Stärke darf ein Urteil ein Buch zurückhalten.
+    withhold_from: str
+
+    @property
+    def may_withhold(self) -> frozenset[str]:
+        cut = self.confidences.index(self.withhold_from)
+        return frozenset(self.confidences[: cut + 1])
+
+
+def load_rating_scheme(path: Path | None = None) -> Scheme:
     target = path or SCHEME_PATH
     try:
-        return target.read_text(encoding="utf-8")
+        text = target.read_text(encoding="utf-8")
     except OSError as exc:
         raise RatingUnavailable(f"Bewertungsschema nicht lesbar: {exc}") from exc
+    try:
+        data = yaml.safe_load(text)
+        sterne = data["sterne"]
+        confidence = data["confidence"]
+        return Scheme(
+            text=text,
+            min_stars=int(sterne["von"]),
+            max_stars=int(sterne["bis"]),
+            confidences=tuple(str(entry["wert"]) for entry in confidence["werte"]),
+            withhold_from=str(confidence["darf_zurueckhalten_ab"]),
+        )
+    except (yaml.YAMLError, KeyError, TypeError, ValueError) as exc:
+        raise RatingUnavailable(f"Bewertungsschema unbrauchbar: {exc}") from exc
 
 
 #: Wieviele Bücher höchstens in einen Aufruf gehen. Profil und Verfahren sind der weitaus
@@ -137,6 +181,21 @@ _HOW_TO_ANSWER = (
     "Erfinde nichts. Was der Klappentext nicht hergibt, ist nicht belegt — "
     "dann ist die confidence 'vermutet' und die Begründung sagt das."
 )
+
+
+def _answer_shape(scheme: Scheme) -> str:
+    """Die geforderte Antwortform — Spanne und Werte aus dem Schema.
+
+    Ausgeschrieben standen sie hier zweimal und in der Prüfung ein drittes Mal.
+    Ein vierter ``confidence``-Wert im Dokument hätte drei Stellen in Python
+    gekostet, die niemand mit dem Dokument abgleicht.
+    """
+    return (
+        f'{{"stars": <{scheme.min_stars}-{scheme.max_stars}>, '
+        f'"confidence": "{"|".join(scheme.confidences)}", '
+        '"reason": "<ein Satz, der einen Teil des Profils benennt und einen Beleg nennt>", '
+        '"pitch": "<ein Satz für die Leserin: warum dieses Buch für sie in Frage kommt>"}'
+    )
 
 
 def _facts(observation: Observation) -> list[str]:
@@ -164,7 +223,7 @@ def _facts(observation: Observation) -> list[str]:
     return facts
 
 
-def prompt_for(observation: Observation, leseprofil: str, scheme: str) -> str:
+def prompt_for(observation: Observation, leseprofil: str, scheme: Scheme) -> str:
     """Was das Modell zu einem einzelnen Buch zu sehen bekommt.
 
     Dass der Klappentext abgeschnitten ist, wird ausdrücklich gesagt. Ein Modell,
@@ -175,18 +234,18 @@ def prompt_for(observation: Observation, leseprofil: str, scheme: str) -> str:
     return (
         "Du bewertest ein Buch. Das VERFAHREN sagt, wie zu urteilen ist; das "
         "LESEPROFIL sagt, wonach. Halte dich an beides.\n\n"
-        f"--- VERFAHREN ---\n{scheme}\n--- ENDE VERFAHREN ---\n\n"
+        f"--- VERFAHREN ---\n{scheme.text}\n--- ENDE VERFAHREN ---\n\n"
         f"--- LESEPROFIL ---\n{leseprofil}\n--- ENDE LESEPROFIL ---\n\n"
         f"--- BUCH ---\n" + "\n".join(facts) + "\n--- ENDE BUCH ---\n\n"
         "Antworte ausschließlich mit JSON in genau dieser Form:\n"
-        '{"stars": <0-5>, "confidence": "belegt|teils|vermutet", '
-        '"reason": "<ein Satz, der einen Teil des Profils benennt und einen Beleg nennt>"}\n\n'
+        + _answer_shape(scheme)
+        + "\n\n"
         + _HOW_TO_ANSWER
     )
 
 
 def prompt_for_many(
-    observations: Sequence[Observation], leseprofil: str, scheme: str
+    observations: Sequence[Observation], leseprofil: str, scheme: Scheme
 ) -> str:
     """Ein Aufruf für mehrere Bücher.
 
@@ -205,21 +264,19 @@ def prompt_for_many(
         "urteilen ist; das LESEPROFIL sagt, wonach. Halte dich an beides. "
         "Beurteile jedes Buch für sich; die Reihenfolge sagt nichts über seine "
         "Passung.\n\n"
-        f"--- VERFAHREN ---\n{scheme}\n--- ENDE VERFAHREN ---\n\n"
+        f"--- VERFAHREN ---\n{scheme.text}\n--- ENDE VERFAHREN ---\n\n"
         f"--- LESEPROFIL ---\n{leseprofil}\n--- ENDE LESEPROFIL ---\n\n"
         + "\n\n".join(blocks)
         + "\n--- ENDE BÜCHER ---\n\n"
         "Antworte ausschließlich mit JSON in genau dieser Form, mit der Nummer "
         "des Buches als Schlüssel:\n"
-        '{"1": {"stars": <0-5>, "confidence": "belegt|teils|vermutet", '
-        '"reason": "<ein Satz, der einen Teil des Profils benennt und einen Beleg nennt>"}, '
-        '"2": {…}}\n\n'
+        '{"1": ' + _answer_shape(scheme) + ', "2": {…}}\n\n'
         + _HOW_TO_ANSWER
     )
 
 
 def parse_many(
-    text: str, observations: Sequence[Observation], version: int
+    text: str, observations: Sequence[Observation], version: int, scheme: Scheme
 ) -> dict[tuple[str, str], Rating]:
     """Die Antwort auf ein Bündel, buchweise gelesen.
 
@@ -247,13 +304,13 @@ def parse_many(
         if not isinstance(entry, dict):
             continue
         try:
-            ratings[observation.key] = parse_answer(json.dumps(entry), version)
+            ratings[observation.key] = parse_answer(json.dumps(entry), version, scheme)
         except RatingUnavailable:
             continue
     return ratings
 
 
-def parse_answer(text: str, version: int) -> Rating:
+def parse_answer(text: str, version: int, scheme: Scheme) -> Rating:
     """Die Antwort des Modells, streng gelesen.
 
     Eine unlesbare Antwort ist kein Anlass zu raten: sie fuehrt dazu, dass das
@@ -271,18 +328,29 @@ def parse_answer(text: str, version: int) -> Rating:
         stars = int(data["stars"])
     except (KeyError, TypeError, ValueError) as exc:
         raise RatingUnavailable("Antwort nennt keine Sterne") from exc
-    if not 0 <= stars <= 5:
-        raise RatingUnavailable(f"Sterne außerhalb 0-5: {stars}")
+    if not scheme.min_stars <= stars <= scheme.max_stars:
+        raise RatingUnavailable(
+            f"Sterne außerhalb {scheme.min_stars}-{scheme.max_stars}: {stars}"
+        )
 
     confidence = str(data.get("confidence", "")).strip().lower()
-    if confidence not in {"belegt", "teils", "vermutet"}:
+    if confidence not in scheme.confidences:
         raise RatingUnavailable(f"unbekannte confidence {confidence!r}")
 
     reason = str(data.get("reason", "")).strip()
     if not reason:
         raise RatingUnavailable("Antwort nennt keine Begründung")
 
-    return Rating(stars=stars, reason=reason, confidence=confidence, profile_version=version)
+    # Ein fehlender Pitch kostet nicht das ganze Urteil: die Sterne und die
+    # Begründung tragen für sich, und ein Buch deswegen unbewertet zu lassen
+    # wäre teurer als eine leere Zeile im Digest.
+    return Rating(
+        stars=stars,
+        reason=reason,
+        confidence=confidence,
+        profile_version=version,
+        pitch=str(data.get("pitch", "")).strip(),
+    )
 
 
 class Rater(Protocol):
@@ -330,14 +398,14 @@ class ModelRater:
     model: str = DEFAULT_MODEL
     timeout: float = 30.0
     leseprofil: str = ""
-    scheme: str = ""
+    scheme: Scheme | None = None
     version: int = 0
     session: requests.Session | None = None
 
     def __post_init__(self) -> None:
         if not self.leseprofil:
             self.leseprofil, self.version = load_leseprofil()
-        if not self.scheme:
+        if self.scheme is None:
             self.scheme = load_rating_scheme()
         if self.session is None:
             self.session = requests.Session()
@@ -368,7 +436,7 @@ class ModelRater:
             text = "".join(block.get("text", "") for block in blocks)
         except (ValueError, KeyError, TypeError) as exc:
             raise RatingUnavailable(f"unerwartete Antwortform: {exc}") from exc
-        return parse_answer(text, self.version)
+        return parse_answer(text, self.version, self.scheme)
 
 
 #: Der Weg ohne Schlüssel: Claude Code hat bereits eine Anmeldung, und ``-p``
@@ -408,18 +476,18 @@ class ClaudeCodeRater:
     executable: str = CLI_NAME
     timeout: float = CLI_TIMEOUT
     leseprofil: str = ""
-    scheme: str = ""
+    scheme: Scheme | None = None
     version: int = 0
 
     def __post_init__(self) -> None:
         if not self.leseprofil:
             self.leseprofil, self.version = load_leseprofil()
-        if not self.scheme:
+        if self.scheme is None:
             self.scheme = load_rating_scheme()
 
     def rate(self, observation: Observation) -> Rating:
         prompt = prompt_for(observation, self.leseprofil, self.scheme)
-        return parse_answer(self._ask(prompt), self.version)
+        return parse_answer(self._ask(prompt), self.version, self.scheme)
 
     def rate_many(
         self, observations: Sequence[Observation]
@@ -434,7 +502,7 @@ class ClaudeCodeRater:
         if not observations:
             return {}
         answer = self._ask(prompt_for_many(observations, self.leseprofil, self.scheme))
-        return parse_many(answer, observations, self.version)
+        return parse_many(answer, observations, self.version, self.scheme)
 
     def _ask(self, prompt: str) -> str:
         command = [self.executable, "-p", prompt, "--output-format", "json"]

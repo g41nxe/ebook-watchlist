@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+import yaml
 
 from ebook_watchlist import gate
 from ebook_watchlist.models import Delta, DeltaKind, MatchReason, Observation
@@ -20,8 +21,10 @@ from ebook_watchlist.rating import (
     ModelRater,
     Rating,
     RatingUnavailable,
+    Scheme,
     build_rater,
     leseprofil_version,
+    load_rating_scheme,
     parse_answer,
     parse_many,
     prompt_for,
@@ -33,7 +36,13 @@ from ebook_watchlist.store import Store
 
 NOW = datetime(2026, 9, 4, 22, 0)
 LESEPROFIL = "Profilversion: 1\n\nHier stünde das Leseprofil."
-SCHEMA = "Hier stünde das Bewertungsschema."
+SCHEMA = Scheme(
+    text="Hier stünde das Bewertungsschema.",
+    min_stars=0,
+    max_stars=5,
+    confidences=("belegt", "teils", "vermutet"),
+    withhold_from="teils",
+)
 
 
 def discovery(**overrides) -> Observation:
@@ -112,15 +121,15 @@ def test_a_whole_blurb_is_not_flagged() -> None:
 
 def test_a_clean_answer_is_read() -> None:
     answer = '{"stars": 4, "confidence": "teils", "reason": "Achse A: Reihe"}'
-    result = parse_answer(answer, version=1)
+    result = parse_answer(answer, version=1, scheme=SCHEMA)
 
     assert (result.stars, result.confidence) == (4, "teils")
     assert result.profile_version == 1
 
 
 def test_json_wrapped_in_chatter_is_still_read() -> None:
-    result = parse_answer('Gern:\n{"stars": 2, "confidence": "vermutet", "reason": "x"}\n', 1)
-    assert result.stars == 2
+    answer = 'Gern:\n{"stars": 2, "confidence": "vermutet", "reason": "x"}\n'
+    assert parse_answer(answer, 1, SCHEMA).stars == 2
 
 
 @pytest.mark.parametrize(
@@ -135,7 +144,7 @@ def test_json_wrapped_in_chatter_is_still_read() -> None:
 )
 def test_an_unusable_answer_is_refused_rather_than_guessed(answer: str) -> None:
     with pytest.raises(RatingUnavailable):
-        parse_answer(answer, version=1)
+        parse_answer(answer, version=1, scheme=SCHEMA)
 
 
 # --- das Tor ----------------------------------------------------------------
@@ -667,7 +676,7 @@ def test_the_leseprofil_goes_out_once_not_once_per_book() -> None:
     prompt = prompt_for_many(_books(5), LESEPROFIL, SCHEMA)
 
     assert prompt.count("Profilversion: 1") == 1
-    assert prompt.count(SCHEMA) == 1
+    assert prompt.count(SCHEMA.text) == 1
     for number in range(1, 6):
         assert f"--- BUCH {number} ---" in prompt
 
@@ -678,7 +687,7 @@ def test_every_book_is_numbered_so_the_answer_can_be_matched() -> None:
     books = _books(3)
     answer = json.dumps({"1": _entry(5), "2": _entry(1), "3": _entry(4)})
 
-    ratings = parse_many(answer, books, version=1)
+    ratings = parse_many(answer, books, version=1, scheme=SCHEMA)
 
     assert [ratings[b.key].stars for b in books] == [5, 1, 4]
 
@@ -687,7 +696,7 @@ def test_a_book_the_answer_skips_is_simply_missing() -> None:
     books = _books(3)
     answer = json.dumps({"1": _entry(4), "3": _entry(2)})
 
-    ratings = parse_many(answer, books, version=1)
+    ratings = parse_many(answer, books, version=1, scheme=SCHEMA)
 
     assert books[1].key not in ratings
     assert set(ratings) == {books[0].key, books[2].key}
@@ -699,14 +708,14 @@ def test_one_crooked_entry_costs_one_book_not_the_batch() -> None:
     books = _books(3)
     answer = json.dumps({"1": _entry(4), "2": {"stars": 99}, "3": _entry(3)})
 
-    ratings = parse_many(answer, books, version=1)
+    ratings = parse_many(answer, books, version=1, scheme=SCHEMA)
 
     assert set(ratings) == {books[0].key, books[2].key}
 
 
 def test_an_answer_without_json_fails_the_batch_but_raises_cleanly() -> None:
     with pytest.raises(RatingUnavailable, match="kein JSON"):
-        parse_many("Ich kann das nicht beurteilen.", _books(2), version=1)
+        parse_many("Ich kann das nicht beurteilen.", _books(2), version=1, scheme=SCHEMA)
 
 
 def test_batches_are_capped_at_twenty() -> None:
@@ -846,14 +855,35 @@ def test_a_passing_judgement_is_never_counted_as_unsure(store: Store) -> None:
     assert report.shown_unsure == 0
 
 
-def test_the_scheme_is_not_versioned(tmp_path) -> None:
-    """Eine Änderung am Verfahren entwertet keine Bewertung (ADR 21)."""
+def test_the_scheme_is_not_versioned() -> None:
+    """Eine Änderung am Verfahren entwertet keine Bewertung (ADR 21). Trüge es
+    eine Version, läge die Versuchung nahe, sie an ein Urteil zu hängen."""
     from ebook_watchlist.rating import load_rating_scheme
 
-    scheme = tmp_path / "schema.md"
-    scheme.write_text("Ein Verfahren ohne jede Versionsangabe.", encoding="utf-8")
+    geladen = yaml.safe_load(load_rating_scheme().text)
 
-    assert load_rating_scheme(scheme) == "Ein Verfahren ohne jede Versionsangabe."
+    assert "version" not in geladen
+
+
+def test_the_code_agrees_with_the_scheme_about_withholding() -> None:
+    """Die Regel steht im Dokument und noch einmal in ``Rating.withholds``.
+    Dieser Test ist das, was die beiden zusammenhält — sonst wäre es wieder
+    eine Regel im Dokument, die im Code nicht gilt."""
+    from ebook_watchlist.rating import load_rating_scheme
+
+    scheme = load_rating_scheme()
+
+    for confidence in scheme.confidences:
+        urteil = Rating(stars=1, reason="x", confidence=confidence, profile_version=1)
+        assert urteil.withholds(threshold=3) is (confidence in scheme.may_withhold)
+
+
+def test_the_code_agrees_with_the_scheme_about_the_star_range() -> None:
+    scheme = load_rating_scheme()
+    zu_hoch = f'{{"stars": {scheme.max_stars + 1}, "confidence": "teils", "reason": "x"}}'
+
+    with pytest.raises(RatingUnavailable):
+        parse_answer(zu_hoch, 1, scheme)
 
 
 def test_the_scheme_names_no_axis() -> None:
@@ -861,7 +891,7 @@ def test_the_scheme_names_no_axis() -> None:
     Achse, ist es keins mehr."""
     from ebook_watchlist.rating import load_rating_scheme
 
-    text = load_rating_scheme().lower()
+    text = load_rating_scheme().text.lower()
 
     for verboten in ("achse a", "achse b", "achse c", "achse d", "achse e", "kernachse"):
         assert verboten not in text, f"{verboten!r} steht im Bewertungsschema"
@@ -875,17 +905,18 @@ def test_a_changed_scheme_ages_no_judgement(store: Store, tmp_path) -> None:
     einziges Urteil über ein Buch dadurch falsch würde (ADR 21)."""
     from ebook_watchlist.rating import load_rating_scheme
 
-    erst = tmp_path / "a.md"
-    erst.write_text("Verfahren, erste Fassung.", encoding="utf-8")
-    dann = tmp_path / "b.md"
-    dann.write_text("Verfahren, ganz anders.", encoding="utf-8")
+    vorlage = load_rating_scheme().text
+    erst = tmp_path / "a.yaml"
+    erst.write_text(vorlage, encoding="utf-8")
+    dann = tmp_path / "b.yaml"
+    dann.write_text(vorlage + "\nnachtrag: ganz anders\n", encoding="utf-8")
 
     rater = StubRater(rating(4))
     deltas = [first_seen(discovery(isbn="9783104911854"))]
     gate.apply(deltas, store=store, rater=rater, profile_version=1,
                threshold=3, budget=10, now=NOW)
 
-    assert load_rating_scheme(erst) != load_rating_scheme(dann)
+    assert load_rating_scheme(erst).text != load_rating_scheme(dann).text
 
     _, second = gate.apply(deltas, store=store, rater=rater, profile_version=1,
                            threshold=3, budget=10, now=NOW)
@@ -936,3 +967,49 @@ def test_a_price_drop_of_an_unsure_low_rating_carries_its_reason(store: Store) -
     assert len(kept) == 1
     assert report.shown_unsure == 1
     assert report.judgements[billig.key].reason == "Ruht auf Ableitung."
+
+
+def test_the_prompt_carries_the_scheme_as_text_not_as_an_object() -> None:
+    """Gemessen statt vermutet: der Prompt enthielt eine Weile
+    ``Scheme(text='…', min_stars=0, …)`` — das Python-Repr des Datenobjekts."""
+    text = prompt_for(discovery(), LESEPROFIL, SCHEMA)
+
+    assert SCHEMA.text in text
+    assert "Scheme(" not in text
+    assert "min_stars" not in text
+
+
+def test_the_prompt_asks_for_a_pitch() -> None:
+    """Der Pitch nützt nichts, wenn das Modell nicht danach gefragt wird."""
+    for text in (prompt_for(discovery(), LESEPROFIL, SCHEMA),
+                 prompt_for_many([discovery()], LESEPROFIL, SCHEMA)):
+        assert '"pitch"' in text
+
+
+def test_the_answer_shape_comes_from_the_scheme() -> None:
+    """Spanne und Werte standen ausgeschrieben im Prompt. Ein vierter
+    confidence-Wert im Dokument hätte sie nicht erreicht."""
+    eigen = Scheme(text="x", min_stars=1, max_stars=9,
+                   confidences=("sicher", "unsicher"), withhold_from="sicher")
+
+    text = prompt_for(discovery(), LESEPROFIL, eigen)
+
+    assert "<1-9>" in text
+    assert "sicher|unsicher" in text
+
+
+def test_a_pitch_is_read_from_the_answer() -> None:
+    answer = ('{"stars": 4, "confidence": "teils", "reason": "x", '
+              '"pitch": "Ein Profiler am Abgrund, und die Jagd beginnt auf Seite eins."}')
+
+    result = parse_answer(answer, 1, SCHEMA)
+
+    assert result.pitch.startswith("Ein Profiler")
+
+
+def test_a_missing_pitch_does_not_cost_the_judgement() -> None:
+    """Sterne und Begründung tragen für sich. Ein Buch deswegen unbewertet zu
+    lassen wäre teurer als eine leere Zeile im Digest."""
+    result = parse_answer('{"stars": 4, "confidence": "teils", "reason": "x"}', 1, SCHEMA)
+
+    assert (result.stars, result.pitch) == (4, "")
