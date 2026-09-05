@@ -325,6 +325,9 @@ ausfallen oder doppelt laufen. Beides ist unkritisch.
 - [docs/offene-punkte.md](docs/offene-punkte.md) — was fehlt, und welche
   Behauptungen sich unterwegs als falsch erwiesen haben
 - [.agents/skills/](.agents/skills) — `buch-bewerten`, `leseprofil-schaerfen`
+- [docs/research/title-matching-practices.md](docs/research/title-matching-practices.md)
+  — wie MARC, ONIX, Primo und Open Library Titel zuordnen, und was das für
+  unseren Matcher heißt
 - [docs/research/](docs/research) — Recherche zu den Schnittstellen von VÖBB und
   beam-shop, zu Metadatenquellen und deren Rechtslage
 
