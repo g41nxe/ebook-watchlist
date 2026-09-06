@@ -221,7 +221,7 @@
               {# Kein Bild geholt: ein gezeichneter Ruecken statt eines leeren
                  Kastens, damit die Reihe nicht auseinanderfaellt. #}
               <span class="block aspect-[2/3] w-full rounded-sm"
-                    style="background: hsl({{ (kandidat.title | sum_chars) % 360 }} 24% 34%)"></span>
+                    style="background: hsl({{ 160 + ((kandidat.title | sum_chars) % 28) }} 30% 30%)"></span>
               {% endif %}
               <span class="haken">&#10003;</span>
             </span>
