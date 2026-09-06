@@ -51,7 +51,14 @@
          alt="" class="h-10 w-10 shrink-0">
     <div>
       <div class="font-semibold tracking-tight">Buchfink</div>
-      {% block subtitle %}{% endblock %}
+      {# Die Zeile der Anwendung, auf jeder Seite dieselbe. Vorher stand hier
+         der Profilname — der ist auf jeder Seite ebenfalls derselbe und hat
+         nie etwas unterschieden. `error.html` setzt den Block trotzdem um:
+         wenn die Einrichtung klemmt, ist das die wichtigere Auskunft. #}
+      {% block subtitle %}
+      <div class="mt-0.5 text-[11px] tracking-[0.05em] text-soft uppercase">
+        Weniger Suchen. Mehr Lesen.</div>
+      {% endblock %}
     </div>
     <nav class="ml-auto flex gap-1 text-sm">
       <a href="/" class="rounded px-2.5 py-1 text-soft hover:bg-hair hover:text-ink">Übersicht</a>

@@ -1,13 +1,7 @@
 {% extends "base.html" %}
-{% block subtitle %}
-<div class="mt-0.5 text-[11px] tracking-[0.05em] text-soft uppercase">{{ profile.name }}</div>
-{% endblock %}
 
 {% block content %}
-<h1 class="font-serif text-2xl font-semibold tracking-tight">Übersicht</h1>
-{# Die eine Stelle, an der die Zeile steht. In der Kopfzeile konkurrierte sie
-   mit dem Profilnamen, und zwei kleine Zeilen untereinander liest niemand. #}
-<p class="mt-0.5 mb-4 text-sm text-soft">Weniger Suchen. Mehr Lesen.</p>
+<h1 class="mb-4 font-serif text-2xl font-semibold tracking-tight">Übersicht</h1>
 
 {% include "_run_panel.html" %}
 
