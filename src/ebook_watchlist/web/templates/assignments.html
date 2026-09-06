@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Zuordnungen — eBook-Watchlist{% endblock %}
+{% block subtitle %}
+<div class="mt-0.5 text-[11px] tracking-[0.05em] text-soft uppercase">{{ profile.name }}</div>
+{% endblock %}
+
+{% from "_cover.html" import cover %}
+
+{% block content %}
+<h1 class="mb-1 font-serif text-2xl font-semibold tracking-tight">Braucht deine Entscheidung</h1>
+<p class="mb-5 max-w-xl text-sm text-soft">
+  Hier hat die Suche mehr als eine Ausgabe gefunden und konnte sie nicht
+  auseinanderhalten. Welche gemeint ist, weißt nur du — und die Antwort gilt
+  dann als <strong class="text-ink">von Hand bestätigt</strong>, nicht als
+  geraten.
+</p>
+
+{% if pile.is_empty %}
+<p class="rounded-lg border border-rule bg-card px-4 py-6 text-center text-sm text-soft">
+  Nichts offen — jede Zuordnung ist geklärt.
+</p>
+{% else %}
+
+<div class="mb-4 flex items-center gap-2 border-b border-rule pb-2 text-xs text-soft">
+  <span>{{ pile.open_count }} offen</span>
+  {% if pile.rejected_count %}
+  <span>· {{ pile.rejected_count }} abgelehnt</span>
+  {% endif %}
+</div>
+
+<ul class="divide-y divide-hair">
+  {% for frage in pile.questions %}
+  <li class="py-4">
+    <p class="mb-2 text-sm">
+      <span class="text-soft">Du beobachtest</span>
+      <a href="/book/{{ frage.book_id }}"
+         class="font-serif text-base font-semibold hover:underline underline-offset-2"
+        >{{ frage.title }}</a>
+      {% if frage.author %}<span class="text-soft">· {{ frage.author }}</span>{% endif %}
+      <span class="ml-1 text-xs text-soft">bei {{ frage.source_label }}</span>
+    </p>
+
+    {# Die Kandidaten nebeneinander: welche Ausgabe gemeint ist, ist eine
+       Frage ans Auge, und das Titelbild beantwortet sie schneller als der
+       Titel (Ticket 41, Entwurf A). #}
+    <div class="flex flex-wrap items-stretch gap-2">
+      {% for kandidat in frage.candidates %}
+      <form method="post" action="/zuordnungen/{{ frage.book_id }}/waehlen" class="contents">
+        <input type="hidden" name="source" value="{{ frage.source }}">
+        <input type="hidden" name="url" value="{{ kandidat.url or '' }}">
+        <button type="submit" name="was" value="bestaetigen"
+                class="flex max-w-xs items-center gap-3 rounded border border-rule bg-card
+                       p-2 pr-4 text-left hover:border-accent hover:bg-accent/5">
+          {{ cover(kandidat.title, kandidat.cover_file, false, false) }}
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-medium">{{ kandidat.title }}</span>
+            {% if kandidat.is_bundle %}
+            <span class="mt-0.5 inline-block rounded bg-amber/15 px-1.5 py-0.5
+                         text-[11px] font-medium text-amber"
+                  title="{% if kandidat.volumes %}Enthält: {{ kandidat.volumes | join(', ') }}
+                         {% else %}Mehrere Bände in einer Ausgabe{% endif %}">
+              {% if kandidat.volumes %}{{ kandidat.volumes | length }} Bände
+              {% else %}Sammelausgabe{% endif %}</span>
+            {% endif %}
+            <span class="block truncate text-xs text-soft">{{ kandidat.author or "unbekannt" }}</span>
+          </span>
+        </button>
+        <button type="submit" name="was" value="ablehnen"
+                class="self-stretch rounded border border-dashed border-rule px-2
+                       text-xs text-soft hover:border-danger hover:text-danger"
+                title="Dieser Kandidat ist es nicht — die Ablehnung hält, lässt sich
+                       aber zurücknehmen">✕</button>
+      </form>
+      {% endfor %}
+    </div>
+
+    {% if frage.rejected %}
+    {# Zurücknehmen dort, wo das Ablehnen war — keine zweite Stelle. #}
+    <details class="mt-2">
+      <summary class="cursor-pointer text-xs text-soft hover:text-ink">
+        {{ frage.rejected | length }} abgelehnt</summary>
+      <div class="mt-1 flex flex-wrap gap-2">
+        {% for kandidat in frage.rejected %}
+        <form method="post" action="/zuordnungen/{{ frage.book_id }}/waehlen">
+          <input type="hidden" name="source" value="{{ frage.source }}">
+          <input type="hidden" name="url" value="{{ kandidat.url or '' }}">
+          <button type="submit" name="was" value="zurueck"
+                  class="rounded border border-rule px-2 py-1 text-xs text-soft
+                         line-through hover:border-accent hover:text-accent hover:no-underline"
+                  title="Ablehnung zurücknehmen">{{ kandidat.title }}</button>
+        </form>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

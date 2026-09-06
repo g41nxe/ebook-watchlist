@@ -988,6 +988,56 @@ class Store:
                 )
             ).first()
 
+    def unsure_links(self, profile_slug: str) -> list[BookSourceRow]:
+        """Zuordnungen, bei denen eine Quelle unsicher ist (Ticket 41).
+
+        Ueber ``book_relation`` gefiltert: eine unklare Zuordnung zu einem Buch,
+        das die Leserin gar nicht mehr beobachtet, ist keine Frage an sie.
+        """
+        with self.session() as session:
+            beobachtet = select(BookRelationRow.book_id).where(
+                BookRelationRow.profile_slug == profile_slug,
+                BookRelationRow.kind == str(RelationKind.WATCHING),
+                BookRelationRow.active.is_(True),
+            )
+            stmt = (
+                select(BookSourceRow)
+                .where(
+                    BookSourceRow.book_id.in_(beobachtet),
+                    BookSourceRow.details.like('%"unsure"%'),
+                )
+                .order_by(BookSourceRow.book_id)
+            )
+            rows = list(session.scalars(stmt))
+            for row in rows:
+                session.expunge(row)
+            return rows
+
+    def reject_candidate(
+        self, book_id: int, source: str, url: str, *, now: datetime, undo: bool = False
+    ) -> None:
+        """Einen Kandidaten ablehnen — oder die Ablehnung zuruecknehmen.
+
+        Festgehalten wird die Adresse, nicht bloss die Tatsache: derselbe
+        Kandidat wird nicht noch einmal vorgelegt, ein **neuer** schon. Und
+        umkehrbar, weil ein Irrtum beim Wegklicken sonst dauerhaft waere
+        (ADR 18, Ticket 41).
+        """
+        with self.session() as session:
+            row = session.get(BookSourceRow, (book_id, source))
+            if row is None:
+                return
+            details = json.loads(row.details or "{}")
+            abgelehnt = list(details.get("rejected") or [])
+            if undo:
+                abgelehnt = [eintrag for eintrag in abgelehnt if eintrag != url]
+            elif url not in abgelehnt:
+                abgelehnt.append(url)
+            details["rejected"] = abgelehnt
+            row.details = json.dumps(details, ensure_ascii=False)
+            row.resolved_at = now
+            session.commit()
+
     def put_book_source(
         self,
         book_id: int,

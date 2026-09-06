@@ -112,6 +112,11 @@ class Scored:
         return (
             0 if self.id_match else 1,
             0 if self.title_exact else 1,
+            # Ein nachweislich anderer Band steht hinten. Der Widerspruch hob
+            # bisher nur die Sicherheitsstufe: bei 'Red Rising' kamen deshalb
+            # 'Teil 1' und 'Teil 2' als gleichwertige Kandidaten mit vor,
+            # obwohl wir *wissen*, dass sie es nicht sind (ADR 23).
+            1 if self.volume_conflict else 0,
             # Der gesuchte Einzelband schlaegt die Sammelausgabe: sie steht
             # nicht auf der Watchlist, und sie ist ein eigenes Buch (ADR 24).
             1 if self.is_bundle else 0,
@@ -298,6 +303,9 @@ def _is_tied(best: Scored, runner_up: Scored) -> bool:
         # auseinanderhalten koennen — genau das war vorher der Muenzwurf
         # (ADR 24).
         and best.is_bundle == runner_up.is_bundle
+        # Dasselbe fuer die Bandnummer: was einen anderen Band nennt, ist
+        # nicht 'gleich gut' wie etwas, das keinen nennt.
+        and best.volume_conflict == runner_up.volume_conflict
     )
 
 

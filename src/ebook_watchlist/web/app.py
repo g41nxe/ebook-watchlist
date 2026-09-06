@@ -28,7 +28,7 @@ from ..models import LinkOutcome
 from ..relations import RelationKind
 from ..sources import registry
 from ..store import RunRow, Store
-from . import book, profile_page, triage, watchlist
+from . import assignments, book, profile_page, triage, watchlist
 from .runs import RunLauncher, journal_status
 
 STATIC = Path(__file__).parent / "static"
@@ -327,6 +327,40 @@ def create_app() -> FastAPI:
             reason="von Hand bestätigt",
         )
         return RedirectResponse("/watchlist", status_code=303)
+
+    # --- Zuordnungen entscheiden (Ticket 41) -------------------------------
+
+    @app.get("/zuordnungen", response_class=HTMLResponse)
+    def assignments_page(request: Request) -> HTMLResponse:
+        profile = load_profile()
+        return TEMPLATES.TemplateResponse(
+            request,
+            "assignments.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "pile": assignments.open_questions(_store_for(paths.db_path()), profile),
+            },
+        )
+
+    @app.post("/zuordnungen/{book_id}/waehlen")
+    def assignments_choose(
+        book_id: int,
+        source: str = Form(...),
+        url: str = Form(""),
+        was: str = Form(...),
+    ) -> RedirectResponse:
+        """Bestaetigen, ablehnen, oder eine Ablehnung zuruecknehmen."""
+        store = _store_for(paths.db_path())
+        now = datetime.now()
+        if was == "bestaetigen" and url:
+            assignments.confirm(store, book_id, source, url, now)
+        elif was == "ablehnen" and url:
+            assignments.reject(store, book_id, source, url, now)
+        elif was == "zurueck" and url:
+            assignments.restore(store, book_id, source, url, now)
+        return RedirectResponse("/zuordnungen", status_code=303)
+
 
     # --- Buchseite (Ticket 07) ---------------------------------------------
 
