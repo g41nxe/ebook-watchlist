@@ -90,6 +90,7 @@ class BeamSource(ShopSource):
                     title=tile.title,
                     author=tile.author,
                     identifier=tile.isbn,
+                    cover_url=tile.cover_url,
                     payload=tile.url,
                 )
                 for tile in tiles

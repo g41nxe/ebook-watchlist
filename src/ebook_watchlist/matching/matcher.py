@@ -37,6 +37,10 @@ STRONG_TITLE = 95
 STRONG_AUTHOR = 90
 #: Two candidates within this many points are effectively tied.
 TIE_MARGIN = 3
+#: Hoechstens so viele Kandidaten kommen der Leserin zur Auswahl. Eine
+#: Sicherung, keine Auswahlregel — welche gezeigt werden, entscheidet
+#: :attr:`Resolution.indistinguishable` (Ticket 41).
+MAX_CANDIDATES = 5
 #: Stands in for "no year on either side" so the tie-break stays sortable.
 UNKNOWN_YEAR_DELTA = 9999
 
@@ -65,6 +69,10 @@ class Candidate:
     author: str | None = None
     year: int | None = None
     identifier: str | None = None
+    #: Adresse des Titelbilds, wie die Kachel sie nennt. Kostet nichts: sie
+    #: steht in jedem Suchtreffer, wurde bisher nur weggeworfen. Zwei Ausgaben
+    #: nebeneinander zu vergleichen ist eine Frage ans Auge (Ticket 41).
+    cover_url: str | None = None
     payload: Any = None
 
 
@@ -128,6 +136,26 @@ class Resolution:
         if self.best is None or self.confidence is not Confidence.AUTO_ACCEPT:
             return None
         return self.best.candidate
+
+    @property
+    def indistinguishable(self) -> tuple[Candidate, ...]:
+        """Die Kandidaten, die der Matcher **nicht auseinanderhalten** konnte.
+
+        Das ist die Antwort auf „warum fragst du mich?" — gezeigt wird genau
+        das, was gleich gut aussah, nicht die ersten drei und nicht alles ueber
+        einer erfundenen Punktzahl (Ticket 41).
+
+        Der Deckel von fuenf ist eine Sicherung, keine Auswahlregel: sollte ein
+        Matcher zwanzig Titel gleich bewerten, waere eine Liste von zwanzig
+        keine Hilfe mehr. Gemessen an den vier offenen Bestaetigungen wird die
+        Gruppe nicht groesser als zwei.
+        """
+        if self.best is None:
+            return ()
+        gleich = [self.best] + [
+            kandidat for kandidat in self.ranked[1:] if _is_tied(self.best, kandidat)
+        ]
+        return tuple(scored.candidate for scored in gleich[:MAX_CANDIDATES])
 
 
 def _author_scores(

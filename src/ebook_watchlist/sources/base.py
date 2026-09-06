@@ -150,6 +150,24 @@ class RunContext:
             # bleibt eine falsche automatische Zuordnung sichtbar (ADR 9).
             matched_title=best.candidate.title if best else None,
             matched_author=best.candidate.author if best else None,
+            # Alle, die der Matcher nicht auseinanderhalten konnte — nicht nur
+            # der Sieger. Ohne sie stand die Leserin vor einer Auswahl mit
+            # genau einer Option, obwohl die Vorlage schon eine Liste war
+            # (Ticket 41).
+            #
+            # **Ohne Preis.** Bei einer Bestaetigung geht es um Identitaet,
+            # nicht um ein Angebot, und eine Ablehnung soll halten — sie darf
+            # sich nicht auf einen Betrag von vorgestern beziehen.
+            candidates=[
+                {
+                    "title": kandidat.title,
+                    "author": kandidat.author,
+                    "url": str(kandidat.payload) if kandidat.payload else None,
+                    "cover_url": kandidat.cover_url,
+                }
+                for kandidat in resolution.indistinguishable
+            ]
+            or None,
         )
 
     def remember_absence(self, source: str, entry: WatchlistEntry, reason: str) -> None:

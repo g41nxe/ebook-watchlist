@@ -193,3 +193,50 @@ def test_the_matcher_touches_nothing_outside_itself() -> None:
     first = match(query, candidates)
     second = match(query, candidates)
     assert first == second
+
+
+# --- welche Kandidaten der Leserin vorgelegt werden (Ticket 41) -------------
+
+
+def test_only_the_indistinguishable_candidates_are_offered() -> None:
+    """Gezeigt wird, was der Matcher nicht auseinanderhalten konnte — nicht die
+    ersten drei und nicht alles über einer erfundenen Punktzahl. Das ist die
+    Antwort auf „warum fragst du mich?"."""
+    resolution = match(
+        Query(title="Der Kruzifix-Killer", author="Chris Carter"),
+        [
+            Candidate(title="Der Kruzifix-Killer", author="Carter, Chris"),
+            Candidate(title="Der Kruzifix-Killer / Der Vollstrecker", author="Carter, Chris"),
+            Candidate(title="Ein ganz anderes Buch", author="Carter, Chris"),
+        ],
+    )
+
+    titel = [kandidat.title for kandidat in resolution.indistinguishable]
+    assert titel == ["Der Kruzifix-Killer"]
+
+
+def test_a_genuine_tie_offers_both() -> None:
+    resolution = match(
+        Query(title="Faust", author="Goethe"),
+        [
+            Candidate(title="Faust", author="Goethe, Johann Wolfgang"),
+            Candidate(title="Faust", author="Goethe, Johann Wolfgang"),
+        ],
+    )
+
+    assert len(resolution.indistinguishable) == 2
+
+
+def test_the_list_is_capped() -> None:
+    """Eine Sicherung gegen den Fall, dass zwanzig Titel gleich aussehen —
+    zwanzig Kandidaten wären keine Hilfe mehr."""
+    resolution = match(
+        Query(title="Faust", author="Goethe"),
+        [Candidate(title="Faust", author="Goethe, Johann Wolfgang") for _ in range(9)],
+    )
+
+    assert len(resolution.indistinguishable) == 5
+
+
+def test_nothing_found_offers_nothing() -> None:
+    assert match(Query(title="Faust"), []).indistinguishable == ()
