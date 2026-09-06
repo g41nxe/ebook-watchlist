@@ -140,3 +140,31 @@ bestätigt: 25 | widerspricht: 0 | Graubereich: 2 | ohne Autorfeld: 28
 
 Eine Bestätigung zu verlangen hätte solche Einträge dauerhaft von jeder
 Rückfrage ausgeschlossen.
+
+## Nachtrag (Review zu Ticket 54): wer entscheidet, muss auch sortieren
+
+Der Grundsatz wurde an einem einzigen Tag **dreimal** halb umgesetzt, immer
+gleich: das Kriterium kam in `_confidence`, aber nicht in `sort_key`.
+
+| | Kriterium | Folge |
+|---|---|---|
+| Ticket 45 | `author_conflict` | eine Anthologie fremder Autor:innen gewann gegen das gesuchte Buch |
+| Ticket 53 | `author_missing` | ein Kandidat ohne Autorfeld verdeckte einen mit der richtigen Autor:in |
+| Review 54 | `id_conflict` | ein Kandidat mit **falscher** ISBN gewann, weil er zuerst kam |
+
+Die Sicherheitsstufe zu heben genügt nicht: `Resolution.best` ist `ranked[0]`,
+und die gezeigten Kandidaten hängen über `_is_tied` ebenfalls daran. Wer die
+Reihenfolge nicht anfasst, überlässt die Entscheidung der Reihenfolge der
+Shop-Treffer.
+
+**Die Regel lautet deshalb: jedes Signal auf `Scored` beeinflusst den
+Sortierschlüssel.** Sie steht nicht nur hier, sondern als Test —
+`test_every_signal_that_decides_also_sorts` liest die Felder der Datenklasse
+und den Quelltext von `sort_key` und fällt um, sobald ein Feld dazukommt, das
+nur an der Entscheidungsstelle gelesen wird. Geschrieben wurde er nach dem
+dritten Fall; er fand den vierten sofort.
+
+Wo ein Kriterium im Schlüssel steht, ist damit **nicht** entschieden — das
+bleibt eine Abwägung je Fall, und sie war zweimal knapp: `author_missing`
+gehört hinter `title_contained`, sonst verliert ein exakter Titel ohne
+Autorfeld gegen einen bloß enthaltenen.

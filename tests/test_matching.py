@@ -402,3 +402,56 @@ def test_the_reason_says_which_of_the_two_it_was() -> None:
 
     assert "keine Autor:in" in ohne.reason
     assert "andere Autor:in" in falsch.reason
+
+
+def test_every_signal_that_decides_also_sorts() -> None:
+    """Die Invariante, die an einem Tag dreimal verletzt wurde.
+
+    Ticket 45 (`author_conflict`), Ticket 53 (`author_missing`) und der Review
+    dazu (`id_conflict`) waren derselbe Fehler: ein Kriterium wurde in
+    `_confidence` geprüft, aber nicht in `sort_key` — und damit entschied bei
+    zwei sonst gleichen Kandidaten die Reihenfolge der Shop-Treffer, welcher
+    gewinnt. Jedes Mal war die Reparatur, das Signal in den Schlüssel zu
+    heben.
+
+    Dieser Test prüft die Regel statt der Fälle: **was auf `Scored` steht,
+    sortiert mit.** Ein neues Feld, das nur an der Entscheidungsstelle gelesen
+    wird, lässt ihn umfallen — genau dann, wenn der Fehler entsteht, und nicht
+    erst wenn jemand einen falschen Kandidaten auf der Watchlist sieht.
+    """
+    import dataclasses
+    import inspect
+    import re
+
+    from ebook_watchlist.matching import matcher
+
+    quelle = inspect.getsource(matcher)
+    schluessel = re.search(r"def sort_key\(self\).*?\n        \)\n", quelle, re.S)
+    assert schluessel is not None, "sort_key nicht gefunden — der Test misst nichts"
+
+    ohne_wirkung = [
+        feld.name
+        for feld in dataclasses.fields(matcher.Scored)
+        if feld.name != "candidate" and f"self.{feld.name}" not in schluessel.group(0)
+    ]
+
+    assert not ohne_wirkung, (
+        f"Diese Signale entscheiden mit, sortieren aber nicht: {ohne_wirkung}. "
+        "Bei zwei sonst gleichen Kandidaten entscheidet damit die Reihenfolge "
+        "der Quelle — siehe Ticket 45, 53 und den Review zu 54."
+    )
+
+
+def test_a_contradicting_identifier_loses_the_place_not_only_the_confidence() -> None:
+    """Gefunden durch die Invariante oben: `id_conflict` hob seit Ticket 36 nur
+    die Sicherheitsstufe. Ein Kandidat mit *falscher* ISBN gewann deshalb gegen
+    einen ohne Widerspruch, wenn er im Shop zufällig zuerst stand."""
+    query = Query(title="Der Schwarm", author="Frank Schätzing", identifier="9783462033748")
+    widerspricht = Candidate(
+        title="Der Schwarm", author="Frank Schätzing", identifier="9780000000001"
+    )
+    unauffaellig = Candidate(title="Der Schwarm - Roman", author="Frank Schätzing")
+
+    resolution = match(query, [widerspricht, unauffaellig])
+
+    assert resolution.ranked[0].candidate is unauffaellig

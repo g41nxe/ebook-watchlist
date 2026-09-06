@@ -118,6 +118,13 @@ class Scored:
         a point of noise."""
         return (
             0 if self.id_match else 1,
+            # Eine widersprechende Kennung ist der staerkste Gegenbeleg, den
+            # es gibt — staerker als ein abweichender Name, denn eine ISBN
+            # meint genau eine Ausgabe. Sie hob bisher nur die
+            # Sicherheitsstufe: bei zwei sonst gleichen Kandidaten gewann
+            # deshalb der mit der *falschen* Kennung, wenn er zufaellig
+            # zuerst kam (ADR 23, gefunden beim Review zu Ticket 54).
+            1 if self.id_conflict else 0,
             # Vor dem Titel, und das ist der Kern von Ticket 45: "Dark Matter"
             # von Kim Mannix trifft den Titel exakt, "Dark Matter. Der
             # Zeitenlaeufer" von Crouch nur enthalten — gesucht war aber
