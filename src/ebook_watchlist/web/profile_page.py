@@ -31,11 +31,11 @@ SWEEP_INTERVAL = timedelta(days=7)
 _WEEKDAYS = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
 
 _RELATION_LABELS: tuple[tuple[str, str], ...] = (
-    (str(RelationKind.WATCHING), "beobachtet"),
-    (str(RelationKind.OWNED), "besessen"),
-    (str(RelationKind.LIKED), "gefiel"),
-    (str(RelationKind.DISLIKED), "gefiel nicht"),
-    (str(RelationKind.DISMISSED), "verworfen"),
+    (str(RelationKind.WATCHING), "in Beobachtung"),
+    (str(RelationKind.OWNED), "im Besitz"),
+    (str(RelationKind.LIKED), "Mag ich"),
+    (str(RelationKind.DISLIKED), "Kein Interesse"),
+    (str(RelationKind.DISMISSED), "Ausgeschlossen"),
 )
 
 

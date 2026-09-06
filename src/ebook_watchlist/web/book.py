@@ -38,11 +38,11 @@ ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL)
 #: Was die Leserin über ein Buch sagen kann, in der Reihenfolge, in der es auf
 #: der Seite steht. Mehrere gelten gleichzeitig — das ist der Normalfall.
 KINDS: tuple[tuple[str, str], ...] = (
-    (str(RelationKind.WATCHING), "beobachten"),
-    (str(RelationKind.OWNED), "besitze ich"),
-    (str(RelationKind.LIKED), "gefiel mir"),
-    (str(RelationKind.DISLIKED), "gefiel mir nicht"),
-    (str(RelationKind.DISMISSED), "nicht mehr vorschlagen"),
+    (str(RelationKind.WATCHING), "in Beobachtung"),
+    (str(RelationKind.OWNED), "im Besitz"),
+    (str(RelationKind.LIKED), "Mag ich"),
+    (str(RelationKind.DISLIKED), "Kein Interesse"),
+    (str(RelationKind.DISMISSED), "Ausgeschlossen"),
 )
 
 #: Nur für den Vergleich zweier Zeitstempel, von denen einer fehlen darf.

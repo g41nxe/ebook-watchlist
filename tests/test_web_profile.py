@@ -82,7 +82,8 @@ def test_the_counts_cover_every_relation(client: TestClient, db: Store) -> None:
 
     body = client.get("/profil").text
 
-    for label in ("beobachtet", "besessen", "gefiel", "verworfen"):
+    for label in ("in Beobachtung", "im Besitz", "Mag ich", "Kein Interesse",
+                  "Ausgeschlossen"):
         assert label in body
 
 

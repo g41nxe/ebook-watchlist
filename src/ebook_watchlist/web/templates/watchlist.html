@@ -148,7 +148,7 @@
               {{ 'pausieren' if entry.active else 'aktivieren' }}</button>
           </form>
           <div class="my-1 border-t border-hair"></div>
-          {% for kind, label in (("owned", "im Besitz"), ("dismissed", "nicht interessant")) %}
+          {% for kind, label in (("owned", "im Besitz"), ("dismissed", "Ausgeschlossen")) %}
           <form method="post" action="/watchlist/{{ entry.book_id }}/abschliessen">
             <input type="hidden" name="kind" value="{{ kind }}">
             <button type="submit"

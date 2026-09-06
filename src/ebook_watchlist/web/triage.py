@@ -32,9 +32,9 @@ from ..store import Store
 #: Was mit einem Stapel geschehen kann. Alle drei schreiben eine Beziehung —
 #: "verworfen" ist keine Löschung, sondern eine Aussage über das Buch.
 ACTIONS: tuple[tuple[str, str], ...] = (
-    (str(RelationKind.DISMISSED), "Verwerfen"),
-    (str(RelationKind.OWNED), "Habe ich"),
-    (str(RelationKind.WATCHING), "Beobachten"),
+    (str(RelationKind.DISMISSED), "Ausgeschlossen"),
+    (str(RelationKind.OWNED), "im Besitz"),
+    (str(RelationKind.WATCHING), "in Beobachtung"),
 )
 
 #: Wie viele Zeilen eine Seite zeigt. Der Rückstand ist dreistellig, und eine
