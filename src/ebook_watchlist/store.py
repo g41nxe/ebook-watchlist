@@ -39,6 +39,12 @@ class Base(DeclarativeBase):
     pass
 
 
+#: Der Ausloeser eines **engen** Laufs — einer, der genau einen
+#: Watchlist-Eintrag ansieht (Ticket 51). Er bekommt eine eigene Zeile, weil
+#: seine Beobachtung eine braucht, zaehlt aber nirgends als "der letzte Lauf".
+ENTRY_TRIGGER = "entry"
+
+
 class RunRow(Base):
     __tablename__ = "run"
 
@@ -234,6 +240,10 @@ class RatingRow(Base):
     #: auf der Vorschlagsseite. Getrennt von ``reason``: die Begründung ist ein
     #: Protokoll zum Nachprüfen und nennt auch, was fehlt.
     pitch: Mapped[str] = mapped_column(String, default="")
+    #: Auf wie vielen Stimmen die Angabe ruht — nur bei fremden Bewertungen.
+    #: 5,0 aus einer Stimme ist keine Auskunft, 2,8 aus 1641 schon
+    #: (Ticket 54).
+    votes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: Die Fassung des Leseprofils, gegen die geurteilt wurde. Eine neue
     #: Fassung macht ein Maschinenurteil ungültig — das ist die eine Änderung,
     #: bei der ein erneuter Aufruf richtig ist. Eine Änderung am
@@ -480,11 +490,21 @@ class Store:
             session.commit()
 
     def recent_runs(self, profile_slug: str, limit: int = 20) -> list[RunRow]:
-        """The Run journal, newest first — what the Dashboard shows."""
+        """The Run journal, newest first — what the Dashboard shows.
+
+        Ohne die engen Laeufe aus Ticket 51: ein "Lauf" heisst hier *jemand
+        hat alles angesehen*. Ein einzelner Eintrag, den die Leserin gerade
+        selbst angestossen hat, ist kein Rundgang — er wuerde das Journal mit
+        Einzeilern fuellen und im Panel als *der* letzte Lauf erscheinen.
+        Seine Zeile bleibt trotzdem stehen: die Beobachtung haengt daran.
+        """
         with self.session() as session:
             stmt = (
                 select(RunRow)
-                .where(RunRow.profile_slug == profile_slug)
+                .where(
+                    RunRow.profile_slug == profile_slug,
+                    RunRow.trigger != ENTRY_TRIGGER,
+                )
                 .order_by(RunRow.id.desc())
                 .limit(limit)
             )
@@ -507,6 +527,9 @@ class Store:
                     RunRow.profile_slug == profile_slug,
                     RunRow.id < before_run_id,
                     RunRow.finished_at.is_not(None),
+                    # Sonst datierte "seit dem letzten Check" auf einen
+                    # einzelnen Eintrag, den die Leserin selbst angesehen hat.
+                    RunRow.trigger != ENTRY_TRIGGER,
                 )
                 .order_by(RunRow.id.desc())
                 .limit(1)
@@ -1205,6 +1228,7 @@ class Store:
         now: datetime,
         origin: str = "model",
         pitch: str = "",
+        votes: int | None = None,
     ) -> None:
         """Ein Urteil festhalten.
 
@@ -1228,6 +1252,7 @@ class Store:
                 session.add(row)
             row.stars = stars
             row.confidence = confidence
+            row.votes = votes
             row.pitch = pitch
             row.reason = reason
             row.profile_version = profile_version

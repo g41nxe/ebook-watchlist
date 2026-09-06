@@ -146,3 +146,63 @@ def test_the_row_stops_asking_when_it_is_over(client: TestClient, db: Store) -> 
 
 def test_an_unknown_entry_is_not_found(client: TestClient, db: Store) -> None:
     assert client.get("/watchlist/9999/nachsehen").status_code == 404
+
+
+# --- was der Review gefunden hat -------------------------------------------
+
+
+def test_a_narrow_run_always_closes_its_row(data_dir: Path, db: Store) -> None:
+    """Eine Lauf-Zeile ohne Ende sieht für `runs.py` aus wie ein laufender
+    Lauf — und ihre Prozessnummer ist die des Webservers, der lebt. Das Panel
+    hätte danach für immer „Lauf läuft …" gemeldet."""
+    from ebook_watchlist import single
+
+    buch_id = eintrag(db)
+    profile = load_profile()
+    echte_quellen = single.build_sources
+
+    class Stolpert:
+        name = "beam"
+
+        def watch(self, watchlist: object, context: object) -> list:
+            raise RuntimeError("der Shop ist weg")
+
+    monkeypatch_ziel = single
+    monkeypatch_ziel.build_sources = lambda profile, client: [Stolpert()]  # type: ignore[assignment]
+    try:
+        bericht = single.check_one(buch_id)
+    finally:
+        monkeypatch_ziel.build_sources = echte_quellen
+
+    offen = [row for row in db.recent_runs(profile.slug, limit=50) if row.finished_at is None]
+    assert not offen
+    assert "beam" in bericht.trouble
+
+
+def test_a_narrow_run_is_not_the_last_run(data_dir: Path, db: Store) -> None:
+    """Ein „Lauf" im Journal heißt: jemand hat alles angesehen. Ein einzelner
+    Eintrag würde das Panel nach jedem Klick auf „Lauf abgeschlossen,
+    1 Änderung(en)" setzen."""
+    from ebook_watchlist.store import ENTRY_TRIGGER
+
+    profile = load_profile()
+    gross = db.start_run(profile.slug, "cli", NOW)
+    db.finish_run(gross, status="ok", delta_count=42, finished_at=NOW)
+    db.start_run(profile.slug, ENTRY_TRIGGER, NOW)
+
+    assert db.latest_run(profile.slug).id == gross
+
+
+def test_the_digest_dates_itself_from_the_last_real_run(data_dir: Path, db: Store) -> None:
+    """Sonst datierte „Änderungen seit letztem Check" auf einen einzelnen
+    Eintrag, den die Leserin selbst angesehen hat."""
+    from ebook_watchlist.store import ENTRY_TRIGGER
+
+    profile = load_profile()
+    gross = db.start_run(profile.slug, "cli", NOW)
+    db.finish_run(gross, status="ok", delta_count=42, finished_at=NOW)
+    eng = db.start_run(profile.slug, ENTRY_TRIGGER, NOW)
+    db.finish_run(eng, status="ok", delta_count=1, finished_at=NOW)
+    naechster = db.start_run(profile.slug, "cli", NOW)
+
+    assert db.last_finished_run(profile.slug, naechster).id == gross

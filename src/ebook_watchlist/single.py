@@ -36,7 +36,7 @@ from .http import HttpClient
 from .models import Observation
 from .sources import build_sources
 from .sources.base import RunContext
-from .store import Store
+from .store import ENTRY_TRIGGER, Store
 
 #: Wie lange ein enger Lauf auf einen großen wartet, bevor er aufgibt.
 #: Gemessen an sechzehn Läufen: Median 135 s, längster 395 s. Zehn Minuten
@@ -108,17 +108,34 @@ def check_one(book_id: int, *, now: datetime | None = None) -> Report:
     except Timeout:
         return Report(trouble="ein Lauf blockiert seit über zehn Minuten")
 
+    run_id: int | None = None
+    found: list[Observation] = []
+    stolperer: list[str] = []
+
     try:
-        run_id = store.start_run(profile.slug, "ui", now, pid=os.getpid())
+        run_id = store.start_run(profile.slug, ENTRY_TRIGGER, now, pid=os.getpid())
         context = RunContext(profile_slug=profile.slug, store=store, now=now)
-        found: list[Observation] = []
         for source in enabled:
             try:
                 found.extend(source.watch([entry], context))
             except Exception as exc:  # noqa: BLE001 - eine Quelle, nicht der Lauf
-                return Report(trouble=f"{source.name}: {type(exc).__name__}")
+                # Eine stolpernde Quelle haelt die andere nicht auf — dieselbe
+                # Regel wie im grossen Lauf (ADR 7). Vorher brach der ganze
+                # enge Lauf ab, und eine hakende Onleihe verhinderte den
+                # Shop-Preis.
+                stolperer.append(f"{source.name}: {type(exc).__name__}")
         store.append(run_id, profile.slug, found, now)
-        store.finish_run(run_id, status="ok", delta_count=len(found), finished_at=datetime.now())
-        return Report(observations=tuple(found))
+        return Report(observations=tuple(found), trouble="; ".join(stolperer))
     finally:
+        # **Immer**, auch auf jedem Fehlerweg. Eine Zeile ohne Ende sieht fuer
+        # `runs.py` aus wie ein laufender Lauf — und weil ihre Prozessnummer
+        # die des Webservers ist, lebt der Prozess. Das Panel haette danach
+        # fuer immer "Lauf laeuft …" gemeldet und den Knopf gesperrt.
+        if run_id is not None:
+            store.finish_run(
+                run_id,
+                status="ok" if not stolperer else "failed",
+                delta_count=len(found),
+                finished_at=datetime.now(),
+            )
         lock.release()
