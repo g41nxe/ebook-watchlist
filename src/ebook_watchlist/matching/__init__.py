@@ -10,6 +10,7 @@ from .matcher import (
     authors_contradict,
     match,
     score,
+    worth_confirming,
 )
 from .normalize import fold, normalize_author, normalize_authors, normalize_title, split_authors
 
@@ -28,4 +29,5 @@ __all__ = [
     "normalize_title",
     "score",
     "split_authors",
+    "worth_confirming",
 ]

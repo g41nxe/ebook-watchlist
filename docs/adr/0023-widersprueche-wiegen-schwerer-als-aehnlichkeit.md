@@ -113,3 +113,30 @@ einzigen falschen Antwort ist schlechter als gar keine Frage.
 Ein Widerspruch ist, was `author_matches` verneint — dieselbe strenge Regel,
 die schon entscheidet, ob ein Autorentreffer einer ist. Ein fehlendes Autorfeld
 ist keiner: Nichtwissen widerspricht nicht.
+
+## Nachtrag (Ticket 53)
+
+Der Grundsatz hat eine Kehrseite: **wo nichts widersprechen kann, ist auch
+nichts zu bestätigen.**
+
+`title_is_contained` holt einen Kandidaten aus dem Nichts, wo die
+Titelähnlichkeit nicht reicht. Gebaut wurde die Regel für einen Fall, in dem
+die Autor:in exakt stimmte — geprüft hat sie das nie. Bei *Autorität* und
+*Akzeptanz* von Jeff VanderMeer legte sie deshalb je ein Sachbuch vor, das der
+Shop ohne jeden Verfasser führt.
+
+Ein enthaltener Titel ist deshalb nur dann eine Frage, wenn die Personen sich
+nicht widersprechen **und** der Kandidat überhaupt jemanden nennt, sofern der
+Eintrag eine Autor:in angibt (`matching.worth_confirming`).
+
+Ausdrücklich **nicht** verlangt wird eine Bestätigung. `author_matches` ist
+fürs Bestätigen bewusst streng, und zwischen „bestätigt" und „widerspricht"
+liegt ein breites Feld — gemessen an den gespeicherten Zuordnungen liegt darin
+jede Eingabe, die nur einen Nachnamen trägt:
+
+```
+bestätigt: 25 | widerspricht: 0 | Graubereich: 2 | ohne Autorfeld: 28
+```
+
+Eine Bestätigung zu verlangen hätte solche Einträge dauerhaft von jeder
+Rückfrage ausgeschlossen.

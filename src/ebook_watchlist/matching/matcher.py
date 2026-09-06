@@ -339,6 +339,41 @@ def authors_contradict(target: str | None, credited: str | None) -> bool:
     return wanted.isdisjoint(found)
 
 
+def worth_confirming(scored: Scored, query: Query) -> bool:
+    """Ob ein *enthaltener* Titel eine Frage an die Leserin wert ist (Ticket 53).
+
+    `title_is_contained` holt einen Kandidaten aus dem Nichts, wo die
+    Titelaehnlichkeit nicht reicht — "Dark Matter" in "Dark Matter. Der
+    Zeitenlaeufer". Gebaut wurde die Regel fuer einen Fall, in dem die
+    Autor:in **exakt** stimmte; geprueft hat sie das nie. Bei "Autoritaet" und
+    "Akzeptanz" von VanderMeer legte sie deshalb je ein Sachbuch vor, das der
+    Shop ohne jeden Verfasser fuehrt.
+
+    Zwei Bedingungen, beide aus vorhandenen Bausteinen:
+
+    * Die Personen duerfen sich nicht **widersprechen** (ADR 23, Nachtrag).
+    * Wer nach einer Autor:in fragt, bekommt keine Frage zu einem Kandidaten,
+      der **niemanden** nennt — dort ist nichts zu entscheiden.
+
+    Ausdruecklich **nicht** verlangt wird eine Bestaetigung. `author_matches`
+    ist fuers Bestaetigen bewusst streng, und zwischen "bestaetigt" und
+    "widerspricht" liegt ein breites Feld: "Chris Carter" gegen "Chris James
+    Carter" erreicht 80, "F. Schaetzing" gegen "Frank Schaetzing" 75 — alles
+    dieselben Menschen. Gemessen an den gespeicherten Zuordnungen faellt
+    ausserdem jede Eingabe, die nur einen Nachnamen traegt, in dieses Feld:
+    "VanderMeer" gegen "VanderMeer, Jeff" ist weder das eine noch das andere.
+    Eine Bestaetigung zu verlangen haette solche Eintraege dauerhaft von jeder
+    Rueckfrage ausgeschlossen.
+
+    Gemessen an fuenf Live-Suchen: 24 von 240 Kacheln tragen kein Autorfeld
+    (10 %) — aber **null** in der Anfrage, fuer die die Regel gebaut wurde,
+    und 21 von 96 in den beiden, die den Fehler ausgeloest haben.
+    """
+    if scored.author_conflict:
+        return False
+    return not (query.author and not scored.candidate.author)
+
+
 def _is_tied(best: Scored, runner_up: Scored) -> bool:
     """Two hits we cannot honestly tell apart — the case Calibre punts to its GUI."""
     return (
@@ -370,10 +405,17 @@ def _confidence(query: Query, ranked: Sequence[Scored]) -> tuple[Confidence, str
         # eine Annahme und zu viel zum Wegwerfen. Es kommt der Leserin zur
         # Bestaetigung vor — ein Klick, und die Zuordnung heisst danach
         # "von Hand bestaetigt" (Ticket 36, ADR 9).
-        if best.title_contained:
+        if best.title_contained and worth_confirming(best, query):
             return (
                 Confidence.PROVISIONAL,
                 "der gesuchte Titel steckt im gefundenen — bitte bestätigen",
+            )
+        if best.title_contained:
+            # Enthalten schon, aber niemand kann die Frage beantworten: der
+            # Kandidat nennt keine Autor:in oder eine andere (Ticket 53).
+            return (
+                Confidence.NO_MATCH,
+                "der Titel steckt zwar im gefundenen, aber die Autor:in passt nicht dazu",
             )
         return (
             Confidence.NO_MATCH,

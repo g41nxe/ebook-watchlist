@@ -18,6 +18,7 @@ from ebook_watchlist.matching import (
     normalize_title,
     score,
     split_authors,
+    worth_confirming,
 )
 
 CORPUS = yaml.safe_load(
@@ -300,3 +301,60 @@ def test_a_surname_with_spaced_initials_stays_one_person() -> None:
     hätte der Autor-Widerspruch eine richtige Zuordnung verschlechtert."""
     assert split_authors("Barnes, S. A.") == ["Barnes, S. A."]
     assert normalize_authors("Barnes, S. A.")[0].full == "s a barnes"
+
+
+# --- eine Frage, die jemand beantworten kann (Ticket 53) -------------------
+
+
+def test_a_contained_title_without_any_author_is_no_question() -> None:
+    """Der Anlass: „Autorität" von VanderMeer bekam „Neue Autorität – Das
+    Handbuch" vorgelegt, ein Sachbuch, das der Shop ohne jeden Verfasser
+    führt. Enthalten ist der Titel — zu entscheiden gibt es nichts."""
+    resolution = match(
+        Query(title="Autorität", author="VanderMeer"),
+        [Candidate(title="Neue Autorität – Das Handbuch", author=None)],
+    )
+
+    assert resolution.confidence is Confidence.NO_MATCH
+
+
+def test_a_contained_title_with_the_right_author_stays_a_question() -> None:
+    """Der Fall, für den `title_is_contained` gebaut wurde (Ticket 36)."""
+    resolution = match(
+        Query(title="Dark Matter", author="Blake Crouch"),
+        [Candidate(title="Dark Matter. Der Zeitenläufer", author="Crouch, Blake")],
+    )
+
+    assert resolution.confidence is Confidence.PROVISIONAL
+
+
+def test_an_entry_without_an_author_still_gets_asked() -> None:
+    """Wer keine Autor:in angibt, kann auch keine bestätigt bekommen — die
+    Regel darf ihm die Rückfrage nicht nehmen."""
+    resolution = match(
+        Query(title="Judas", author=None),
+        [Candidate(title="Kinder des Judas", author=None)],
+    )
+
+    assert resolution.confidence is Confidence.PROVISIONAL
+
+
+def test_a_shortened_own_spelling_does_not_lose_the_question() -> None:
+    """Gemessen an den gespeicherten Zuordnungen liegt jede Eingabe, die nur
+    einen Nachnamen trägt, zwischen „bestätigt" und „widerspricht". Eine
+    Bestätigung zu verlangen hätte solche Einträge dauerhaft von jeder
+    Rückfrage ausgeschlossen."""
+    assert worth_confirming(
+        score(Query(title="Autorität", author="VanderMeer"),
+              Candidate(title="Autorität – Der Roman", author="VanderMeer, Jeff")),
+        Query(title="Autorität", author="VanderMeer"),
+    )
+
+
+def test_a_contradicting_author_ends_the_question() -> None:
+    resolution = match(
+        Query(title="Dark Matter", author="Blake Crouch"),
+        [Candidate(title="Dark Matter and Dark Energy", author="Brian Clegg")],
+    )
+
+    assert resolution.confidence is Confidence.NO_MATCH
