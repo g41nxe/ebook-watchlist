@@ -242,7 +242,10 @@
   opacity: 0.18;
 }
 
-/* Ein Aufklapper, dessen Zeile im offenen Zustand "Schliessen" sagt. */
-details > summary > .auf,
-details[open] > summary > .zu { display: none; }
-details[open] > summary > .auf { display: inline-flex; }
+/* Ein Aufklapper, dessen Zeile im offenen Zustand etwas anderes sagt. Die
+   Namen tragen ihr `wenn-`, weil die Regel jedes `details` der Anwendung
+   trifft: `.auf` und `.zu` waeren zwei deutsche Alltagswoerter, die sich
+   irgendwann jemand anders fuer etwas anderes nimmt. */
+details > summary > .wenn-auf,
+details[open] > summary > .wenn-zu { display: none; }
+details[open] > summary > .wenn-auf { display: inline-flex; }
