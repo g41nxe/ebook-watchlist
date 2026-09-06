@@ -85,10 +85,6 @@ class Shelf:
     def count(self) -> int:
         return len(self.books)
 
-    def __iter__(self):
-        """Damit die alte Entpackung ``label, number`` weiter funktioniert."""
-        return iter((self.label, self.count))
-
 
 @dataclass(frozen=True, slots=True)
 class Overview:
