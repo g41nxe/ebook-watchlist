@@ -215,6 +215,9 @@
       <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen"
             class="mt-1 rounded-lg border border-rule bg-paper p-3">
         <input type="hidden" name="source" value="{{ entry.choice_source }}">
+        {# Zurueck dorthin, wo entschieden wurde — nicht immer in den Filter. #}
+        <input type="hidden" name="zurueck"
+               value="{{ '/watchlist?nur=unklar' if nur_unklar else '/watchlist' }}">
 
         <div class="streifen">
           {% for kandidat in entry.candidates %}

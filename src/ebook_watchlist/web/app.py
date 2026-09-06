@@ -336,6 +336,14 @@ def create_app() -> FastAPI:
         )
         return RedirectResponse("/watchlist", status_code=303)
 
+    def _zurueck(ziel: str) -> str:
+        """Nur zurueck auf die Watchlist — ein Formularfeld ist kein Ziel.
+
+        Ohne die Pruefung liesse sich ueber ein untergeschobenes Feld auf eine
+        fremde Adresse umleiten.
+        """
+        return ziel if ziel in ("/watchlist", "/watchlist?nur=unklar") else "/watchlist"
+
     @app.post("/watchlist/{book_id}/umbenennen")
     def watchlist_rename(
         book_id: int, title: str = Form(...), author: str = Form("")
@@ -381,6 +389,7 @@ def create_app() -> FastAPI:
         source: str = Form(...),
         url: str = Form(""),
         was: str = Form(...),
+        zurueck: str = Form("/watchlist"),
     ) -> RedirectResponse:
         """Bestaetigen, ablehnen, oder eine Ablehnung zuruecknehmen.
 
@@ -396,7 +405,10 @@ def create_app() -> FastAPI:
             assignments.reject_all(store, book_id, source, now)
         elif was == "zurueck":
             assignments.restore(store, book_id, source, now)
-        return RedirectResponse("/watchlist?nur=unklar", status_code=303)
+        # Dorthin zurueck, wo entschieden wurde. Vorher stand hier fest
+        # ``?nur=unklar``: wer aus der vollen Liste heraus bestaetigte, landete
+        # danach in der gefilterten — und sah seinen Eintrag nicht mehr.
+        return RedirectResponse(_zurueck(zurueck), status_code=303)
 
 
     # --- Buchseite (Ticket 07) ---------------------------------------------

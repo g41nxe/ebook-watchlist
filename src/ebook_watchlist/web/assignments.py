@@ -145,7 +145,22 @@ def confirm(store: Store, book_id: int, source: str, url: str, now) -> None:
 
     Das Ergebnis heißt ``confirmed`` statt ``linked`` — ein Mensch hat
     entschieden, keine Heuristik (ADR 9).
+
+    Dabei erbt das Buch das Titelbild der gewählten Ausgabe. Es liegt schon auf
+    der Platte — die Kandidatenkarte hat es gezeigt —, und ohne diesen Schritt
+    stünde die Zeile bis zum nächsten Lauf mit einem Platzhalter da, obwohl das
+    Bild bekannt ist. Geholt wird nichts (ADR 3): nachgesehen wird nur, ob die
+    Datei da ist.
     """
+    row = store.get_book_source(book_id, source)
+    gewaehlt = next(
+        (
+            kandidat
+            for kandidat in (_details(row).get("candidates") or [] if row else [])
+            if kandidat.get("url") == url
+        ),
+        None,
+    )
     store.put_book_source(
         book_id,
         source,
@@ -154,6 +169,11 @@ def confirm(store: Store, book_id: int, source: str, url: str, now) -> None:
         resolved_at=now,
         reason="von Hand bestätigt",
     )
+    buch = store.book(book_id)
+    if buch is not None and not buch.cover_file and gewaehlt:
+        datei = _cover_file(gewaehlt.get("cover_url"))
+        if datei:
+            store.set_cover(book_id, datei)
 
 
 def reject_all(store: Store, book_id: int, source: str, now) -> None:

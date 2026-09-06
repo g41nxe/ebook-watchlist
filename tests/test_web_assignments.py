@@ -188,3 +188,60 @@ def test_a_paused_entry_asks_nothing(db: Store) -> None:
     eintrag = next(e for e in watchlist.entries(db, profile) if e.book_id == buch_id)
     assert eintrag.candidates
     assert not eintrag.needs_choice
+
+
+def test_confirming_returns_to_the_list_you_came_from(client: TestClient, db: Store) -> None:
+    """Vorher stand hier fest `?nur=unklar`: wer aus der vollen Liste heraus
+    bestätigte, landete in der gefilterten und sah seinen Eintrag nicht mehr."""
+    buch_id = unklar(db, ("Red Rising", "https://beam.invalid/1"))
+
+    antwort = client.post(
+        f"/watchlist/{buch_id}/zuordnen",
+        data={"source": "beam", "url": "https://beam.invalid/1", "was": "bestaetigen",
+              "zurueck": "/watchlist"},
+        follow_redirects=False,
+    )
+
+    assert antwort.headers["location"] == "/watchlist"
+
+
+def test_a_smuggled_destination_is_ignored(client: TestClient, db: Store) -> None:
+    buch_id = unklar(db, ("Red Rising", "https://beam.invalid/1"))
+
+    antwort = client.post(
+        f"/watchlist/{buch_id}/zuordnen",
+        data={"source": "beam", "was": "keiner", "zurueck": "https://woanders.invalid"},
+        follow_redirects=False,
+    )
+
+    assert antwort.headers["location"] == "/watchlist"
+
+
+def test_the_book_inherits_the_cover_of_the_chosen_edition(
+    client: TestClient, db: Store, data_dir: Path
+) -> None:
+    """Das Bild lag schon da — die Kandidatenkarte hat es gezeigt. Ohne diesen
+    Schritt stand die Zeile bis zum nächsten Lauf mit einem Platzhalter."""
+    from ebook_watchlist.covers import CoverStore, file_name
+
+    profile = load_profile()
+    bild = "https://beam.invalid/cover.jpg"
+    covers = CoverStore(paths.covers_dir())
+    covers.directory.mkdir(parents=True, exist_ok=True)
+    covers.path(file_name(bild)).write_bytes(b"x" * 5000)
+
+    buch = db.find_or_create_book(isbn=None, title="Dark Matter", author="Crouch", now=NOW)
+    db.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+    db.put_book_source(
+        buch.id, "beam", outcome=str(LinkOutcome.UNSURE), url=None, resolved_at=NOW,
+        reason="unklar",
+        candidates=[{"title": "Der Zeitenläufer", "author": "Crouch",
+                     "url": "https://beam.invalid/1", "cover_url": bild}],
+    )
+
+    client.post(
+        f"/watchlist/{buch.id}/zuordnen",
+        data={"source": "beam", "url": "https://beam.invalid/1", "was": "bestaetigen"},
+    )
+
+    assert db.book(buch.id).cover_file == file_name(bild)
