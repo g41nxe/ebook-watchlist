@@ -231,10 +231,14 @@ class BeamSource(ShopSource):
             author=entry.author,
             isbn=detail.isbn,
             cover_url=detail.cover_url,
-            # Ausdruecklich **kein** Klappentext: das Tor beurteilt einen
-            # Watchlist-Titel nie, und sonst liest ihn niemand. Mitzuschreiben
-            # kostete rund zehn Megabyte im Jahr fuer Text, den nichts abruft
-            # — der Snapshot ist anhaengend, jeder Lauf schriebe ihn erneut.
+            # Der Klappentext kommt mit — aber er landet nicht in der
+            # Beobachtung: ``Store.append`` legt ihn an der ``book``-Zeile ab
+            # und laesst die Spalte der Beobachtung leer. Damit steht er
+            # einmal statt taeglich neu, und die Buchseite hat ihn (Ticket 52).
+            #
+            # Bis dahin wurde er hier verworfen, mit der Begruendung, niemand
+            # lese ihn. Das stimmte, solange es die Stelle nicht gab.
+            blurb=detail.blurb,
             match_reason=MatchReason.WATCHLIST,
             watchlist_key=entry.key,
             price_cents=detail.price_cents,

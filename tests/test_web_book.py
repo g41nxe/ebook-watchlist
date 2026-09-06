@@ -480,3 +480,90 @@ def test_a_foreign_voice_never_goes_stale(db) -> None:
 
     assert stimme.is_foreign
     assert not stimme.stale(2)
+
+
+# --- der Kopf, der die Frage beantwortet (Ticket 52) ------------------------
+
+
+def test_the_head_carries_price_and_availability(client: TestClient, db: Store) -> None:
+    """Preis und Verfügbarkeit standen in der **letzten** Tabelle der Seite —
+    700 Pixel unter dem Titel. Wer die Seite öffnet, will genau das wissen."""
+    from ebook_watchlist.models import MatchReason, Observation
+
+    profile = load_profile()
+    buch = db.find_or_create_book(isbn=None, title="Das Knochenband", author="MacBride", now=NOW)
+    db.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+    # Ohne Zuordnung keine Kachel: die Kachel *ist* die Quelle, nicht die
+    # Beobachtung.
+    db.put_book_source(buch.id, "beam", outcome="linked", url="https://beam.invalid/1",
+                       resolved_at=NOW, reason="")
+    run_id = db.start_run(profile.slug, "cli", NOW)
+    db.append(run_id, profile.slug, [
+        Observation(source="beam", source_item_id="1", title="Das Knochenband",
+                    author="MacBride", match_reason=MatchReason.WATCHLIST,
+                    price_cents=299, book_id=buch.id, blurb="Ein abgründiger Fall."),
+    ], NOW)
+
+    body = client.get(f"/book/{buch.id}").text
+
+    kopf = body[: body.find("Wie gut das passt")]
+    assert "2,99" in kopf
+    assert "kachelbild" in kopf
+
+
+def test_the_blurb_lives_on_the_book_not_in_every_observation(db: Store) -> None:
+    """Er ist ein Stammdatum und kein Messwert: in jeder Beobachtung stünde er
+    täglich neu, rund zehn Megabyte im Jahr für denselben Text (Ticket 52)."""
+    from ebook_watchlist.models import MatchReason, Observation
+
+    profile = load_profile()
+    buch = db.find_or_create_book(isbn=None, title="Egal", author="Wer", now=NOW)
+    db.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+    run_id = db.start_run(profile.slug, "cli", NOW)
+    db.append(run_id, profile.slug, [
+        Observation(source="beam", source_item_id="1", title="Egal", author="Wer",
+                    match_reason=MatchReason.WATCHLIST, price_cents=299,
+                    book_id=buch.id, blurb="Ein langer Text."),
+    ], NOW)
+
+    assert db.book(buch.id).blurb == "Ein langer Text."
+    beobachtet = db.observations_for_book(profile.slug, buch.id)
+    assert [o.blurb for o in beobachtet] == [None]
+
+
+def test_a_discovery_keeps_its_blurb_in_the_observation(db: Store) -> None:
+    """Eine Entdeckung hat keine Buch-Zeile (ADR 18) — und das Bewertungstor
+    liest ihren Klappentext genau dort."""
+    from ebook_watchlist.models import MatchReason, Observation
+
+    profile = load_profile()
+    run_id = db.start_run(profile.slug, "cli", NOW)
+    db.append(run_id, profile.slug, [
+        Observation(source="beam", source_item_id="9", title="Ein Fund", author="Wer",
+                    match_reason=MatchReason.GENRE_CATEGORY, price_cents=399,
+                    blurb="Ein Schiff, allein im Dunkeln."),
+    ], NOW)
+
+    fund = db.latest_discoveries(profile.slug)[0]
+    assert fund.blurb == "Ein Schiff, allein im Dunkeln."
+
+
+def test_the_longer_blurb_wins(db: Store) -> None:
+    """Die Kachel einer Suchseite trägt einen Anriss, die Detailseite den
+    ganzen Text — welche zuerst kommt, entscheidet der Zufall des Laufs."""
+    from ebook_watchlist.models import MatchReason, Observation
+
+    profile = load_profile()
+    buch = db.find_or_create_book(isbn=None, title="Egal", author="Wer", now=NOW)
+    run_id = db.start_run(profile.slug, "cli", NOW)
+
+    def schreibe(text: str) -> None:
+        db.append(run_id, profile.slug, [
+            Observation(source="beam", source_item_id="1", title="Egal", author="Wer",
+                        match_reason=MatchReason.WATCHLIST, book_id=buch.id, blurb=text),
+        ], NOW)
+
+    schreibe("Der ganze Text, viel laenger als der Anriss.")
+    schreibe("Kurz …")
+
+    assert db.book(buch.id).blurb == "Der ganze Text, viel laenger als der Anriss."

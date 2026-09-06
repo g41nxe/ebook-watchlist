@@ -436,6 +436,17 @@ def _blurb_without_the_collapse_button(connection: Connection) -> None:
             )
 
 
+def _book_carries_its_blurb(connection: Connection) -> None:
+    """Platz fuer den Klappentext am Buch (Ticket 52).
+
+    Er ist ein Stammdatum und kein Messwert. In jeder Beobachtung stuende er
+    taeglich neu — rund zehn Megabyte im Jahr fuer denselben Text; am Buch
+    steht er einmal. Gefuellt wird die Spalte beim naechsten Lauf, aus den
+    Beobachtungen, die ohnehin hereinkommen.
+    """
+    add_column(connection, "book", "blurb", "TEXT")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -460,6 +471,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _how_many_voted,
     _the_detour_leaves_no_table,
     _blurb_without_the_collapse_button,
+    _book_carries_its_blurb,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

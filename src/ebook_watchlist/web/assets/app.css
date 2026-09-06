@@ -180,6 +180,53 @@
     filter: none;
   }
 
+  /* Auf der Buchseite ist das Cover viermal so gross wie in einer Zeile —
+     das Abzeichen im Listenmass wirkt daneben verloren (Ticket 52). */
+  .badge-gross { width: 28px; height: 28px }
+  .badge-gross svg { width: 17px; height: 17px }
+
+  /* Das Quellensymbol gross und blass in der Kachel: es sagt auf einen Blick,
+     um welche Quelle es geht, ohne den Wert zu stoeren. Rechts auf halber
+     Hoehe und vollstaendig sichtbar — angeschnitten in der Ecke lief es dem
+     Wert in die Zeile, und ein halbes Symbol liest sich als Fehler. Der
+     Inhalt haelt den Platz frei (`pr-16`). */
+  .kachelbild {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 56px;
+    height: 56px;
+    opacity: 0.09;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+  /* Die ganze Kachel ist der Verweis. Beim Ueberfahren tritt der Rahmen in
+     der Farbe der Quelle hervor und das Wasserzeichen wird kraeftiger — mehr
+     braucht es nicht, um zu sagen "hier kann man klicken". */
+  .kachel-klickbar { transition: border-color 0.15s, background-color 0.15s }
+  .kachel-klickbar:hover {
+    border-color: currentColor;
+    background: color-mix(in oklab, currentColor 6%, var(--color-card));
+  }
+  .kachel-klickbar:hover .kachelbild { opacity: 0.18 }
+
+  /* Klappentext: verkuerzt, aufklappbar — dasselbe Muster, das der Shop
+     selbst benutzt, nur ohne dass sein Knopf im gespeicherten Text landet. */
+  .klappentext summary::-webkit-details-marker { display: none }
+  .klappentext:not([open]) summary p {
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .klappentext:not([open]) .mehr::after { content: "mehr anzeigen" }
+  .klappentext[open] .mehr::after { content: "weniger anzeigen" }
+
   /* Wo mit dem Finger bedient wird, gelten 44 px als Mindestmass. */
   @media (hover: none) {
     .tun { min-height: 44px }

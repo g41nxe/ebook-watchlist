@@ -191,6 +191,40 @@ class Page:
     restrict: str | None = None
     #: Ob das Buch überhaupt beobachtet wird — sonst gibt es nichts zu prüfen.
     watching: bool = False
+    #: Der Klappentext, wie er an der ``book``-Zeile steht (Ticket 52).
+    blurb: str | None = None
+    #: Was die Leserin sich selbst zu dem Buch notiert hat.
+    note: str | None = None
+    #: Die jüngste Beobachtung je Quelle — daraus baut der Kopf seine Kacheln.
+    latest: tuple[Sighting, ...] = ()
+
+    @property
+    def price(self) -> str | None:
+        """Der zuletzt gesehene Preis, gleich von welcher Quelle."""
+        for sichtung in self.latest:
+            if sichtung.price:
+                return sichtung.price
+        return None
+
+    @property
+    def seen(self) -> datetime | None:
+        return max((s.when for s in self.latest if s.when), default=None)
+
+    @property
+    def deal(self) -> bool:
+        """Schnaeppchen — dieselbe Regel wie in den Listen."""
+        return any(sichtung.deal for sichtung in self.latest)
+
+    @property
+    def borrowable(self) -> bool:
+        return any(sichtung.availability == "ausleihbar" for sichtung in self.latest)
+
+    def latest_at(self, source: str) -> Sighting | None:
+        """Die juengste Sichtung dieser Quelle, oder ``None``."""
+        for sichtung in self.latest:
+            if sichtung.source == source:
+                return sichtung
+        return None
 
     @property
     def my_stars(self) -> int | None:
@@ -307,6 +341,20 @@ def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
     )
 
 
+def _latest_per_source(history: tuple[Sighting, ...]) -> tuple[Sighting, ...]:
+    """Je Quelle die juengste Sichtung, in der Reihenfolge der Geschichte.
+
+    Der Kopf zeigt je Quelle eine Kachel; welche Zeile dafuer gilt, ist die
+    neueste — nicht die erste, die zufaellig oben steht.
+    """
+    neueste: dict[str, Sighting] = {}
+    for sichtung in history:
+        vorher = neueste.get(sichtung.source)
+        if vorher is None or (sichtung.when or datetime.min) > (vorher.when or datetime.min):
+            neueste[sichtung.source] = sichtung
+    return tuple(neueste.values())
+
+
 def build(store: Store, profile: Profile, book_id: int) -> Page | None:
     """Die Seite zu einem Buch, oder ``None``, wenn es das nicht gibt."""
     book = store.book(book_id)
@@ -375,6 +423,11 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
         judgements=_judgements(store, book, seen),
         profile_version=current_version,
         origin=_origin(seen),
+        blurb=book.blurb,
+        note=_details(known[str(RelationKind.WATCHING)]).get("note")
+        if str(RelationKind.WATCHING) in known
+        else None,
+        latest=_latest_per_source(history),
         restrict=_details(known[str(RelationKind.WATCHING)]).get("restrict")
         if str(RelationKind.WATCHING) in known
         else None,

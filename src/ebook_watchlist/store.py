@@ -133,6 +133,15 @@ class BookRow(Base):
     #: Dateiname im Cover-Ordner, nicht die Adresse beim Shop: die Seite
     #: laedt nichts von einem Dritten nach (Ticket 15).
     cover_file: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Der Klappentext — **einmal**, am Buch und nicht an jeder Beobachtung.
+    #:
+    #: Er ist ein Stammdatum und kein Messwert: er aendert sich praktisch nie,
+    #: im Gegensatz zu Preis und Verfuegbarkeit. Ihn in jede Beobachtung zu
+    #: schreiben kostete rund zehn Megabyte im Jahr fuer denselben Text
+    #: (Ticket 52). Eine Entdeckung hat keine ``book``-Zeile und traegt ihn
+    #: deshalb weiterhin in ihrer Beobachtung — dort liest ihn das
+    #: Bewertungstor.
+    blurb: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
     __table_args__ = (Index("ix_book_title", "title"),)
@@ -1501,6 +1510,28 @@ class Store:
             row.updated_at = now
             session.commit()
 
+    def _remember_blurbs(self, observations: Sequence[Observation]) -> None:
+        """Den Klappentext am Buch festhalten, wo eins dahintersteht.
+
+        Ueberschrieben wird nur, was laenger geworden ist: die Kachel einer
+        Suchseite traegt einen Anriss, die Detailseite den ganzen Text, und
+        welche von beiden zuerst kommt, entscheidet der Zufall des Laufs.
+        """
+        gefunden: dict[int, str] = {}
+        for observation in observations:
+            if observation.book_id and observation.blurb:
+                vorher = gefunden.get(observation.book_id, "")
+                if len(observation.blurb) > len(vorher):
+                    gefunden[observation.book_id] = observation.blurb
+        if not gefunden:
+            return
+        with self.session() as session:
+            for book_id, blurb in gefunden.items():
+                row = session.get(BookRow, book_id)
+                if row is not None and len(blurb) > len(row.blurb or ""):
+                    row.blurb = blurb
+            session.commit()
+
     def append(
         self,
         run_id: int,
@@ -1510,6 +1541,10 @@ class Store:
     ) -> None:
         if not observations:
             return
+        # Der Klappentext eines Buches gehoert an die ``book``-Zeile, nicht in
+        # jede Beobachtung: er aendert sich nicht, sie wiederholt sich taeglich
+        # (Ticket 52). Eine Entdeckung hat keine Buch-Zeile und behaelt ihn.
+        self._remember_blurbs(observations)
         with self.session() as session:
             session.add_all(
                 ObservationRow(
@@ -1529,7 +1564,7 @@ class Store:
                     available_from=obs.available_from,
                     category=obs.category,
                     url=obs.url,
-                    blurb=obs.blurb,
+                    blurb=None if obs.book_id else obs.blurb,
                     cover_url=obs.cover_url,
                     rating=obs.rating,
                     rating_votes=obs.rating_votes,

@@ -10,7 +10,11 @@
 </p>
 
 <div class="flex flex-wrap items-start gap-5">
-  <div class="h-36 w-24 shrink-0 overflow-hidden rounded shadow-[0_2px_8px_rgba(0,0,0,.4)]">
+  {# Das Cover traegt dieselben Abzeichen wie in den Listen, nur groesser:
+     hier ist es viermal so gross wie in einer Zeile, und das Listenmass
+     wirkte daneben verloren (Ticket 52). #}
+  <div class="relative shrink-0">
+  <div class="h-36 w-24 overflow-hidden rounded shadow-[0_2px_8px_rgba(0,0,0,.4)]">
     {% if page.cover_file %}
     <img src="/covers/{{ page.cover_file }}" alt="" class="h-full w-full object-cover">
     {% else %}
@@ -24,9 +28,28 @@
     </svg>
     {% endif %}
   </div>
+  {% if page.borrowable or page.deal %}
+  <span class="absolute -top-2 -right-2 flex flex-col gap-1">
+    {% if page.borrowable %}
+    <span title="in der Bibliothek ausleihbar" class="badge badge-gross bg-accent">
+      <svg><use href="#ic-lib"/></svg></span>
+    {% endif %}
+    {% if page.deal %}
+    <span title="Schnäppchen" class="badge badge-gross bg-amber">
+      <svg><use href="#ic-tag"/></svg></span>
+    {% endif %}
+  </span>
+  {% endif %}
+  </div>
 
   <div class="min-w-0 flex-1">
-    <h1 class="font-serif text-2xl font-semibold tracking-tight">{{ page.title }}</h1>
+    <div class="flex flex-wrap items-baseline gap-x-3">
+      <h1 class="font-serif text-2xl font-semibold tracking-tight">{{ page.title }}</h1>
+      {% if page.watching %}
+      <a href="#berichtigen" class="text-xs text-accent underline decoration-accent/30
+                                    underline-offset-2 hover:decoration-accent">ändern</a>
+      {% endif %}
+    </div>
     <p class="mt-0.5 text-soft">{{ page.author or "unbekannt" }}</p>
     <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
       {% if page.series %}
@@ -37,6 +60,65 @@
         <dd class="inline tabular-nums">{{ page.isbn }}</dd></div>
       {% endif %}
     </dl>
+
+    {# Je Quelle eine Kachel: die beiden sagen Verschiedenes — die eine einen
+       Preis, die andere eine Verfuegbarkeit. Eine gemeinsame Zeile zwaenge
+       beides in dieselbe Form (Ticket 52).
+
+       Die ganze Kachel ist der Verweis; ein eigenes "oeffnen" daneben sagte
+       dasselbe zweimal. Die Farbe steht an der Kachel, damit `currentColor`
+       beim Ueberfahren stimmt — deshalb nennt jeder Wert seine Farbe
+       ausdruecklich, sonst erbte ein Preis von 9,99 das Bernstein und saehe
+       aus wie ein Schnaeppchen. #}
+    {% if page.sources %}
+    <div class="mt-4 flex flex-wrap items-stretch gap-3">
+      {% for state in page.sources %}
+      {% set sichtung = page.latest_at(state.display) %}
+      {% set library = state.category == "library" %}
+      {% set gefunden = state.url and state.outcome in ("linked", "confirmed") %}
+      {% set ton = ("text-accent" if library else "text-amber") if gefunden else "text-soft" %}
+      <{{ "a" if gefunden else "div" }}
+         {% if gefunden %}href="{{ state.url }}" target="_blank" rel="noopener"
+         title="{{ state.display }} öffnen" class="kachel-klickbar cursor-pointer {% else %}
+         class="{% endif %}{{ ton }} relative flex min-w-52 flex-1 flex-col
+                justify-between overflow-hidden rounded-lg border border-rule bg-card
+                px-4 pt-3 pr-16 pb-4">
+        <svg class="kachelbild {{ ton }}" aria-hidden="true">
+          <use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
+        <div class="relative mb-3 flex items-center gap-1.5 text-[11px] tracking-wide uppercase">
+          <svg class="i"><use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
+          {{ state.display }}
+        </div>
+        <div class="relative">
+          {% if sichtung and sichtung.price %}
+          <span class="block font-serif text-xl leading-none font-medium tabular-nums
+                       {{ 'text-amber' if sichtung.deal else 'text-ink' }}">{{ sichtung.price }}</span>
+          {% elif sichtung and sichtung.availability %}
+          <span class="block text-xl leading-none font-medium
+                       {{ 'text-accent' if sichtung.availability == 'ausleihbar' else 'text-ink' }}"
+                >{{ sichtung.availability }}</span>
+          {% else %}
+          <span class="block text-xl leading-none font-medium text-soft">{{ state.label }}</span>
+          {% endif %}
+        </div>
+      </{{ "a" if gefunden else "div" }}>
+      {% endfor %}
+    </div>
+    {% if page.seen %}
+    <p class="mt-1 text-xs text-soft tabular-nums">
+      aktualisiert am {{ page.seen.strftime("%d.%m. %H:%M") }}</p>
+    {% endif %}
+    {% endif %}
+
+    {% if page.note %}
+    {# Die wertvollste Zeile des Eintrags, und bis Ticket 52 unsichtbar: bei
+       15 von 17 Watchlist-Titeln gefuellt, und in ihr standen die
+       Originaltitel, die vier Umbenennungen geloest haben. #}
+    <p class="mt-3 text-sm text-soft italic">{{ page.note }}
+      <a href="#berichtigen" class="ml-1 text-xs not-italic text-accent underline
+                                    decoration-accent/30 underline-offset-2
+                                    hover:decoration-accent">ändern</a></p>
+    {% endif %}
 
     {# Warum dieses Buch ueberhaupt hereinkam. Ein Watchlist-Titel bekommt
        hier nichts: warum er da steht, weiss die Leserin, sie hat ihn
@@ -76,57 +158,22 @@
 </div>
 {% endif %}
 
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  Was du dazu sagst
-</h2>
-<div class="flex flex-wrap gap-2">
-  {% for kind, label in kinds %}
-  {% set on = kind in page.active_kinds %}
-  <form method="post" action="/book/{{ page.book_id }}/relation">
-    <input type="hidden" name="kind" value="{{ kind }}">
-    <input type="hidden" name="active" value="{{ '0' if on else '1' }}">
-    <button type="submit"
-            class="rounded-full border px-3 py-1 text-sm transition
-                   {{ 'border-accent bg-accent/10 text-accent'
-                      if on else 'border-rule text-soft hover:border-soft hover:text-ink' }}">
-      {{ label }}
-    </button>
-  </form>
-  {% endfor %}
-</div>
-
-{% if page.watching %}
-{# An welcher Art Quelle geprueft wird. Stand bis Ticket 48 im
-   Drei-Punkte-Menue der Watchlist-Zeile — dort war es der einzige Eintrag,
-   und es ist eine Einstellung, keine Handlung. Hier steht es bei den anderen
-   Angaben zu diesem Buch. #}
-<div class="mt-4 flex flex-wrap items-center gap-2">
-  <span class="text-xs text-soft">Prüfen bei</span>
-  {% for value, label in (("", "allen Quellen"), ("library", "nur Bibliothek"), ("shop", "nur Shop")) %}
-  <form method="post" action="/book/{{ page.book_id }}/restrict">
-    <input type="hidden" name="restrict" value="{{ value }}">
-    <button type="submit"
-            class="rounded-full border px-3 py-1 text-xs transition
-                   {{ 'border-accent bg-accent/10 text-accent'
-                      if (page.restrict or '') == value
-                      else 'border-rule text-soft hover:border-soft hover:text-ink' }}">
-      {{ label }}</button>
-  </form>
-  {% endfor %}
-</div>
+{% if page.blurb %}
+{# Verkuerzt, aufklappbar — dasselbe Muster, das der Shop selbst benutzt, nur
+   ohne dass sein Knopf im gespeicherten Text landet (Ticket 40). `details`
+   ohne Skript: zugeklappt zeigt es nur das `summary`, und darin steht der
+   Text mit einer Zeilenbegrenzung. #}
+<details class="klappentext mt-6">
+  <summary class="list-none">
+    <p class="text-sm leading-relaxed">{{ page.blurb }}</p>
+    <span class="mehr mt-1 inline-block cursor-pointer text-xs text-accent underline
+                 decoration-accent/30 underline-offset-2 hover:decoration-accent"></span>
+  </summary>
+</details>
 {% endif %}
 
-{% set past = page.relations | selectattr("is_history") | list %}
-{% if past %}
-{# Stillgelegt, nicht geloescht: "beobachtet, bis du es gekauft hast". #}
-<p class="mt-3 text-xs text-soft">
-  Früher:
-  {% for relation in past %}{{ relation.label }}{% if not loop.last %}, {% endif %}{% endfor %}
-</p>
-{% endif %}
-
-<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  <svg class="i"><use href="#ic-star"/></svg>Wie gut das passt
+<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-accent">
+  <svg class="i text-accent"><use href="#ic-star"/></svg>Wie gut das passt
 </h2>
 
 {# Sterne der Leserin und Sterne einer Maschine stehen bewusst getrennt und
@@ -227,38 +274,7 @@
 </ul>
 {% endif %}
 
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  Bei den Quellen
-</h2>
-{% if not page.sources %}
-<p class="py-2 text-sm text-soft italic">Noch keine Quelle hat nachgesehen.</p>
-{% endif %}
-<ul class="divide-y divide-hair">
-  {% for state in page.sources %}
-  {% set library = state.category == "library" %}
-  <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-sm">
-    <span class="flex w-28 shrink-0 items-center gap-1.5
-                 {{ 'text-accent' if library else 'text-amber' }}">
-      <svg class="i"><use href="#ic-{{ 'lib' if library else 'shop' }}"/></svg>
-      {{ state.display }}
-    </span>
-    <span class="{{ 'text-danger' if state.is_question else 'text-soft' }}">{{ state.label }}</span>
-    {% if state.matched_title %}
-    {# Wie *diese* Quelle das Buch nennt — daran bleibt eine falsche Zuordnung
-       sichtbar (ADR 9). #}
-    <span class="text-soft">nennt es „{{ state.matched_title }}“{% if state.matched_author %},
-      {{ state.matched_author }}{% endif %}</span>
-    {% endif %}
-    {% if state.url %}
-    <a href="{{ state.url }}" target="_blank" rel="noopener"
-       class="ml-auto text-accent underline decoration-accent/30 underline-offset-2
-              hover:decoration-accent">dort ansehen</a>
-    {% endif %}
-  </li>
-  {% endfor %}
-</ul>
-
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
+<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-accent">
   Was beobachtet wurde
 </h2>
 {% if not page.has_history %}
@@ -320,4 +336,85 @@
 </table>
 </div>
 {% endif %}
+<h2 id="berichtigen" class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-accent">
+  Was du dazu sagst
+</h2>
+<div class="flex flex-wrap gap-2">
+  {% for kind, label in kinds %}
+  {% set on = kind in page.active_kinds %}
+  <form method="post" action="/book/{{ page.book_id }}/relation">
+    <input type="hidden" name="kind" value="{{ kind }}">
+    <input type="hidden" name="active" value="{{ '0' if on else '1' }}">
+    <button type="submit"
+            class="rounded-full border px-3 py-1 text-sm transition
+                   {{ 'border-accent bg-accent/10 text-accent'
+                      if on else 'border-rule text-soft hover:border-soft hover:text-ink' }}">
+      {{ label }}
+    </button>
+  </form>
+  {% endfor %}
+</div>
+
+{% if page.watching %}
+{# An welcher Art Quelle geprueft wird. Stand bis Ticket 48 im
+   Drei-Punkte-Menue der Watchlist-Zeile — dort war es der einzige Eintrag,
+   und es ist eine Einstellung, keine Handlung. Hier steht es bei den anderen
+   Angaben zu diesem Buch. #}
+<div class="mt-4 flex flex-wrap items-center gap-2">
+  <span class="text-xs text-soft">Prüfen bei</span>
+  {% for value, label in (("", "allen Quellen"), ("library", "nur Bibliothek"), ("shop", "nur Shop")) %}
+  <form method="post" action="/book/{{ page.book_id }}/restrict">
+    <input type="hidden" name="restrict" value="{{ value }}">
+    <button type="submit"
+            class="rounded-full border px-3 py-1 text-xs transition
+                   {{ 'border-accent bg-accent/10 text-accent'
+                      if (page.restrict or '') == value
+                      else 'border-rule text-soft hover:border-soft hover:text-ink' }}">
+      {{ label }}</button>
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% set past = page.relations | selectattr("is_history") | list %}
+{% if past %}
+{# Stillgelegt, nicht geloescht: "beobachtet, bis du es gekauft hast". #}
+<p class="mt-3 text-xs text-soft">
+  Früher:
+  {% for relation in past %}{{ relation.label }}{% if not loop.last %}, {% endif %}{% endfor %}
+</p>
+{% endif %}
+{# Seit die Kacheln im Kopf stehen, sagt dieser Abschnitt den Preis nicht
+   noch einmal — was bleibt, ist der Zustand der Zuordnung. Das ist
+   Werkzeug und keine Auskunft, also steht es klein und am Ende. #}
+<h2 class="mt-9 mb-3 text-[11px] font-medium tracking-wide text-accent uppercase">
+  Zuordnung
+</h2>
+{% if not page.sources %}
+<p class="py-2 text-sm text-soft italic">Noch keine Quelle hat nachgesehen.</p>
+{% endif %}
+<ul class="divide-y divide-hair">
+  {% for state in page.sources %}
+  {% set library = state.category == "library" %}
+  <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-sm">
+    <span class="flex w-28 shrink-0 items-center gap-1.5
+                 {{ 'text-accent' if library else 'text-amber' }}">
+      <svg class="i"><use href="#ic-{{ 'lib' if library else 'shop' }}"/></svg>
+      {{ state.display }}
+    </span>
+    <span class="{{ 'text-danger' if state.is_question else 'text-soft' }}">{{ state.label }}</span>
+    {% if state.matched_title %}
+    {# Wie *diese* Quelle das Buch nennt — daran bleibt eine falsche Zuordnung
+       sichtbar (ADR 9). #}
+    <span class="text-soft">nennt es „{{ state.matched_title }}“{% if state.matched_author %},
+      {{ state.matched_author }}{% endif %}</span>
+    {% endif %}
+    {% if state.url %}
+    <a href="{{ state.url }}" target="_blank" rel="noopener"
+       class="ml-auto text-accent underline decoration-accent/30 underline-offset-2
+              hover:decoration-accent">dort ansehen</a>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
 {% endblock %}
