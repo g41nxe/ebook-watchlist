@@ -257,3 +257,19 @@ def test_a_renamed_node_still_does_not_double_the_text() -> None:
     )
 
     assert parse.parse_detail(html).blurb == "Der Anfang und der Rest."
+
+
+def test_an_empty_full_node_does_not_swallow_the_blurb() -> None:
+    """Nur auf „Knoten da?" zu pruefen reichte nicht: ein leerer
+    ``description--full`` liess den Klappentext ganz verschwinden — und ein
+    Buch ohne Klappentext holt ``_with_full_blurbs`` bei jedem Lauf erneut."""
+    html = (
+        '<html><head><link rel="canonical" href="https://www.beam-shop.de/a"></head>'
+        '<body><div class="product--details"><h1 class="product--title">T</h1>'
+        '<meta itemprop="price" content="4.99">'
+        '<div itemprop="description"><div class="description--preview">'
+        'Ein kurzer Text.</div><div class="description--full"></div>'
+        "</div></div></body></html>"
+    )
+
+    assert parse.parse_detail(html).blurb == "Ein kurzer Text."

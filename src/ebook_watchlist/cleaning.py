@@ -78,7 +78,19 @@ def without_teaser(blurb: str | None) -> str | None:
     treffer = _TEASER_CUT.search(blurb)
     if treffer is None:
         return blurb
-    return blurb[treffer.end() :].strip() or blurb
+    rest = blurb[treffer.end() :].strip()
+    if not rest:
+        return blurb
+    # Geschnitten wird nur, wenn der Rest den Anriss auch wirklich
+    # wiederholt. Ohne diese Probe verstuemmelt ein Klappentext, in dem
+    # "alles anzeigen" als Fliesstext vorkommt: "Die Ausstellung will alles
+    # anzeigen, was die Stadt verbirgt" wurde zu ", was die Stadt verbirgt".
+    # Damit ist der Schnitt verlustfrei **von Bauart**, nicht nur an den 110
+    # gemessenen Faellen.
+    anriss = _WHITESPACE.sub(" ", blurb[: treffer.start()]).strip().rstrip(". …")
+    if not _WHITESPACE.sub(" ", rest).startswith(anriss[:60]):
+        return blurb
+    return rest
 
 
 def is_truncated(blurb: str | None) -> bool:

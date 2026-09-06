@@ -12,6 +12,7 @@ from ebook_watchlist.cleaning import (
     clean_blurb,
     is_truncated,
     preferred_spelling,
+    without_teaser,
 )
 
 # --- Klappentexte ----------------------------------------------------------
@@ -88,3 +89,17 @@ def test_two_different_people_stay_apart() -> None:
 
 def test_nothing_to_choose_from() -> None:
     assert preferred_spelling([]) is None
+
+
+def test_the_cut_only_happens_where_the_text_really_repeats() -> None:
+    """„alles anzeigen" kann auch Fliesstext sein. Ohne Probe schnitt die
+    Regel mitten im Satz und warf den Anfang weg (Ticket 40)."""
+    satz = "Die Ausstellung will alles anzeigen, was die Stadt verbirgt."
+
+    assert without_teaser(satz) == satz
+
+
+def test_the_teaser_goes_where_the_full_text_repeats_it() -> None:
+    doppelt = "Der Anfang ... alles anzeigen expand_more Der Anfang und der Rest."
+
+    assert without_teaser(doppelt) == "Der Anfang und der Rest."

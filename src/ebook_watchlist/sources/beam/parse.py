@@ -305,13 +305,21 @@ def _description(page) -> str | None:
     node = page.select_one(sel.DETAIL_DESCRIPTION)
     if node is None:
         return None
-    voll = node.select_one(sel.DETAIL_DESCRIPTION_FULL)
-    anriss = node.select_one(sel.DETAIL_DESCRIPTION_PREVIEW)
-    gewaehlt = voll if voll is not None else (anriss if anriss is not None else node)
+    # Der erste Knoten, der auch wirklich etwas traegt. Nur auf "ist da" zu
+    # pruefen reichte nicht: ein leerer ``--full``-Knoten haette den
+    # Klappentext ganz verschluckt — und ein Buch ohne Klappentext wird von
+    # ``_with_full_blurbs`` bei **jedem** Lauf erneut geholt.
+    kandidaten = (
+        node.select_one(sel.DETAIL_DESCRIPTION_FULL),
+        node.select_one(sel.DETAIL_DESCRIPTION_PREVIEW),
+        node,
+    )
+    texte = (kandidat.get_text(" ", strip=True) for kandidat in kandidaten if kandidat is not None)
+    gewaehlt = next((text for text in texte if text), "")
     # ``without_teaser`` faengt den Fall ab, dass der Shop die Klassen
     # umbenennt: dann steht wieder beides im Text, und der Schnitt am Knopf
     # ist zwar die schwaechere, aber immer noch verlustfreie Regel.
-    return without_teaser(gewaehlt.get_text(" ", strip=True)) or None
+    return without_teaser(gewaehlt) or None
 
 
 def total_pages(html: str) -> int | None:
