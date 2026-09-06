@@ -55,6 +55,8 @@ class Detail:
     rating: int | None = None
     #: Auf wie vielen Stimmen dieser Schnitt ruht.
     votes: int | None = None
+    #: Der Klappentext. Kostet wie das Titelbild keine eigene Anfrage.
+    blurb: str | None = None
 
     @property
     def availability(self) -> Availability:
@@ -116,6 +118,7 @@ def parse_detail(html: str) -> Detail:
         cover_url=_cover(page),
         rating=_rating(page),
         votes=_votes(page),
+        blurb=_blurb(page),
     )
 
 
@@ -144,6 +147,34 @@ def _votes(page) -> int | None:
         return None
     ziffern = re.sub(r"[^0-9]", "", wert.get_text(" ", strip=True))
     return int(ziffern) if ziffern else None
+
+
+def _blurb(page) -> str | None:
+    """Der Klappentext, den die Onleihe selbst mitliefert (Ticket 56).
+
+    Ein Buch, das nur die Bibliothek fuehrt, hatte bisher keinen: gemessen ueber
+    alle gespeicherten Beobachtungen kamen 2674 Klappentexte aus dem Shop und 0
+    von hier — dabei steht er auf der Seite, die fuer die Verfuegbarkeit ohnehin
+    geholt wird.
+
+    Gegriffen wird das ``dd`` der Beschreibungsliste, nicht der Reiter
+    ``#tabContent_1_``: die Nummer darin ist eine Position und altert so
+    schlecht wie jeder Zaehler im Markup. Der Reiter waere auch zu weit — er
+    haelt die Biografie der Autorin in derselben Lade, in der abgelegten
+    Beispielseite 383 Zeichen davon.
+
+    Abgeschnitten wird nichts: die Beschriftung "Inhalt:" bleibt im ``dt``, und
+    die Pressestimmen, die eine der beiden Seiten voranstellt (584 von 1372
+    Zeichen), sind zu duenn belegt fuer eine Regel — die Guillemets, an denen
+    sie haengen, gebraucht derselbe Text auch fuer den Buchtitel. Die
+    Leerzeichen zieht ``clean_blurb`` zusammen, fuer jede Quelle an einer
+    Stelle (Ticket 16).
+    """
+    label = page.select_one(sel.DETAIL_ABSTRACT)
+    text = label.find_next("dd") if label is not None else None
+    if text is None:
+        return None
+    return text.get_text(" ", strip=True) or None
 
 
 def _cover(page) -> str | None:

@@ -263,3 +263,65 @@ def test_a_page_without_a_rating_block_says_nothing() -> None:
 
     assert detail.rating is None
     assert detail.votes is None
+
+
+def test_the_detail_page_carries_the_blurb() -> None:
+    """Der Klappentext stand die ganze Zeit auf der Seite, die ohnehin fuer die
+    Verfuegbarkeit geholt wird — gelesen hat ihn niemand: 2674 gespeicherte
+    Klappentexte kamen aus dem Shop, 0 aus der Onleihe (Ticket 56).
+
+    Gegriffen wird die Beschreibungsliste, nicht der Reiter ``#tabContent_1_``:
+    dessen Nummer ist eine Position, und der Reiter traegt 383 Zeichen mehr als
+    der Klappentext — die Biografie der Autorin haengt in derselben Lade.
+    """
+    detail = parse.parse_detail(fixture("detail-available.html"))
+
+    assert detail.blurb is not None
+    assert detail.blurb.startswith("»So inspirierend, so lustig")
+    assert detail.blurb.endswith("dass wir alle miteinander verbunden sind.")
+    # Die Beschriftung steht im ``dt``, der Text im ``dd`` — die Wahl des
+    # Knotens erledigt das Praefix "Inhalt: " von selbst.
+    assert "Inhalt:" not in detail.blurb
+    # Die Biografie ist eine eigene Zeile derselben Liste (``dt.author-info``).
+    assert "geboren 1974" not in detail.blurb
+
+
+def test_the_blurb_is_read_on_both_captured_pages() -> None:
+    """Der zweite Beleg — und der ohne Pressestimmen: von den beiden abgelegten
+    Seiten fuehrt nur eine welche, dort 584 von 1372 Zeichen. Zu wenig, um
+    daraus eine Regel zum Abschneiden zu machen; und die Anfuehrungszeichen,
+    an denen sie haengt, gebraucht derselbe Text auch fuer den Buchtitel."""
+    detail = parse.parse_detail(fixture("detail-unavailable.html"))
+
+    assert detail.blurb is not None
+    assert detail.blurb.startswith("Der Anfang der Geschichte um sieben Schwestern")
+    assert "Lucinda Riley wurde in Irland geboren" not in detail.blurb
+
+
+def test_a_page_without_an_abstract_says_nothing() -> None:
+    """Nicht jeder Titel hat einen — dann steht dort auch kein leerer String."""
+    html = (
+        '<html><body><div class="exemplar-count">1</div>'
+        '<div class="availability-count">1</div></body></html>'
+    )
+
+    assert parse.parse_detail(html).blurb is None
+
+
+def test_check_carries_the_blurb_into_the_observation() -> None:
+    """Ein Buch, das nur die Bibliothek fuehrt, hat damit einen Klappentext —
+    ohne eine einzige zusaetzliche Anfrage."""
+    client = StubClient(fixture("detail-available.html"))
+    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    entry = WatchlistEntry(
+        title="Sieben Richtige",
+        author="Volker Jarck",
+        resolved_links={"voebb": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
+    )
+
+    observation = source.check(entry)
+
+    assert observation is not None
+    assert observation.blurb is not None
+    assert observation.blurb.startswith("»So inspirierend, so lustig")
+    assert len(client.requests) == 1

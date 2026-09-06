@@ -1516,6 +1516,12 @@ class Store:
         Ueberschrieben wird nur, was laenger geworden ist: die Kachel einer
         Suchseite traegt einen Anriss, die Detailseite den ganzen Text, und
         welche von beiden zuerst kommt, entscheidet der Zufall des Laufs.
+
+        Seit Ticket 56 liefert auch die Bibliothek einen — zwei *Haeuser* statt
+        zweier Fassungen desselben. Die Regel bleibt trotzdem die alte: 2 von 23
+        zugeordneten Buechern haengen an beiden, und 52 der 53 Buch-Zeilen
+        tragen ueberhaupt keinen Klappentext. Ein Vorrang fuer zwei Faelle waere
+        geraten; gemessen wird er, wenn die Zahl nach dem naechsten Lauf steht.
         """
         gefunden: dict[int, str] = {}
         for observation in observations:

@@ -73,6 +73,12 @@ DETAIL_RATING_FILLED = ".ic_star.active"
 #: Die Anzahl steht in einer eigenen Beschreibungsliste, nicht in den
 #: ``horizontalDescription``-Zeilen wie Autor:in und Reihe.
 DETAIL_VOTES = "dt.user-vote"
+#: Der Klappentext. Der Reiter darueber heisst ``#tabContent_1_`` — eine
+#: Position, kein Name, und er traegt ausserdem die Biografie der Autorin: 1755
+#: Zeichen statt 1372 in der abgelegten Beispielseite. Die Beschreibungsliste
+#: darunter trennt beides sauber, und die Beschriftung "Inhalt:" bleibt im
+#: ``dt`` zurueck, wo sie niemanden stoert.
+DETAIL_ABSTRACT = "dt.abstract"
 #: Bibliographic rows are ``<b>LABEL:</b><span>VALUE</span>`` pairs.
 DESCRIPTION_ROW = "p.horizontalDescription"
 

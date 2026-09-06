@@ -569,6 +569,33 @@ def test_the_longer_blurb_wins(db: Store) -> None:
     assert db.book(buch.id).blurb == "Der ganze Text, viel laenger als der Anriss."
 
 
+def test_two_houses_are_still_settled_by_length(db: Store) -> None:
+    """Seit Ticket 56 liefert auch die Bibliothek einen Klappentext — und damit
+    stellt sich die Frage, wer gewinnt, wenn beide einen haben.
+
+    Sie bleibt vorerst beantwortet wie bisher: der laengere. Gemessen sind es
+    2 von 23 zugeordneten Buechern, die an beiden Haeusern haengen, und 52 der
+    53 Buch-Zeilen tragen ueberhaupt keinen Klappentext. Eine Vorrangregel fuer
+    zwei Faelle waere geraten, nicht gemessen; dieser Test haelt fest, was
+    heute geschieht, damit eine spaetere Regel eine Entscheidung ist und kein
+    Versehen."""
+    from ebook_watchlist.models import MatchReason, Observation
+
+    profile = load_profile()
+    buch = db.find_or_create_book(isbn=None, title="Egal", author="Wer", now=NOW)
+    run_id = db.start_run(profile.slug, "cli", NOW)
+    db.append(run_id, profile.slug, [
+        Observation(source="beam", source_item_id="1", title="Egal", author="Wer",
+                    match_reason=MatchReason.WATCHLIST, book_id=buch.id,
+                    blurb="Der Text des Shops."),
+        Observation(source="voebb", source_item_id="2", title="Egal", author="Wer",
+                    match_reason=MatchReason.WATCHLIST, book_id=buch.id,
+                    blurb="Der Text der Bibliothek, mit Pressestimmen davor."),
+    ], NOW)
+
+    assert db.book(buch.id).blurb == "Der Text der Bibliothek, mit Pressestimmen davor."
+
+
 def test_the_title_can_be_corrected_from_the_book_page(client: TestClient, db: Store) -> None:
     """Bis hierher gab es das Umbenennen nur auf der Watchlist, und dort nur,
     wenn keine Quelle den Titel fand (ADR 27). Es ist aber eine Eigenschaft
