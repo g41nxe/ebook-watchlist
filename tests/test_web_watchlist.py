@@ -111,7 +111,7 @@ def test_a_paused_entry_still_shows_on_the_page(client: TestClient, db: Store) -
 
     body = client.get("/watchlist").text
     assert book.title in body
-    assert "wieder prüfen" in body
+    assert "aktivieren" in body
 
 
 # --- auf eine Art Quelle einschraenken --------------------------------------

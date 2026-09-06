@@ -120,7 +120,7 @@ def test_the_row_menu_holds_the_endings_not_the_setting(
 
     body = client.get("/watchlist").text
 
-    assert "habe ich gekauft" in body
+    assert "im Besitz" in body
     assert "nicht interessant" in body
     assert "Prüfen bei" not in body
 

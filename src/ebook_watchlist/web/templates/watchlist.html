@@ -125,7 +125,14 @@
          die Abschlüsse, und „gekauft" und „nicht interessant" stehen durch
          eine Linie getrennt: sie nehmen den Eintrag aus der Liste
          (docs/research/row-actions-and-overflow-menus.md). #}
-      <details class="relative">
+      {# Ein Menue soll zugehen, wenn man woanders hinklickt — `details` tut
+         das von sich aus nicht. Alpine statt eines eigenen Skripts: lokaler
+         Zustand ohne Serverwissen ist genau seine Haelfte der Arbeitsteilung
+         (ADR 20). Escape schliesst ebenfalls, damit die Tastatur nicht
+         schlechter dasteht als die Maus. #}
+      <details class="relative" x-data
+               @click.outside="$el.open = false"
+               @keydown.escape.window="$el.open = false">
         <summary title="was mit diesem Eintrag geschehen soll"
                  class="cursor-pointer list-none rounded p-1.5 text-soft
                         hover:bg-hair hover:text-ink">
@@ -138,10 +145,10 @@
             <button type="submit"
                     class="tun w-full rounded px-2 py-2 text-left text-xs text-ink
                            hover:bg-hair">
-              {{ 'nicht mehr prüfen' if entry.active else 'wieder prüfen' }}</button>
+              {{ 'pausieren' if entry.active else 'aktivieren' }}</button>
           </form>
           <div class="my-1 border-t border-hair"></div>
-          {% for kind, label in (("owned", "habe ich gekauft"), ("dismissed", "nicht interessant")) %}
+          {% for kind, label in (("owned", "im Besitz"), ("dismissed", "nicht interessant")) %}
           <form method="post" action="/watchlist/{{ entry.book_id }}/abschliessen">
             <input type="hidden" name="kind" value="{{ kind }}">
             <button type="submit"
