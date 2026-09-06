@@ -1,0 +1,148 @@
+"""Ein Lauf für einen Eintrag (Ticket 51).
+
+Wer gerade bestätigt, berichtigt oder aufgenommen hat, wartet nicht bis zum
+nächsten großen Lauf. Am 6.9.2026 traf das dreimal hintereinander — *Dark
+Matter* stand nach dem Bestätigen ohne Preis da, weil der Lauf 43 Minuten
+vorher gelaufen war.
+"""
+
+from __future__ import annotations
+
+import threading
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from ebook_watchlist import paths
+from ebook_watchlist.config import load_profile
+from ebook_watchlist.relations import RelationKind
+from ebook_watchlist.single import Report
+from ebook_watchlist.store import Store
+from ebook_watchlist.web import create_app, recheck
+
+NOW = datetime(2026, 9, 6, 22, 0)
+
+
+@pytest.fixture
+def db(data_dir: Path) -> Store:
+    return Store(paths.db_path())
+
+
+@pytest.fixture
+def client(data_dir: Path) -> TestClient:
+    return TestClient(create_app(), raise_server_exceptions=False, follow_redirects=True)
+
+
+def eintrag(db: Store, titel: str = "Kugelblitz") -> int:
+    buch = db.find_or_create_book(isbn=None, title=titel, author="Cixin Liu", now=NOW)
+    db.put_relation(load_profile().slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+    return buch.id
+
+
+# --- die Zustandsablage ----------------------------------------------------
+
+
+def test_a_check_that_is_running_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    losgelassen = threading.Event()
+    monkeypatch.setattr(recheck, "check_one", lambda book_id: losgelassen.wait(5) or Report())
+    rechecker = recheck.Rechecker()
+    try:
+        zustand = rechecker.start(7, now=NOW)
+        assert zustand.busy
+        assert rechecker.state(7).busy
+    finally:
+        losgelassen.set()
+
+
+def test_a_finished_check_carries_its_report(monkeypatch: pytest.MonkeyPatch) -> None:
+    fertig = threading.Event()
+    monkeypatch.setattr(recheck, "check_one", lambda book_id: Report(trouble="nichts da"))
+    rechecker = recheck.Rechecker()
+
+    rechecker.start(7, now=NOW)
+    for _ in range(100):
+        if not rechecker.state(7).busy:
+            fertig.set()
+            break
+        threading.Event().wait(0.02)
+
+    assert fertig.is_set()
+    assert rechecker.state(7).trouble == "nichts da"
+
+
+def test_a_second_start_does_not_duplicate_a_running_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    losgelassen = threading.Event()
+    monkeypatch.setattr(recheck, "check_one", lambda book_id: losgelassen.wait(5) or Report())
+    rechecker = recheck.Rechecker()
+
+    erst = rechecker.start(7, now=NOW)
+    nochmal = rechecker.start(7, now=NOW)
+
+    assert erst.started_at == nochmal.started_at
+    losgelassen.set()
+
+
+def test_waiting_and_searching_are_told_apart() -> None:
+    """Ein enger Lauf ist nach gemessenen 2,1 s durch. Dauert es länger, hält
+    ein großer Lauf die Sperre — und das ist etwas anderes als „sucht"."""
+    laeuft = recheck.Check(book_id=7, started_at=NOW)
+
+    assert laeuft.label(now=NOW + timedelta(seconds=1)) == "sucht …"
+    assert laeuft.label(now=NOW + timedelta(minutes=2)) == "wartet …"
+
+
+def test_a_check_that_blew_up_does_not_stay_busy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ein Faden, der eine Ausnahme wirft, darf die Zeile nicht ewig auf
+    „sucht …" stehen lassen."""
+
+    def kaputt(book_id: int) -> Report:
+        raise RuntimeError("Zonk")
+
+    monkeypatch.setattr(recheck, "check_one", kaputt)
+    rechecker = recheck.Rechecker()
+
+    rechecker.start(7, now=NOW)
+    for _ in range(100):
+        if not rechecker.state(7).busy:
+            break
+        threading.Event().wait(0.02)
+
+    assert not rechecker.state(7).busy
+    assert "Zonk" in rechecker.state(7).trouble
+
+
+# --- die Zeile -------------------------------------------------------------
+
+
+def test_the_row_asks_again_while_something_runs(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    losgelassen = threading.Event()
+    monkeypatch.setattr(recheck, "check_one", lambda book_id: losgelassen.wait(5) or Report())
+    buch_id = eintrag(db)
+
+    try:
+        body = client.post(f"/watchlist/{buch_id}/nachsehen").text
+    finally:
+        losgelassen.set()
+
+    assert f'hx-get="/watchlist/{buch_id}/nachsehen"' in body
+    assert "every 2s" in body
+
+
+def test_the_row_stops_asking_when_it_is_over(client: TestClient, db: Store) -> None:
+    """Der Trigger steht nur dran, solange etwas läuft — sonst hört die Seite
+    von selbst auf zu fragen (ADR 3, wie `_run_panel.html`)."""
+    buch_id = eintrag(db)
+
+    body = client.get(f"/watchlist/{buch_id}/nachsehen").text
+
+    assert "every 2s" not in body
+
+
+def test_an_unknown_entry_is_not_found(client: TestClient, db: Store) -> None:
+    assert client.get("/watchlist/9999/nachsehen").status_code == 404

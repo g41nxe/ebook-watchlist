@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import shutil
+import socket
 import textwrap
 from pathlib import Path
 
@@ -144,3 +145,53 @@ def data_dir(unseeded_data_dir: Path, schema_template: Path) -> Path:
     shutil.copy(schema_template, unseeded_data_dir / "snapshots.db")
     main(["seed"])
     return unseeded_data_dir
+
+@pytest.fixture(autouse=True)
+def kein_netz(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Kein Test greift nach draußen — außer den ausdrücklich als ``live``
+    markierten.
+
+    Anlass ist Ticket 51: seit die Oberfläche einen engen Lauf in einem Faden
+    anstoßen kann, würde ein Test, der einen Eintrag aufnimmt oder bestätigt,
+    **wirklich** beim Shop anfragen. Das fällt nicht auf — der Faden ist
+    ``daemon``, der Test ist längst grün —, und es steht der stehenden Vorgabe
+    entgegen, sparsam mit den echten Quellen zu sein.
+
+    Geblockt wird an der Steckdose und nicht an einer Bibliothek: was auch
+    immer jemand künftig zum Holen benutzt, kommt hier vorbei. Nur die eigene
+    Maschine bleibt offen — `pytest-xdist` redet über Sockets mit seinen
+    Arbeitern, und der Testklient von FastAPI tut es auch.
+    """
+    if request.node.get_closest_marker("live"):
+        return
+
+    echt = socket.socket.connect
+
+    def nur_hierhin(self: socket.socket, adresse: object, *rest: object) -> object:
+        host = adresse[0] if isinstance(adresse, tuple) else ""
+        if host in ("127.0.0.1", "::1", "localhost", ""):
+            return echt(self, adresse, *rest)
+        raise RuntimeError(
+            f"Dieser Test wollte zu {host!r}. Entweder fehlt eine Attrappe, "
+            "oder er gehoert mit @pytest.mark.live markiert."
+        )
+
+    monkeypatch.setattr(socket.socket, "connect", nur_hierhin)
+
+
+@pytest.fixture(autouse=True)
+def kein_enger_lauf(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Der enge Lauf aus Ticket 51 tut in Tests nichts.
+
+    Er laeuft in einem ``daemon``-Faden, und der ueberlebt den Test, der ihn
+    angestossen hat. Danach greift er auf ``paths.db_path()`` zu — also auf
+    das Datenverzeichnis des **naechsten** Tests — und nimmt unterwegs die
+    Lauf-Sperre. Genau das hat einmal einen Test ueber den Lauf-Knopf
+    umgeworfen, der damit nichts zu tun hatte.
+
+    Wer den engen Lauf pruefen will, setzt hier seine eigene Attrappe ein.
+    """
+    from ebook_watchlist.single import Report
+    from ebook_watchlist.web import recheck
+
+    monkeypatch.setattr(recheck, "check_one", lambda book_id: Report())

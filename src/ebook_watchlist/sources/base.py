@@ -233,6 +233,38 @@ class ResolvingSource(Source):
         """Search for ``entry``. ``None`` means a genuine "not in this catalogue"."""
         return None
 
+    def wants(self, entry: WatchlistEntry) -> bool:
+        """Ob dieser Eintrag an dieser Art Quelle geprueft werden soll.
+
+        ``restrict`` sagt das je Eintrag: "nur Bibliothek", "nur Shop", oder
+        beides. Die Unterklassen sagen, welche der beiden Angaben sie meinen.
+        """
+        return True
+
+    def watch(
+        self, watchlist: Sequence[WatchlistEntry], context: RunContext
+    ) -> list[Observation]:
+        """Nur die Watchlist — ohne Entdeckung.
+
+        Herausgezogen, weil ein Lauf fuer *einen* Eintrag genau diesen Teil
+        braucht und sonst nichts (Ticket 51). Vorher stand die Schleife
+        zweimal da, einmal je Quellenart, und ``collect`` haengte bei einem
+        Shop die Genre-Suche an — dreihundert Funde, wo einer gefragt war.
+        """
+        observations = []
+        for entry in watchlist:
+            if not (entry.active and self.wants(entry)):
+                continue
+            linked = self.linked_entry(entry, context)
+            if linked is None:
+                continue
+            observation = self.check(linked)
+            if observation is not None:
+                observations.append(
+                    dataclasses.replace(observation, book_id=context.book_for(entry))
+                )
+        return observations
+
     def linked_entry(self, entry: WatchlistEntry, context: RunContext) -> WatchlistEntry | None:
         """``entry`` with this Source's link filled in, or ``None`` to skip it."""
         if entry.resolved_links.get(self.name):
@@ -273,22 +305,13 @@ class LibrarySource(ResolvingSource):
     @abstractmethod
     def check(self, entry: WatchlistEntry) -> Observation | None: ...
 
+    def wants(self, entry: WatchlistEntry) -> bool:
+        return entry.check_library
+
     def collect(
         self, profile: Profile, watchlist: Sequence[WatchlistEntry], context: RunContext
     ) -> list[Observation]:
-        observations = []
-        for entry in watchlist:
-            if not (entry.active and entry.check_library):
-                continue
-            linked = self.linked_entry(entry, context)
-            if linked is None:
-                continue
-            observation = self.check(linked)
-            if observation is not None:
-                observations.append(
-                    dataclasses.replace(observation, book_id=context.book_for(entry))
-                )
-        return observations
+        return self.watch(watchlist, context)
 
 
 class ShopSource(ResolvingSource):
@@ -296,6 +319,9 @@ class ShopSource(ResolvingSource):
 
     @abstractmethod
     def check(self, entry: WatchlistEntry) -> Observation | None: ...
+
+    def wants(self, entry: WatchlistEntry) -> bool:
+        return entry.check_shop
 
     def by_author(self, author: str) -> list[Observation]:
         """Everything this shop stocks by one Reference Author."""
@@ -308,18 +334,7 @@ class ShopSource(ResolvingSource):
     def collect(
         self, profile: Profile, watchlist: Sequence[WatchlistEntry], context: RunContext
     ) -> list[Observation]:
-        observations = []
-        for entry in watchlist:
-            if not (entry.active and entry.check_shop):
-                continue
-            linked = self.linked_entry(entry, context)
-            if linked is None:
-                continue
-            observation = self.check(linked)
-            if observation is not None:
-                observations.append(
-                    dataclasses.replace(observation, book_id=context.book_for(entry))
-                )
+        observations = self.watch(watchlist, context)
 
         # Discoveries must not collide with what the Watchlist already covers:
         # two Observations of one item in a single Run would leave the diff with

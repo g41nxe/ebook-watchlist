@@ -30,6 +30,7 @@ from ..relations import RelationKind
 from ..sources import registry
 from ..store import RunRow, Store
 from . import assignments, book, profile_page, triage, watchlist
+from .recheck import Rechecker
 from .runs import RunLauncher, journal_status
 
 STATIC = Path(__file__).parent / "static"
@@ -185,6 +186,7 @@ def create_app() -> FastAPI:
     # das Kind, das wir gestartet und noch nicht im Journal gesehen haben
     # (Ticket 10).
     launcher = RunLauncher()
+    rechecker = Rechecker()
 
     @app.exception_handler(ConfigError)
     def broken_configuration(request: Request, exc: ConfigError) -> HTMLResponse:
@@ -270,18 +272,21 @@ def create_app() -> FastAPI:
 
     @app.post("/watchlist/add")
     def watchlist_add(title: str = Form(...), author: str = Form("")) -> RedirectResponse:
-        # Aufgeloest wird hier nicht: die Oberflaeche scrapt nie (ADR 3). Der
-        # Eintrag steht als "noch nicht gesucht" da, bis ein Lauf ihn ansieht.
+        # Die Anfrage selbst sucht nichts (ADR 3) — sie stoesst einen engen
+        # Lauf an, und der sucht im Hintergrund. "Gesucht wird beim naechsten
+        # Lauf" war die ehrliche Auskunft, solange es nur den grossen gab
+        # (Ticket 51).
         if not title.strip():
             return RedirectResponse("/watchlist", status_code=303)
         profile = load_profile()
-        watchlist.add(
+        book_id = watchlist.add(
             _store_for(paths.db_path()),
             profile.slug,
             title=title,
             author=author,
             now=datetime.now(),
         )
+        rechecker.start(book_id)
         return RedirectResponse("/watchlist", status_code=303)
 
     @app.post("/watchlist/{book_id}/active")
@@ -320,6 +325,46 @@ def create_app() -> FastAPI:
             now=datetime.now(),
         )
         return RedirectResponse(f"/book/{book_id}", status_code=303)
+
+    @app.post("/watchlist/{book_id}/nachsehen")
+    def watchlist_recheck(request: Request, book_id: int) -> HTMLResponse:
+        """Genau diesen einen Eintrag jetzt pruefen (Ticket 51).
+
+        Wer gerade bestaetigt, berichtigt oder aufgenommen hat, wartet sonst
+        bis zum naechsten grossen Lauf — und der kann an diesem Titel schon
+        vorbei sein.
+        """
+        rechecker.start(book_id)
+        return _zeile(request, book_id)
+
+    @app.get("/watchlist/{book_id}/nachsehen")
+    def watchlist_recheck_status(request: Request, book_id: int) -> HTMLResponse:
+        """Dasselbe Fragment, das der POST liefert — htmx fragt hier nach."""
+        return _zeile(request, book_id)
+
+    def _zeile(request: Request, book_id: int) -> HTMLResponse:
+        """Die eine Zeile, frisch gelesen, mit dem Stand ihres engen Laufs.
+
+        Beide Routen liefern genau dieses Fragment, damit Knopf und Anzeige
+        nicht auseinanderlaufen koennen — dieselbe Regel wie beim grossen Lauf.
+        """
+        profile = load_profile()
+        store = _store_for(paths.db_path())
+        eintrag = next(
+            (e for e in watchlist.entries(store, profile) if e.book_id == book_id), None
+        )
+        if eintrag is None:
+            raise HTTPException(status_code=404, detail="kein solcher Eintrag")
+        return TEMPLATES.TemplateResponse(
+            request,
+            "_watchlist_row.html",
+            {
+                "entry": eintrag,
+                "check": rechecker.state(book_id),
+                "now": datetime.now(),
+                "profile": profile,
+            },
+        )
 
     @app.post("/watchlist/{book_id}/abschliessen")
     def watchlist_finish(book_id: int, kind: str = Form(...)) -> RedirectResponse:
@@ -379,7 +424,10 @@ def create_app() -> FastAPI:
         nur ein Vorwurf gewesen.
         """
         store = _store_for(paths.db_path())
-        store.rename_book(book_id, title=title, author=author or None)
+        if store.rename_book(book_id, title=title, author=author or None):
+            # Der Sinn der Berichtigung ist, dass gesucht wird — und zwar
+            # jetzt, nicht beim naechsten grossen Lauf (Ticket 51).
+            rechecker.start(book_id)
         return RedirectResponse("/watchlist", status_code=303)
 
     @app.post("/watchlist/{book_id}/fehlt")
@@ -424,6 +472,9 @@ def create_app() -> FastAPI:
         now = datetime.now()
         if was == "bestaetigen" and url:
             assignments.confirm(store, book_id, source, url, now)
+            # Bestaetigt heisst: die Adresse steht. Der Preis dazu soll nicht
+            # bis zum naechsten grossen Lauf warten (Ticket 51).
+            rechecker.start(book_id)
         elif was == "keiner":
             assignments.reject_all(store, book_id, source, now)
         elif was == "zurueck":
