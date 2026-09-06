@@ -85,11 +85,11 @@ def check_details(key: str, details: dict) -> dict:
     sind Tippfehler, die sich nur durch verändertes Verhalten bemerkbar machten
     — die teuerste Art, einen Fehler zu finden (ADR 18).
     """
-    unknown = set(details) - {"tier", "sources", "note", "restrict"}
+    unknown = set(details) - {"tier", "sources", "note", "restrict", "known_missing"}
     if unknown:
         raise ConfigurationError(
             f"unbekannte Angaben zu {key!r}: {', '.join(sorted(unknown))} "
-            "(bekannt: note, restrict, sources, tier)"
+            "(bekannt: known_missing, note, restrict, sources, tier)"
         )
     restrict = details.get("restrict")
     if restrict is not None and restrict not in RESTRICTIONS:

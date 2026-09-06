@@ -86,6 +86,8 @@ class Entry:
     #: Unter der Schnaeppchen-Grenze. Faerbt den Preis und setzt das
     #: Abzeichen aufs Cover — dieselbe Farbe bedeutet ueberall dasselbe.
     deal: bool = False
+    #: Der Titel, zu dem die Leserin "kenne ich" gesagt hat (ADR 27).
+    known_missing: str | None = None
 
     @property
     def is_bundle(self) -> bool:
@@ -161,6 +163,37 @@ class Entry:
             if state.is_question and state.candidates:
                 return state.name
         return None
+
+    @property
+    def missing(self) -> bool:
+        """Keine der geprueften Quellen kennt diesen Titel (ADR 27).
+
+        `not_found` bleibt sonst eine Antwort und braucht niemanden — hier
+        aber sagt es nichts ueber das Buch, sondern ueber die **Eingabe**.
+        Gemessen am 6.9.: von neun so stehenden Titeln waren sieben schlicht
+        falsch benannt, darunter ein Schnaeppchen zu 2,99 Euro, das einen Tag
+        lang unsichtbar blieb.
+
+        **Alle** Quellen, nicht eine: vierzehn von vierzehn Eintraegen stehen
+        bei der Onleihe auf `not_found`, sie fuehrt die meisten nicht. Eine
+        Meldung je Quelle haette jeden Titel jeden Tag gemeldet — genau der
+        Fehler, den Ticket 04 vermieden hat.
+
+        Ein pausierter Eintrag schweigt: er wird nicht mehr geprueft.
+        """
+        if not self.active or not self.sources:
+            return False
+        return all(state.outcome == LinkOutcome.NOT_FOUND for state in self.sources)
+
+    @property
+    def missing_known(self) -> bool:
+        """Ob die Leserin diese Luecke schon weggeklickt hat.
+
+        Gemerkt wird der **Titel**, nicht das Buch: wer nach einer
+        Umbenennung wieder nichts findet, hoert eine neue Behauptung ueber
+        eine neue Eingabe (ADR 27).
+        """
+        return self.known_missing == self.title
 
     @property
     def unresolved(self) -> bool:
@@ -252,6 +285,7 @@ def entries(
                 cover_file=book.cover_file,
                 sources=states,
                 latest=latest.get(book.id),
+                known_missing=details.get("known_missing"),
                 deal=is_strong_deal(
                     getattr(latest.get(book.id), "price_cents", None), profile
                 ),

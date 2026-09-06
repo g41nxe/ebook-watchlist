@@ -19,6 +19,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     create_engine,
+    delete,
     event,
     func,
     select,
@@ -945,6 +946,35 @@ class Store:
             if row is not None:
                 session.expunge(row)
             return row
+
+    def rename_book(self, book_id: int, *, title: str, author: str | None = None) -> bool:
+        """Den Titel berichtigen, unter dem die Leserin ein Buch fuehrt (ADR 27).
+
+        Umbenannt wird die **bestehende** Zeile. Notiz, Beziehung, Urteile und
+        die ganze Geschichte haengen an ihrer Nummer; ein neu angelegtes Buch
+        liesse all das am alten Eintrag zurueck.
+
+        Die Zuordnungen fallen dabei weg — sie galten fuer den alten Titel und
+        waeren danach eine Behauptung ueber etwas anderes. Damit sucht der
+        naechste Lauf neu, und genau das ist der Zweck der Uebung.
+        """
+        blank = title.strip()
+        if not blank:
+            return False
+        with self.session() as session:
+            row = session.get(BookRow, book_id)
+            if row is None:
+                return False
+            if row.title == blank and (author is None or row.author == author):
+                return False
+            row.title = blank
+            if author is not None:
+                row.author = author.strip() or None
+            session.execute(
+                delete(BookSourceRow).where(BookSourceRow.book_id == book_id)
+            )
+            session.commit()
+            return True
 
     def books(self) -> list[BookRow]:
         with self.session() as session:

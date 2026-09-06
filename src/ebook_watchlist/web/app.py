@@ -11,6 +11,7 @@ password in front of it before exposing it anywhere else.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -333,6 +334,45 @@ def create_app() -> FastAPI:
             resolved_at=datetime.now(),
             reason="von Hand bestätigt",
         )
+        return RedirectResponse("/watchlist", status_code=303)
+
+    @app.post("/watchlist/{book_id}/umbenennen")
+    def watchlist_rename(
+        book_id: int, title: str = Form(...), author: str = Form("")
+    ) -> RedirectResponse:
+        """Den Titel berichtigen, unter dem ein Buch gefuehrt wird (ADR 27).
+
+        Die erste Bearbeitungsmoeglichkeit, die die Watchlist ueberhaupt hat.
+        Sieben Titel mussten am 6.9. korrigiert werden, und jede einzelne
+        Korrektur lief ueber SQL von Hand — ein Hinweis ohne Abhilfe waere
+        nur ein Vorwurf gewesen.
+        """
+        store = _store_for(paths.db_path())
+        store.rename_book(book_id, title=title, author=author or None)
+        return RedirectResponse("/watchlist", status_code=303)
+
+    @app.post("/watchlist/{book_id}/fehlt")
+    def watchlist_missing(book_id: int, title: str = Form(...)) -> RedirectResponse:
+        """„Kenne ich" — und das haelt.
+
+        Gemerkt wird der Titel, nicht das Buch: nach einer Umbenennung ist es
+        eine neue Behauptung ueber eine neue Eingabe, und der Hinweis kommt
+        wieder (ADR 27).
+        """
+        store = _store_for(paths.db_path())
+        profile = load_profile()
+        kind = str(RelationKind.WATCHING)
+        vorhanden = next(
+            (
+                relation
+                for relation in store.relations_of(profile.slug, book_id)
+                if relation.kind == kind
+            ),
+            None,
+        )
+        details = json.loads(vorhanden.details or "{}") if vorhanden else {}
+        details["known_missing"] = title
+        store.set_relation_details(profile.slug, book_id, kind, details, now=datetime.now())
         return RedirectResponse("/watchlist", status_code=303)
 
     @app.post("/watchlist/{book_id}/zuordnen")

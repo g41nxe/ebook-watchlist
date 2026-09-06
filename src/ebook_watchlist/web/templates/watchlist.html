@@ -147,6 +147,54 @@
     </div>
     </div>
 
+    {% if entry.missing and not entry.missing_known %}
+    {# Keine Quelle kennt diesen Titel — und den hast du selbst geschrieben.
+       Das sagt nichts ueber das Buch, sondern ueber die Eingabe: von neun so
+       stehenden Titeln waren am 6.9. sieben schlicht falsch benannt (ADR 27).
+       Ruhiger als die Zuordnung: hier ist nichts zu entscheiden, nur etwas zu
+       berichtigen. #}
+    <details class="w-full pl-15">
+      <summary class="inline-flex cursor-pointer list-none items-center gap-1.5
+                      rounded py-1 text-xs text-soft hover:text-ink
+                      hover:underline underline-offset-2">
+        <svg class="i"><use href="#ic-warn"/></svg>
+        Keine Quelle kennt diesen Titel
+      </summary>
+
+      <div class="mt-1 rounded-lg border border-rule bg-paper p-3">
+        <p class="mb-2 max-w-lg text-xs text-soft">
+          Oft stimmt der Titel nicht — ein Originaltitel, eine Beschreibung
+          statt eines Namens, ein Wort daneben. Steht er anders im Laden?
+        </p>
+        <form method="post" action="/watchlist/{{ entry.book_id }}/umbenennen"
+              class="flex flex-wrap items-end gap-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-[11px] font-medium text-soft">Titel</span>
+            <input name="title" required autocomplete="off" value="{{ entry.title }}"
+                   class="w-64 rounded border border-rule bg-card px-2 py-1.5 text-sm
+                          text-ink outline-none focus:border-accent">
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-[11px] font-medium text-soft">Autor:in</span>
+            <input name="author" autocomplete="off" value="{{ entry.author or '' }}"
+                   class="w-52 rounded border border-rule bg-card px-2 py-1.5 text-sm
+                          text-ink outline-none focus:border-accent">
+          </label>
+          <button type="submit"
+                  class="tun rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm
+                         font-medium text-accent hover:bg-accent/25">Aktualisieren</button>
+        </form>
+        <form method="post" action="/watchlist/{{ entry.book_id }}/fehlt" class="mt-2">
+          <input type="hidden" name="title" value="{{ entry.title }}">
+          <button type="submit"
+                  class="text-xs text-soft underline underline-offset-2 hover:text-ink"
+                  title="Der Titel stimmt — das Buch gibt es dort nicht. Nach einer
+                         Umbenennung wird wieder gefragt">stimmt so, gibt es dort nicht</button>
+        </form>
+      </div>
+    </details>
+    {% endif %}
+
     {% if entry.needs_choice %}
     {# Entschieden wird hier, nicht auf einer eigenen Seite: der Titel, wie du
        ihn geschrieben hast, steht direkt darueber, und genau der hilft beim
