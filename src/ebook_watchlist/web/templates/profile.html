@@ -12,12 +12,43 @@
   und warum, steht unten.
 </p>
 
-<div class="flex flex-wrap gap-x-8 gap-y-3 rounded-lg border border-rule bg-card px-5 py-4">
-  {% for label, number in view.counts %}
-  <div>
-    <div class="font-serif text-xl font-semibold tabular-nums">{{ number }}</div>
-    <div class="text-xs text-soft">{{ label }}</div>
+{# Die Zahlen bleiben der Ueberblick — dahinter stehen jetzt die Buecher.
+   Bis Ticket 49 stand hier nur die Zahl, und was Ticket 48 aus der Watchlist
+   entfernt, war danach nur ueber seine Buch-Nummer zu finden.
+
+   Alpine statt fuenf `details`: die Zahlen sollen ihr Raster behalten, und
+   die Liste soll darunter in voller Breite aufgehen statt in einer Spalte
+   (ADR 20 — lokaler Zustand ohne Serverwissen). #}
+<div x-data="{ offen: null }"
+     class="rounded-lg border border-rule bg-card px-5 py-4">
+  <div class="flex flex-wrap gap-x-8 gap-y-3">
+    {% for regal in view.counts %}
+    <button type="button" class="text-left"
+            :class="offen === '{{ regal.kind }}' ? 'text-accent' : ''"
+            @click="offen = offen === '{{ regal.kind }}' ? null : '{{ regal.kind }}'"
+            {{ 'disabled' if not regal.count }}>
+      <div class="font-serif text-xl font-semibold tabular-nums">{{ regal.count }}</div>
+      <div class="text-xs {{ 'text-soft' if regal.count else 'text-rule' }}">{{ regal.label }}</div>
+    </button>
+    {% endfor %}
   </div>
+
+  {% for regal in view.counts %}
+  {% if regal.count %}
+  <div x-show="offen === '{{ regal.kind }}'" x-cloak
+       class="mt-4 border-t border-hair pt-3">
+    <p class="mb-2 text-[11px] tracking-wide text-soft uppercase">{{ regal.label }}</p>
+    <ul class="divide-y divide-hair">
+      {% for buch in regal.books %}
+      <li class="flex items-baseline justify-between gap-3 py-1.5">
+        <a href="/book/{{ buch.book_id }}"
+           class="truncate text-sm hover:underline underline-offset-2">{{ buch.title }}</a>
+        <span class="shrink-0 truncate text-xs text-soft">{{ buch.author or "unbekannt" }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
   {% endfor %}
 </div>
 

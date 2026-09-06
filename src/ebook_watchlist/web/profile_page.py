@@ -59,10 +59,42 @@ class Interest:
 
 
 @dataclass(frozen=True, slots=True)
+class Held:
+    """Ein Buch, wie es in einer der Regale steht."""
+
+    book_id: int
+    title: str
+    author: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class Shelf:
+    """Eine Beziehungsart mit den Buechern dahinter (Ticket 49).
+
+    Bis dahin stand hier nur eine Zahl. Solange nichts die Watchlist verliess,
+    reichte das; seit Ticket 48 verlaesst sie etwas, und ohne diesen Rueckweg
+    waere ein Buch nach einem Klick auf "im Besitz" nur noch ueber seine
+    Nummer zu finden.
+    """
+
+    kind: str
+    label: str
+    books: tuple[Held, ...]
+
+    @property
+    def count(self) -> int:
+        return len(self.books)
+
+    def __iter__(self):
+        """Damit die alte Entpackung ``label, number`` weiter funktioniert."""
+        return iter((self.label, self.count))
+
+
+@dataclass(frozen=True, slots=True)
 class Overview:
     authors: tuple[Interest, ...]
     themen: tuple[Interest, ...]
-    counts: tuple[tuple[str, int], ...]
+    counts: tuple[Shelf, ...]
     strong_deal: str
     deal: str
     min_discount: int
@@ -112,8 +144,25 @@ def build(store: Store, profile: Profile) -> Overview:
             if row.key == key
         )
 
+    # Nicht nur die Zahl, sondern die Buecher dahinter: was Ticket 48 aus der
+    # Watchlist entfernt, war sonst nur ueber die Buch-Adresse zu finden, und
+    # die muss man kennen (Ticket 49).
+    #
+    # Nur lesen. Die fuenf Knoepfe stehen auf der Buchseite, und eine dritte
+    # Stelle, an der Beziehungen geschrieben werden, waere eine zu viel.
+    #
+    # Ohne Titelbild: von 53 Buechern haben 13 eine Bilddatei, eine Bildliste
+    # bestuende zu drei Vierteln aus Platzhaltern.
     counts = tuple(
-        (label, len(store.relations(profile.slug, kind=kind)))
+        Shelf(
+            kind=kind,
+            label=label,
+            books=tuple(
+                Held(book_id=buch.id, title=buch.title, author=buch.author)
+                for row in store.relations(profile.slug, kind=kind)
+                if (buch := store.book(row.book_id)) is not None
+            ),
+        )
         for kind, label in _RELATION_LABELS
     )
 

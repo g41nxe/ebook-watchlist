@@ -129,3 +129,64 @@ def test_neither_document_is_shown_as_a_python_object(client: TestClient) -> Non
 
     assert "Scheme(" not in body
     assert "withhold_from" not in body
+
+
+# --- die Bücher hinter den Zahlen (Ticket 49) -------------------------------
+
+
+def besessen(db: Store, titel: str, autor: str = "Wer Auch Immer") -> int:
+    buch = db.find_or_create_book(isbn=None, title=titel, author=autor, now=NOW)
+    db.put_relation(load_profile().slug, buch.id, str(RelationKind.OWNED), now=NOW)
+    return buch.id
+
+
+def test_a_count_carries_the_books_behind_it(client: TestClient, db: Store) -> None:
+    """Bis Ticket 49 stand hier nur eine Zahl. Seit Ticket 48 verlässt etwas die
+    Watchlist — ohne diesen Rückweg wäre es nur über seine Nummer zu finden."""
+    buch_id = besessen(db, "Cold Eternity", "S.A. Barnes")
+
+    body = client.get("/profil").text
+
+    assert "Cold Eternity" in body
+    assert f'/book/{buch_id}"' in body
+
+
+def test_the_number_still_says_how_many(client: TestClient, db: Store) -> None:
+    besessen(db, "Cold Eternity")
+    besessen(db, "Providence")
+
+    regal = next(r for r in view.build(db, load_profile()).counts if r.kind == "owned")
+
+    assert regal.count == 2
+    assert [b.title for b in regal.books] == ["Cold Eternity", "Providence"]
+
+
+def test_an_empty_shelf_cannot_be_opened(client: TestClient, db: Store) -> None:
+    """Ein Regal ohne Bücher aufzuklappen zeigt nichts — der Knopf ist dann aus."""
+    body = client.get("/profil").text
+
+    assert "disabled" in body
+
+
+def test_the_shelves_stay_read_only(client: TestClient, db: Store) -> None:
+    """Die fünf Knöpfe stehen auf der Buchseite. Eine dritte Stelle, an der
+    Beziehungen geschrieben werden, wäre eine zu viel (Ticket 49)."""
+    besessen(db, "Cold Eternity")
+
+    body = client.get("/profil").text
+
+    assert "<form" not in body
+
+
+def test_a_relation_to_a_vanished_book_is_skipped(client: TestClient, db: Store) -> None:
+    """Eine Beziehung ohne Buch-Zeile darf die Seite nicht sprengen."""
+    buch_id = besessen(db, "Verschwunden")
+    with db.session() as session:
+        from ebook_watchlist.store import BookRow
+
+        session.delete(session.get(BookRow, buch_id))
+        session.commit()
+
+    regal = next(r for r in view.build(db, load_profile()).counts if r.kind == "owned")
+
+    assert regal.count == 0
