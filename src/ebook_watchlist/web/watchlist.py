@@ -45,6 +45,11 @@ class SourceState:
     category: str = "shop"
     #: Wie sie der Leserin gegenueber heisst.
     display: str = "Shop"
+    #: Die Ausgaben, die der Matcher nicht auseinanderhalten konnte, und
+    #: die schon abgelehnten. Beide ohne Preis: bei einer Bestaetigung geht
+    #: es um Identitaet, nicht um ein Angebot (Ticket 41).
+    candidates: tuple = ()
+    rejected: tuple = ()
 
     @property
     def is_question(self) -> bool:
@@ -118,6 +123,46 @@ class Entry:
         return self.latest.observed_at.strftime("%d.%m. %H:%M")
 
     @property
+    def candidates(self) -> tuple:
+        """Die Ausgaben, die es sein koennten — leer, wenn alles klar ist.
+
+        Entschieden wird **hier**, nicht auf einer eigenen Seite: der Titel,
+        wie die Leserin ihn geschrieben hat, steht dann eine Zeile darueber,
+        und genau der hilft beim Erkennen (Ticket 41).
+        """
+        for state in self.sources:
+            if state.is_question and state.candidates:
+                return state.candidates
+        return ()
+
+    @property
+    def rejected(self) -> tuple:
+        """Was schon abgelehnt wurde — zum Zuruecknehmen."""
+        for state in self.sources:
+            if state.is_question and state.rejected:
+                return state.rejected
+        return ()
+
+    @property
+    def needs_choice(self) -> bool:
+        """Ob hier eine Entscheidung ansteht.
+
+        Ein **pausierter** Eintrag fragt nicht: er wird nicht mehr geprueft,
+        also ist seine Zuordnung auch keine offene Frage. Auf der eigenen
+        Seite filterte das die Abfrage; in der Liste steht er weiter da, nur
+        ausgegraut.
+        """
+        return self.active and bool(self.candidates)
+
+    @property
+    def choice_source(self) -> str | None:
+        """Welche Quelle fragt — die Entscheidung gilt fuer sie."""
+        for state in self.sources:
+            if state.is_question and state.candidates:
+                return state.name
+        return None
+
+    @property
     def unresolved(self) -> bool:
         """Noch kein Lauf hat dieses Buch angesehen.
 
@@ -125,6 +170,43 @@ class Entry:
         Beziehung, und der nächste Lauf löst auf.
         """
         return not self.sources
+
+
+def _candidates(details: dict, url: str | None, *, abgelehnt: bool) -> tuple:
+    """Die Kandidaten aus einer ``book_source``-Zeile, geteilt in offen und
+    abgelehnt."""
+    from .assignments import Candidate, _cover_file
+
+    weg = set(details.get("rejected") or [])
+    roh_liste = details.get("candidates")
+    if not roh_liste and details.get("matched_title"):
+        # Rueckfall fuer Zeilen aus der Zeit vor der Kandidatenliste: sie
+        # tragen nur den Sieger. Ohne das hoerten sie stillschweigend auf zu
+        # fragen — der teuerste denkbare Weg, eine Entscheidung zu verlieren.
+        roh_liste = [
+            {
+                "title": details["matched_title"],
+                "author": details.get("matched_author"),
+                "url": url,
+                "cover_url": None,
+            }
+        ]
+    aus = []
+    for roh in roh_liste or []:
+        url = roh.get("url")
+        ist_weg = bool(url) and url in weg
+        if ist_weg is not abgelehnt:
+            continue
+        aus.append(
+            Candidate(
+                title=roh.get("title") or "ohne Titel",
+                author=roh.get("author"),
+                url=url,
+                cover_file=_cover_file(roh.get("cover_url")),
+                rejected=ist_weg,
+            )
+        )
+    return tuple(aus)
 
 
 def entries(
@@ -154,6 +236,8 @@ def entries(
                 reason=_details(link).get("reason", ""),
                 category=registry.category(profile, link.source),
                 display=registry.label(profile, link.source),
+                candidates=_candidates(_details(link), link.url, abgelehnt=False),
+                rejected=_candidates(_details(link), link.url, abgelehnt=True),
             )
             for link in store.book_sources(book.id)
         )

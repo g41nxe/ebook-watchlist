@@ -188,7 +188,9 @@ def test_an_unsure_link_asks_for_a_decision(client: TestClient, db: Store) -> No
 
     body = client.get("/watchlist").text
     assert "Die sieben Schwestern - Band 2" in body
-    assert "Das ist es" in body
+    # Die Karte traegt jetzt den Titel selbst; "Das ist es" gab es, als es
+    # genau eine Option gab (Ticket 41).
+    assert "Welche Ausgabe ist es?" in body
 
 
 def test_a_not_found_link_asks_nobody(client: TestClient, db: Store) -> None:

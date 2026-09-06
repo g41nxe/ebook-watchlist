@@ -33,6 +33,27 @@
   <span class="text-xs text-soft">gesucht wird beim nächsten Lauf</span>
 </form>
 
+{# Die Kopfleiste sagt, dass etwas offen ist, und ist gleichzeitig der Filter
+   dorthin. Entschieden wird trotzdem in der Zeile — der Titel, wie du ihn
+   geschrieben hast, steht dann direkt darüber (Ticket 41). #}
+{% if offene_wahl %}
+<div class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger/30
+            bg-danger/5 px-3 py-2">
+  <svg class="i text-danger"><use href="#ic-warn"/></svg>
+  <span class="text-sm">
+    {{ offene_wahl }}
+    {%- if offene_wahl == 1 %} Zuordnung braucht{% else %} Zuordnungen brauchen{% endif %}
+    deine Entscheidung</span>
+  <a href="{{ '/watchlist' if nur_unklar else '/watchlist?nur=unklar' }}"
+     class="ml-auto rounded border border-rule bg-card px-2.5 py-1 text-xs font-medium
+            hover:border-accent hover:text-accent">
+    {{ 'alle zeigen' if nur_unklar else 'nur diese zeigen' }}</a>
+</div>
+{% elif nur_unklar %}
+<p class="mb-4 rounded-lg border border-rule bg-card px-3 py-2 text-sm text-soft">
+  Nichts offen — <a href="/watchlist" class="text-accent underline">alle zeigen</a>.</p>
+{% endif %}
+
 {% if not entries %}
 <p class="py-3 text-sm text-soft italic">Noch nichts auf der Watchlist.</p>
 {% endif %}
@@ -127,29 +148,66 @@
     </div>
   </li>
 
-  {% for state in entry.sources if state.is_question %}
-  {# Der Vorgang, der im Texteditor wie im Gespräch gleichermaßen schlecht ist:
-     eine URL suchen und irgendwo hineinkleben. Hier ist es ein Klick. #}
-  <li class="pb-3">
-    <form method="post" action="/watchlist/{{ entry.book_id }}/confirm"
-          class="ml-15 rounded border border-danger/30 bg-danger/5 p-2 text-xs">
-      <input type="hidden" name="source" value="{{ state.name }}">
-      <p class="mb-1 text-ink">
-        {{ state.display }} ist unsicher{% if state.reason %} — {{ state.reason }}{% endif %}
-      </p>
-      {% if state.matched_title %}
-      <label class="flex items-center gap-2">
-        <input type="radio" name="url" value="{{ state.url or '' }}" required>
-        <span>„{{ state.matched_title }}“{% if state.matched_author %},
-          {{ state.matched_author }}{% endif %}</span>
-      </label>
+  {% if entry.needs_choice %}
+  {# Entschieden wird hier, nicht auf einer eigenen Seite: der Titel, wie du
+     ihn geschrieben hast, steht eine Zeile darüber, und genau der hilft beim
+     Erkennen. Welche Ausgabe gemeint ist, ist eine Frage ans Auge — deshalb
+     das Titelbild (Ticket 41). #}
+  <li class="pb-4">
+    <div class="ml-15 border-l-2 border-danger/30 pl-3">
+      <p class="mb-1.5 text-xs text-soft">Welche Ausgabe ist es?</p>
+      <div class="flex flex-wrap items-stretch gap-2">
+        {% for kandidat in entry.candidates %}
+        <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen"
+              class="contents">
+          <input type="hidden" name="source" value="{{ entry.choice_source }}">
+          <input type="hidden" name="url" value="{{ kandidat.url or '' }}">
+          <button type="submit" name="was" value="bestaetigen"
+                  class="flex max-w-xs items-center gap-2 rounded border border-rule
+                         bg-card p-1.5 pr-3 text-left hover:border-accent
+                         hover:bg-accent/5">
+            {{ cover(kandidat.title, kandidat.cover_file, false, false) }}
+            <span class="min-w-0">
+              <span class="block truncate text-sm font-medium">{{ kandidat.title }}</span>
+              {% if kandidat.is_bundle %}
+              <span class="rounded bg-amber/15 px-1.5 py-0.5 text-[11px] font-medium
+                           text-amber">
+                {% if kandidat.volumes %}{{ kandidat.volumes | length }} Bände
+                {% else %}Sammelausgabe{% endif %}</span>
+              {% endif %}
+              <span class="block truncate text-xs text-soft">
+                {{ kandidat.author or "unbekannt" }}</span>
+            </span>
+          </button>
+          <button type="submit" name="was" value="ablehnen" title="Der ist es nicht"
+                  class="self-stretch rounded border border-dashed border-rule px-2
+                         text-xs text-soft hover:border-danger hover:text-danger"
+                  >✕</button>
+        </form>
+        {% endfor %}
+      </div>
+      {% if entry.rejected %}
+      <details class="mt-2">
+        <summary class="cursor-pointer text-xs text-soft hover:text-ink">
+          {{ entry.rejected | length }} abgelehnt</summary>
+        <div class="mt-1 flex flex-wrap gap-2">
+          {% for kandidat in entry.rejected %}
+          <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen">
+            <input type="hidden" name="source" value="{{ entry.choice_source }}">
+            <input type="hidden" name="url" value="{{ kandidat.url or '' }}">
+            <button type="submit" name="was" value="zurueck"
+                    title="Ablehnung zurücknehmen"
+                    class="rounded border border-rule px-2 py-1 text-xs text-soft
+                           line-through hover:border-accent hover:text-accent
+                           hover:no-underline">{{ kandidat.title }}</button>
+          </form>
+          {% endfor %}
+        </div>
+      </details>
       {% endif %}
-      <button type="submit"
-              class="mt-2 rounded border border-rule bg-card px-2 py-1 font-medium
-                     hover:border-accent hover:text-accent">Das ist es</button>
-    </form>
+    </div>
   </li>
-  {% endfor %}
+  {% endif %}
   {% endfor %}
 </ul>
 {% endblock %}

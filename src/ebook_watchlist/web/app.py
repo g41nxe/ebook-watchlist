@@ -234,25 +234,32 @@ def create_app() -> FastAPI:
 
     # --- Watchlist (Ticket 06) ---------------------------------------------
 
-    def _watchlist_page(request: Request, message: str | None = None) -> HTMLResponse:
+    def _watchlist_page(
+        request: Request, message: str | None = None, nur: str = ""
+    ) -> HTMLResponse:
         profile = load_profile()
         store = _store_for(paths.db_path())
+        alle = watchlist.entries(store, profile)
+        offen = sum(1 for eintrag in alle if eintrag.needs_choice)
+        nur_unklar = nur == "unklar"
         return TEMPLATES.TemplateResponse(
             request,
             "watchlist.html",
             {
                 "profile": profile,
                 "asset_version": asset_version(),
-                "entries": watchlist.entries(store, profile),
+                "entries": [e for e in alle if e.needs_choice] if nur_unklar else alle,
                 "restrictions": watchlist.RESTRICTIONS,
                 "message": message,
+                "offene_wahl": offen,
+                "nur_unklar": nur_unklar,
             },
         )
 
     @app.get("/watchlist", response_class=HTMLResponse)
-    def watchlist_page(request: Request) -> HTMLResponse:
+    def watchlist_page(request: Request, nur: str = "") -> HTMLResponse:
         try:
-            return _watchlist_page(request)
+            return _watchlist_page(request, nur=nur)
         except ConfigError as exc:
             return TEMPLATES.TemplateResponse(
                 request,
@@ -328,29 +335,19 @@ def create_app() -> FastAPI:
         )
         return RedirectResponse("/watchlist", status_code=303)
 
-    # --- Zuordnungen entscheiden (Ticket 41) -------------------------------
-
-    @app.get("/zuordnungen", response_class=HTMLResponse)
-    def assignments_page(request: Request) -> HTMLResponse:
-        profile = load_profile()
-        return TEMPLATES.TemplateResponse(
-            request,
-            "assignments.html",
-            {
-                "profile": profile,
-                "asset_version": asset_version(),
-                "pile": assignments.open_questions(_store_for(paths.db_path()), profile),
-            },
-        )
-
-    @app.post("/zuordnungen/{book_id}/waehlen")
-    def assignments_choose(
+    @app.post("/watchlist/{book_id}/zuordnen")
+    def watchlist_assign(
         book_id: int,
         source: str = Form(...),
         url: str = Form(""),
         was: str = Form(...),
     ) -> RedirectResponse:
-        """Bestaetigen, ablehnen, oder eine Ablehnung zuruecknehmen."""
+        """Bestaetigen, ablehnen, oder eine Ablehnung zuruecknehmen.
+
+        Auf der Watchlist und nicht auf einer eigenen Seite: der Titel, wie die
+        Leserin ihn geschrieben hat, steht beim Entscheiden direkt darueber
+        (Ticket 41).
+        """
         store = _store_for(paths.db_path())
         now = datetime.now()
         if was == "bestaetigen" and url:
@@ -359,7 +356,7 @@ def create_app() -> FastAPI:
             assignments.reject(store, book_id, source, url, now)
         elif was == "zurueck" and url:
             assignments.restore(store, book_id, source, url, now)
-        return RedirectResponse("/zuordnungen", status_code=303)
+        return RedirectResponse("/watchlist?nur=unklar", status_code=303)
 
 
     # --- Buchseite (Ticket 07) ---------------------------------------------
