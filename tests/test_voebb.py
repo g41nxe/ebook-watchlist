@@ -305,7 +305,7 @@ def test_a_page_without_an_abstract_says_nothing() -> None:
         '<div class="availability-count">1</div></body></html>'
     )
 
-    assert parse.parse_detail(html).blurb is None
+    assert parse._blurb(parse.soup(html)) is None
 
 
 def test_check_carries_the_blurb_into_the_observation() -> None:
@@ -325,3 +325,17 @@ def test_check_carries_the_blurb_into_the_observation() -> None:
     assert observation.blurb is not None
     assert observation.blurb.startswith("»So inspirierend, so lustig")
     assert len(client.requests) == 1
+
+
+def test_an_abstract_without_its_own_text_stays_empty() -> None:
+    """`dt.abstract` ohne eigenes `dd` darf sich nicht am naechstbesten
+    bedienen: `find_next` laeuft durch das ganze Dokument weiter und holte
+    sonst den Text einer fremden Liste — im Zweifel die Biografie, die genau
+    deshalb nicht ueber den Reiter gegriffen wird."""
+    html = """<html><body>
+      <dl><dt class="abstract">Inhalt:</dt></dl>
+      <dl><dt class="author-info">Ueber die Autorin:</dt>
+          <dd>Geboren 1968 in Oslo, lebt in Berlin.</dd></dl>
+    </body></html>"""
+
+    assert parse._blurb(parse.soup(html)) is None

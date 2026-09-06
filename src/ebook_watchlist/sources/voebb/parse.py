@@ -171,7 +171,11 @@ def _blurb(page) -> str | None:
     Stelle (Ticket 16).
     """
     label = page.select_one(sel.DETAIL_ABSTRACT)
-    text = label.find_next("dd") if label is not None else None
+    # Das eigene ``dd``, nicht das naechstbeste: ``find_next`` laeuft durch das
+    # ganze Dokument weiter und holte bei einer Beschriftung ohne eigenen Text
+    # den Inhalt einer fremden Liste - im Zweifel die Biografie, um die es
+    # hier gerade nicht geht.
+    text = label.find_next_sibling("dd") if label is not None else None
     if text is None:
         return None
     return text.get_text(" ", strip=True) or None

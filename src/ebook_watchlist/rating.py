@@ -278,7 +278,10 @@ def _facts(observation: Observation) -> list[str]:
     if observation.price_cents is not None:
         facts.append(f"Preis: {observation.price_cents / 100:.2f} EUR")
     if observation.blurb:
-        cut = " (vom Shop abgeschnitten)" if is_truncated(observation.blurb) else ""
+        # Nicht mehr "vom Shop": seit Ticket 56 liefert auch die Bibliothek einen
+        # Klappentext, und dem Modell eine falsche Herkunft zu nennen ist
+        # schlimmer, als die Herkunft wegzulassen.
+        cut = " (von der Quelle abgeschnitten)" if is_truncated(observation.blurb) else ""
         facts.append(f"Klappentext{cut}: {observation.blurb}")
     return facts
 
