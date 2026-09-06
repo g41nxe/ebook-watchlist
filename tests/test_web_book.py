@@ -586,17 +586,16 @@ def test_the_title_can_be_corrected_from_the_book_page(client: TestClient, db: S
     assert db.get_book_source(buch.id, "beam") is None
 
 
-def test_the_note_can_be_written_and_cleared(client: TestClient, db: Store) -> None:
-    """Ersetzen, nicht ergänzen: sonst ließe sich eine Notiz schreiben, aber
-    nie wieder löschen."""
+def test_editing_the_title_leaves_the_note_alone(client: TestClient, db: Store) -> None:
+    """Die Notiz geht in keine Entscheidung ein und kommt aus `notes:` in der
+    Watchlist-Datei — das Formular fasst sie deshalb nicht an. Fasste es sie
+    doch an, loeschte jedes Berichtigen sie still mit."""
     profile = load_profile()
     buch = db.find_or_create_book(isbn=None, title="Egal", author="Wer", now=NOW)
     db.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+    db.set_relation_details(profile.slug, buch.id, str(RelationKind.WATCHING),
+                            {"note": 'Band 1, Originaltitel "Market Forces".'}, now=NOW)
 
-    client.post(f"/book/{buch.id}/bearbeiten",
-                data={"title": "Egal", "author": "Wer", "note": "Band 1."})
-    assert view.build(db, profile, buch.id).note == "Band 1."
+    client.post(f"/book/{buch.id}/bearbeiten", data={"title": "Anders", "author": "Wer"})
 
-    client.post(f"/book/{buch.id}/bearbeiten",
-                data={"title": "Egal", "author": "Wer", "note": ""})
-    assert view.build(db, profile, buch.id).note is None
+    assert view.build(db, profile, buch.id).note == 'Band 1, Originaltitel "Market Forces".'

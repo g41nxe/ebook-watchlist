@@ -184,14 +184,18 @@
 {% endif %}
 
 {% if page.watching %}
-{# Titel, Autor:in und Notiz an einer Stelle. Bis hierher gab es das
-   Umbenennen nur auf der Watchlist, und dort nur, wenn keine Quelle den Titel
-   fand (ADR 27) — es ist aber eine Eigenschaft *dieses Buchs*, und die Notiz
-   erst recht. Zugeklappt, weil man es selten braucht. #}
-<details id="berichtigen" class="mt-6">
+{# Bis hierher gab es das Umbenennen nur auf der Watchlist, und dort nur,
+   wenn keine Quelle den Titel fand (ADR 27) — es ist aber eine Eigenschaft
+   *dieses Buchs*. Zugeklappt, weil man es selten braucht.
+
+   Die Notiz steht hier bewusst nur zum Lesen: sie geht in keine Entscheidung
+   ein (weder Suche noch Zuordnung noch Bewertung), und sie kommt aus
+   `notes:` in der Watchlist-Datei. Ein Feld, das sie ueberschreibt, liesse
+   Datei und Datenbank auseinanderlaufen — fuer nichts. #}
+<details id="berichtigen" class="mt-2">
   <summary class="inline-flex cursor-pointer list-none items-center gap-1.5 rounded py-1
                   text-xs text-soft hover:text-ink hover:underline underline-offset-2">
-    <svg class="i"><use href="#ic-doc"/></svg>Titel, Autor:in und Notiz ändern
+    <svg class="i"><use href="#ic-doc"/></svg>Titel und Autor:in ändern
   </summary>
   <form method="post" action="/book/{{ page.book_id }}/bearbeiten"
         class="mt-2 flex flex-wrap items-end gap-3 rounded-lg border border-rule bg-card p-4">
@@ -207,15 +211,16 @@
              class="w-48 rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink
                     outline-none focus:border-accent">
     </label>
-    <label class="flex flex-1 flex-col gap-1">
-      <span class="text-[11px] font-medium text-soft">Notiz</span>
-      <input name="note" autocomplete="off" value="{{ page.note or '' }}"
-             class="w-full min-w-52 rounded border border-rule bg-paper px-2 py-1.5 text-sm
-                    text-ink outline-none focus:border-accent">
-    </label>
     <button type="submit"
             class="tun rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm
                    font-medium text-accent hover:bg-accent/25">Speichern</button>
+    {# Zuklappen ohne zu speichern. `details` kennt dafuer nichts von sich aus:
+       das `open`-Attribut faellt nur, wenn jemand das `summary` trifft — und
+       das steht oben, ausserhalb des Blicks, sobald das Formular offen ist. #}
+    <button type="button" title="Schließen" aria-label="Schließen"
+            onclick="this.closest('details').open = false"
+            class="tun ml-auto rounded p-1.5 text-soft hover:text-ink">
+      <svg class="i"><use href="#ic-x"/></svg></button>
     <p class="w-full text-xs text-soft">
       Ein geänderter Titel wirft die Zuordnungen weg und wird sofort neu gesucht.</p>
   </form>
