@@ -469,7 +469,7 @@ def _record_foreign_ratings(store: Store, observations: Sequence[Observation]) -
     neuen Fassung. Und ``ebw rate`` schlaegt ausdruecklich ``(subject,
     BY_MODEL)`` nach, sieht diese Zeilen also gar nicht.
 
-    Die Anzahl entscheidet ueber die Sicherheit, nicht ueber den Wert: gemessen
+    Die Anzahl steht daneben und wird nicht in eine Stufe uebersetzt: gemessen
     an Google Books ruhen fuenf von sieben Bewertungen unseres Korpus auf einer
     **einzigen** Stimme (``docs/research/reader-ratings-sources.md``). Wo die
     Anzahl fehlt, wird nichts geschrieben — ein Schnitt ohne sie ist keine
@@ -485,11 +485,13 @@ def _record_foreign_ratings(store: Store, observations: Sequence[Observation]) -
         store.put_rating(
             subject_of(observation),
             stars=observation.rating,
-            # Wenige Stimmen sind kein Beleg. Die Grenze ist keine erfundene
-            # Zahl, sondern die kleinste, ab der ueberhaupt etwas gemittelt
-            # wird: unter zehn Stimmen entscheidet eine einzige Meinung ueber
-            # einen halben Stern.
-            confidence="belegt" if stimmen >= 10 else "teils",
+            # "belegt" heisst im Schema "aus Daten oder geprueter Quelle
+            # nachgewiesen" — und das ist eine Durchschnittsnote der Onleihe,
+            # gleich wie viele Stimmen dahinterstehen. Wie belastbar sie ist,
+            # sagt nicht diese Stufe, sondern die Zahl daneben. Hier stand
+            # vorher eine Grenze von zehn Stimmen: eine erfundene Zahl, und
+            # damit genau das, was beim Grillen ausgeschlossen wurde.
+            confidence="belegt",
             reason=f"Durchschnitt der Leser:innen aus {stimmen} Stimmen",
             profile_version=0,
             now=now,

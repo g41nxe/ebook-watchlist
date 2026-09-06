@@ -32,7 +32,7 @@ from .books import find as find_book
 from .cleaning import author_key, preferred_spelling
 from .migrations import migrate
 from .models import LINK_OUTCOMES, Availability, MatchReason, Observation
-from .ratings import HUMAN_ORIGINS, RATING_ORIGINS
+from .ratings import PROFILE_BOUND, RATING_ORIGINS
 from .relations import RelationKind, check_details, check_interest_key, check_relation_kind
 
 
@@ -1191,7 +1191,11 @@ class Store:
             ).first()
             if row is None:
                 return None
-            if origin not in HUMAN_ORIGINS and row.profile_version != profile_version:
+            # Nur profilgebundene Urteile veralten mit einer neuen Fassung.
+            # Vorher stand hier "nicht menschlich" — und liess damit eine
+            # fremde Leserstimme durchfallen, die mit dem Profil nie etwas zu
+            # tun hatte (Ticket 54).
+            if origin in PROFILE_BOUND and row.profile_version != profile_version:
                 return None
             session.expunge(row)
             return row

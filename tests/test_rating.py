@@ -1110,7 +1110,10 @@ def test_foreign_voices_stand_beside_the_tool_not_instead_of_it(store: Store) ->
 
     _record_foreign_ratings(store, [fund])
 
-    fremd = store.rating(subject_of(fund), 0, origin=BY_LIBRARY_READERS)
+    # Ausdruecklich mit der *aktuellen* Profilversion: eine fremde Stimme
+    # veraltet nicht mit einer neuen Fassung, und die Abfrage darf sie
+    # deshalb nicht wegfiltern (Befund aus dem Review zu Ticket 54).
+    fremd = store.rating(subject_of(fund), 2, origin=BY_LIBRARY_READERS)
     assert fremd.stars == 4
     assert fremd.votes == 1641
     assert fremd.confidence == "belegt"
@@ -1135,5 +1138,30 @@ def test_a_single_voice_is_not_evidence(store: Store) -> None:
 
     _record_foreign_ratings(store, [knapp, ohne])
 
-    assert store.rating(subject_of(knapp), 0, origin=BY_LIBRARY_READERS).confidence == "teils"
-    assert store.rating(subject_of(ohne), 0, origin=BY_LIBRARY_READERS) is None
+    # "belegt" heisst "aus geprueter Quelle" — nicht "statistisch belastbar".
+    # Wie duenn die Stimmenlage ist, sagt die Zahl daneben, keine erfundene
+    # Grenze (Befund aus dem Review zu Ticket 54).
+    knapp_row = store.rating(subject_of(knapp), 2, origin=BY_LIBRARY_READERS)
+    assert knapp_row.confidence == "belegt"
+    assert knapp_row.votes == 3
+    assert store.rating(subject_of(ohne), 2, origin=BY_LIBRARY_READERS) is None
+
+
+def test_a_foreign_voice_survives_a_new_profile_version(store: Store) -> None:
+    """Der Befund aus dem Review: die Versionsprüfung im Store stand auf
+    „nicht menschlich" und liess damit eine fremde Leserstimme durchfallen,
+    die mit dem Leseprofil nie etwas zu tun hatte. Auf der Buchseite war es
+    schon richtig — im Store nicht."""
+    from datetime import datetime
+
+    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL
+
+    store.put_rating("isbn:9780000000009", stars=4, confidence="belegt",
+                     reason="1641 Stimmen", profile_version=0,
+                     now=datetime(2026, 9, 6), origin=BY_LIBRARY_READERS, votes=1641)
+    store.put_rating("isbn:9780000000009", stars=2, confidence="teils", reason="Modell",
+                     profile_version=1, now=datetime(2026, 9, 6), origin=BY_MODEL)
+
+    # Das Modellurteil gegen Profil 1 veraltet mit Profil 2 — die fremde nicht.
+    assert store.rating("isbn:9780000000009", 2, origin=BY_MODEL) is None
+    assert store.rating("isbn:9780000000009", 2, origin=BY_LIBRARY_READERS).stars == 4

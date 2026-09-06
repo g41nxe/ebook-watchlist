@@ -42,6 +42,12 @@ RATING_ORIGINS: frozenset[str] = frozenset(
 #: Profilversion gebunden und von keiner neuen Fassung entwertet.
 FOREIGN_ORIGINS: frozenset[str] = frozenset({BY_LIBRARY_READERS})
 
+#: Wessen Urteil ueberhaupt gegen das Leseprofil faellt — und deshalb mit einer
+#: neuen Fassung veraltet. Weder was ein Mensch sagt noch was fremde Leser:innen
+#: im Schnitt vergeben, gehoert dazu. Eine Liste, damit die Versionspruefung
+#: nicht an drei Stellen verschieden gezogen wird (Ticket 54).
+PROFILE_BOUND: frozenset[str] = frozenset({BY_MODEL, BY_CONVERSATION})
+
 #: Was ein Mensch gesagt hat. Verfällt nicht mit einer neuen Profilversion,
 #: und wird von keinem Modellurteil überschrieben.
 HUMAN_ORIGINS: frozenset[str] = frozenset({BY_READER})
