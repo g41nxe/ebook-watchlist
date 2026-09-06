@@ -12,6 +12,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup, Tag
 
+from ...cleaning import without_teaser
 from ..base import SourceStructureError
 from . import selectors as sel
 
@@ -268,7 +269,7 @@ def parse_detail(html: str) -> Detail:
     author = author_node.get_text(" ", strip=True) if author_node else None
 
     # Der Klappentext steht ausserhalb des Produktblocks, deshalb ``page``.
-    description = page.select_one(sel.DETAIL_DESCRIPTION)
+    blurb = _description(page)
 
     # Die kanonische Adresse steht im Kopf der Seite, nicht im Produktblock.
     canonical = page.select_one(sel.DETAIL_CANONICAL)
@@ -281,8 +282,36 @@ def parse_detail(html: str) -> Detail:
         cover_url=_cover_from(scope.select_one(sel.DETAIL_IMAGE)),
         author=author or None,
         url=canonical_url(href) if isinstance(href, str) and href else None,
-        blurb=description.get_text(" ", strip=True) if description else None,
+        blurb=blurb,
     )
+
+
+def _description(page) -> str | None:
+    """Der Klappentext einmal, nicht zweimal (Ticket 40).
+
+    Unter ``[itemprop=description]`` haengen zwei Kinder — der sichtbare
+    Anriss und der eingeklappte volle Text. Der Browser zeigt immer nur eins
+    davon; ``get_text()`` ueber den Elternknoten nahm beides und schrieb den
+    Anfang doppelt in die Datenbank. Gemessen: 110 der 116 langen
+    Klappentexte, im Median ein Drittel Ballast, 71.313 Zeichen insgesamt —
+    und die gehen in jeden Bewertungs-Prompt.
+
+    Gegriffen wird deshalb der **Knoten**, nicht der Text: ein Klassenname im
+    Seitengeruest aendert sich seltener als ein deutsches Wort auf einem
+    Knopf, und wenn doch, bricht er zusammen mit allen anderen Selektoren.
+    Kurze Klappentexte haben kein ``--full`` — dort bleibt der Anriss, und er
+    *ist* der ganze Text (kein einziger der 1911 kurzen traegt den Knopf).
+    """
+    node = page.select_one(sel.DETAIL_DESCRIPTION)
+    if node is None:
+        return None
+    voll = node.select_one(sel.DETAIL_DESCRIPTION_FULL)
+    anriss = node.select_one(sel.DETAIL_DESCRIPTION_PREVIEW)
+    gewaehlt = voll if voll is not None else (anriss if anriss is not None else node)
+    # ``without_teaser`` faengt den Fall ab, dass der Shop die Klassen
+    # umbenennt: dann steht wieder beides im Text, und der Schnitt am Knopf
+    # ist zwar die schwaechere, aber immer noch verlustfreie Regel.
+    return without_teaser(gewaehlt.get_text(" ", strip=True)) or None
 
 
 def total_pages(html: str) -> int | None:

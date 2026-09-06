@@ -22,6 +22,8 @@ from collections.abc import Callable, Sequence
 
 from sqlalchemy import Connection, Engine, inspect
 
+from .cleaning import without_teaser
+
 Migration = Callable[[Connection], None]
 
 
@@ -319,6 +321,41 @@ def _dnb_is_keyed_by_isbn(connection: Connection) -> None:
     )
 
 
+def _blurb_stands_once(connection: Connection) -> None:
+    """Der doppelte Klappentext, einmal (Ticket 40).
+
+    Der Parser nahm ``get_text()`` ueber den Elternknoten und damit den
+    sichtbaren Anriss **und** den eingeklappten vollen Text. 110 der 116
+    langen Klappentexte stehen deshalb doppelt in der Datenbank, im Median zu
+    einem Drittel Ballast — 71.313 Zeichen, die in jeden Bewertungs-Prompt
+    gehen.
+
+    Von selbst geht das nie weg: nachgeladen wird nur, was auf "…" endet, und
+    ein doppelter Text endet auf dem vollen. **Null** der 110 gelten als
+    abgeschnitten, 102 Buecher blieben also fuer immer so.
+
+    Umgeschrieben statt angehaengt, und das ist Absicht. Das Append-only aus
+    ADR 5 schuetzt die *Zeitreihe* — Preis und Verfuegbarkeit, was der Shop
+    wann gesagt hat. Der Klappentext ist keine: ``diff.py`` erwaehnt ihn
+    nirgends, niemand vergleicht ihn ueber die Zeit. Und korrigiert wird
+    nicht, was der Shop gesagt hat, sondern **unser Lesefehler beim
+    Einsammeln**. Eine kaputt geparste Spalte zu reparieren ist eine
+    Migration, keine Geschichtsfaelschung.
+
+    Der Schnitt ist verlustfrei: in 110 von 110 beginnt der volle Text mit dem
+    Anriss, in keinem einzigen ist er kuerzer.
+    """
+    zeilen = connection.exec_driver_sql(
+        "SELECT id, blurb FROM observation WHERE blurb LIKE '%alles anzeigen%'"
+    ).fetchall()
+    for zeile_id, blurb in zeilen:
+        gekuerzt = without_teaser(blurb)
+        if gekuerzt and gekuerzt != blurb:
+            connection.exec_driver_sql(
+                "UPDATE observation SET blurb = ? WHERE id = ?", (gekuerzt, zeile_id)
+            )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -337,6 +374,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _add_observation_cover_url,
     _add_dnb_columns,
     _dnb_is_keyed_by_isbn,
+    _blurb_stands_once,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

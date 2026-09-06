@@ -232,3 +232,31 @@ def test_after_the_rebuild_two_origins_stand_side_by_side(tmp_path: Path) -> Non
 
     assert store.rating("book:5", 1, origin="model").stars == 2
     assert store.rating("book:5", 1, origin="reader").stars == 5
+
+
+def test_a_doubled_blurb_is_cut_down_to_one(tmp_path: Path) -> None:
+    """Der Parser nahm Anriss und vollen Text; von selbst geht das nie weg,
+    weil nur nachgeladen wird, was auf „…" endet — und ein doppelter Text
+    endet auf dem vollen (Ticket 40)."""
+    path = tmp_path / "s.db"
+    doppelt = "Der Anfang ... alles anzeigen expand_more Der Anfang und der Rest."
+    with sqlite3.connect(path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE observation (
+                id INTEGER NOT NULL PRIMARY KEY,
+                blurb VARCHAR
+            );
+            PRAGMA user_version = 14;
+            """
+        )
+        connection.execute("INSERT INTO observation VALUES (1, ?)", (doppelt,))
+        connection.execute("INSERT INTO observation VALUES (2, 'Ein kurzer Text.')")
+
+    migrate(create_engine(f"sqlite:///{path}"), Base.metadata)
+
+    with sqlite3.connect(path) as connection:
+        texte = dict(connection.execute("SELECT id, blurb FROM observation"))
+    assert texte[1] == "Der Anfang und der Rest."
+    # Wer nie doppelt war, bleibt unberuehrt.
+    assert texte[2] == "Ein kurzer Text."

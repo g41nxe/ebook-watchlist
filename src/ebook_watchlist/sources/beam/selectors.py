@@ -73,6 +73,12 @@ DETAIL_CANONICAL = 'link[rel="canonical"]'
 #: Der ganze Klappentext. Die Kachel traegt nur einen Anriss von rund 200
 #: Zeichen mit "... Mehr" am Ende; hier stehen im Median das Zehnfache.
 DETAIL_DESCRIPTION = "[itemprop=description]"
+#: Unter ``[itemprop=description]`` haengen **zwei** Kinder: der sichtbare
+#: Anriss und der eingeklappte volle Text. Fuer eine Leserin im Browser ist
+#: immer nur eins davon da — ``get_text()`` ueber den Elternknoten nimmt
+#: beides und schreibt den Anfang doppelt in die Datenbank (Ticket 40).
+DETAIL_DESCRIPTION_FULL = ".description--full"
+DETAIL_DESCRIPTION_PREVIEW = ".description--preview"
 
 # --- listing --------------------------------------------------------------
 

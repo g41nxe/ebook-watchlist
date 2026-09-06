@@ -55,6 +55,32 @@ def clean_blurb(blurb: str | None) -> str | None:
     return text or None
 
 
+#: Der Aufklapp-Knopf zwischen Anriss und vollem Text. Er steht in allen 110
+#: doppelten Klappentexten genau **einmal** — und in keinem der 1911 kurzen.
+_TEASER_CUT = re.compile(r"\s*(?:\.\.\.|…)?\s*alles anzeigen\s*(?:expand_more)?\s*", re.IGNORECASE)
+
+
+def without_teaser(blurb: str | None) -> str | None:
+    """Den Klappentext einmal, nicht zweimal (Ticket 40).
+
+    Das Sicherheitsnetz, nicht der Hauptweg: geschnitten wird im Parser am
+    richtigen Knoten (``description--full``), weil ein Klassenname im
+    Seitengeruest stabiler ist als ein deutsches Wort im Fliesstext. Bleibt
+    trotzdem ein Doppel stehen — weil der Shop den Knoten umbenannt hat, oder
+    weil die Zeile aus der Zeit davor stammt —, faengt das hier es auf.
+
+    Der Schnitt ist nachweislich verlustfrei: in 110 von 110 gespeicherten
+    Doppeln beginnt der volle Text mit dem Anriss, und in keinem einzigen ist
+    er kuerzer. Was vor dem Knopf steht, ist deshalb entbehrlich.
+    """
+    if not blurb:
+        return None
+    treffer = _TEASER_CUT.search(blurb)
+    if treffer is None:
+        return blurb
+    return blurb[treffer.end() :].strip() or blurb
+
+
 def is_truncated(blurb: str | None) -> bool:
     """Ob die Quelle den Text abgeschnitten hat.
 

@@ -214,3 +214,46 @@ def test_a_tile_without_a_teaser_simply_has_none() -> None:
         '<button data-note-article="1"></button></div></div>'
     )
     assert parse.parse_tiles(html)[0].blurb is None
+
+
+def test_the_blurb_is_taken_once_not_twice() -> None:
+    """Der Shop rendert Anriss und vollen Text untereinander; der Browser zeigt
+    immer nur einen davon. ``get_text()`` ueber den Elternknoten nahm beides —
+    110 der 116 langen Klappentexte standen deshalb doppelt in der Datenbank
+    (Ticket 40)."""
+    detail = beam_detail("product-detail.html")
+
+    assert detail.blurb is not None
+    assert "alles anzeigen" not in detail.blurb.lower()
+    # Der erste Satz genau einmal, nicht zweimal.
+    assert detail.blurb.count("Die ersten drei Romane") == 1
+
+
+def test_a_short_blurb_has_no_full_node_and_survives() -> None:
+    """Kurze Klappentexte haben kein ``description--full``. Ohne Rueckfall auf
+    den Anriss stuende dort ab sofort gar nichts."""
+    html = (
+        '<html><head><link rel="canonical" href="https://www.beam-shop.de/a"></head>'
+        '<body><div class="product--details"><h1 class="product--title">T</h1>'
+        '<meta itemprop="price" content="4.99">'
+        '<div itemprop="description"><div class="description--preview">'
+        "Ein kurzer Text.</div></div></div></body></html>"
+    )
+
+    assert parse.parse_detail(html).blurb == "Ein kurzer Text."
+
+
+def test_a_renamed_node_still_does_not_double_the_text() -> None:
+    """Benennt der Shop die Klassen um, faellt der Parser auf den Elternknoten
+    zurueck — dann faengt der Schnitt am Aufklapp-Knopf es auf. Die schwaechere
+    Regel, aber immer noch verlustfrei."""
+    html = (
+        '<html><head><link rel="canonical" href="https://www.beam-shop.de/a"></head>'
+        '<body><div class="product--details"><h1 class="product--title">T</h1>'
+        '<meta itemprop="price" content="4.99">'
+        '<div itemprop="description"><div class="teaser">Der Anfang ...</div>'
+        '<span>alles anzeigen</span><div class="rest">Der Anfang und der Rest.'
+        "</div></div></div></body></html>"
+    )
+
+    assert parse.parse_detail(html).blurb == "Der Anfang und der Rest."
