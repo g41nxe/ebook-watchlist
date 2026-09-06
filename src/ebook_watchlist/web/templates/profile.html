@@ -23,12 +23,23 @@
      class="rounded-lg border border-rule bg-card px-5 py-4">
   <div class="flex flex-wrap gap-x-8 gap-y-3">
     {% for regal in view.counts %}
-    <button type="button" class="text-left"
-            :class="offen === '{{ regal.kind }}' ? 'text-accent' : ''"
+    {# Welche Art gerade offen ist, muss man sehen, ohne nach unten zu
+       schauen: Farbe **und** ein Balken darunter — die Liste haengt an
+       diesem Knopf wie ein Reiter an seinem Blatt. Farbe allein waere
+       ausserdem das einzige Merkmal, und darauf soll sich niemand
+       verlassen muessen. #}
+    <button type="button"
+            class="-mx-2 rounded-t px-2 pt-1 pb-1.5 text-left border-b-2 transition
+                   {{ 'hover:bg-hair' if regal.count }}"
+            :class="offen === '{{ regal.kind }}'
+                    ? 'border-accent text-accent bg-accent/10'
+                    : 'border-transparent'"
             @click="offen = offen === '{{ regal.kind }}' ? null : '{{ regal.kind }}'"
             {{ 'disabled' if not regal.count }}>
       <div class="font-serif text-xl font-semibold tabular-nums">{{ regal.count }}</div>
-      <div class="text-xs {{ 'text-soft' if regal.count else 'text-rule' }}">{{ regal.label }}</div>
+      <div class="text-xs"
+           :class="offen === '{{ regal.kind }}' ? '' : '{{ 'text-soft' if regal.count else 'text-rule' }}'"
+           >{{ regal.label }}</div>
     </button>
     {% endfor %}
   </div>
@@ -41,8 +52,13 @@
     <ul class="divide-y divide-hair">
       {% for buch in regal.books %}
       <li class="flex items-baseline justify-between gap-3 py-1.5">
+        {# Dasselbe Muster wie im Dashboard und auf der Buchseite: ein
+           Verweis, den man auch ohne Ueberfahren als solchen erkennt. Ein
+           blosses `hover:underline` sah in einer dichten Liste aus wie
+           Fliesstext. #}
         <a href="/book/{{ buch.book_id }}"
-           class="truncate text-sm hover:underline underline-offset-2">{{ buch.title }}</a>
+           class="truncate text-sm text-accent underline decoration-accent/30
+                  underline-offset-2 hover:decoration-accent">{{ buch.title }}</a>
         <span class="shrink-0 truncate text-xs text-soft">{{ buch.author or "unbekannt" }}</span>
       </li>
       {% endfor %}
