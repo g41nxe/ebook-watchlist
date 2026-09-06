@@ -100,7 +100,11 @@
 
     {# Zwei feste Zeilen: die obere bleibt leer, wenn nichts bekannt ist —
        dadurch stehen die Beträge immer auf derselben Höhe. #}
-    <div class="ml-15 flex w-full items-center justify-between gap-3 sm:ml-0 sm:w-auto">
+    {# ``items-end`` statt ``items-center``: die Preisspalte hat zwei Zeilen,
+       und auf ihrer Mitte zentriert saessen die Symbole acht Pixel ueber dem
+       Betrag. Unten ausgerichtet stehen Betrag und Symbole auf derselben
+       Linie. #}
+    <div class="ml-15 flex w-full items-end justify-between gap-3 sm:ml-0 sm:w-auto">
     <div class="flex w-24 shrink-0 flex-col items-end leading-tight">
       <span class="h-4 text-xs {{ 'text-accent' if entry.borrowable else 'text-soft' }}">
         {{ entry.availability or "" }}</span>
