@@ -192,11 +192,11 @@
      Inhalt haelt den Platz frei (`pr-16`). */
   .kachelbild {
     position: absolute;
-    right: 14px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     opacity: 0.09;
     stroke: currentColor;
     fill: none;

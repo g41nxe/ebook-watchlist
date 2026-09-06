@@ -88,10 +88,10 @@
          title="{{ state.display }} öffnen" class="kachel-klickbar cursor-pointer {% else %}
          class="{% endif %}{{ ton }} relative flex min-w-52 flex-1 flex-col
                 justify-between overflow-hidden rounded-lg border border-rule bg-card
-                px-4 pt-3 pr-16 pb-4">
+                px-3 pt-2 pr-14 pb-2.5">
         <svg class="kachelbild {{ ton }}" aria-hidden="true">
           <use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
-        <div class="relative mb-3 flex items-center gap-1.5 text-[11px] tracking-wide uppercase">
+        <div class="relative mb-2 flex items-center gap-1.5 text-[11px] tracking-wide uppercase">
           <svg class="i"><use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
           {{ state.display }}
         </div>
@@ -112,7 +112,7 @@
              rutscht der Wert dieser Kachel tiefer als der ihrer Nachbarin,
              und ein Strich sagt "dazu ist nichts bekannt" — leer sagt gar
              nichts. #}
-          <span class="mt-1.5 block text-[11px] tabular-nums text-soft">
+          <span class="mt-1 block text-[11px] tabular-nums text-soft">
             {% if sichtung and sichtung.when %}{{ sichtung.when.strftime("%d.%m. %H:%M") }}
             {% else %}&mdash;{% endif %}</span>
         </div>
