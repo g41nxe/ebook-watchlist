@@ -19,43 +19,43 @@
    Alpine statt fuenf `details`: die Zahlen sollen ihr Raster behalten, und
    die Liste soll darunter in voller Breite aufgehen statt in einer Spalte
    (ADR 20 — lokaler Zustand ohne Serverwissen). #}
+{# Die Zahlen bleiben der Ueberblick — dahinter stehen jetzt die Buecher.
+   Bis Ticket 49 stand hier nur die Zahl, und was Ticket 48 aus der Watchlist
+   entfernt, war danach nur ueber seine Buch-Nummer zu finden.
+
+   Als **Reiter** dargestellt: dass ein Klick unten etwas oeffnet, sagt hier
+   die Anordnung und nicht die Farbe — die Zahlen sitzen auf einer Linie, und
+   der offene Reiter durchbricht sie. Vorher waren es fuenf stille Zahlen, die
+   nach nichts aussahen, worauf man klicken koennte.
+
+   Alpine statt fuenf `details`: die Liste soll darunter in voller Breite
+   aufgehen statt in einer Rasterspalte (ADR 20). #}
 <div x-data="{ offen: null }"
-     class="rounded-lg border border-rule bg-card px-5 py-4">
-  <div class="flex flex-wrap gap-x-8 gap-y-3">
+     class="rounded-lg border border-rule bg-card px-5 pt-4">
+  <div class="flex flex-wrap gap-x-2 border-b border-rule">
     {% for regal in view.counts %}
-    {# Welche Art gerade offen ist, muss man sehen, ohne nach unten zu
-       schauen: Farbe **und** ein Balken darunter — die Liste haengt an
-       diesem Knopf wie ein Reiter an seinem Blatt. Farbe allein waere
-       ausserdem das einzige Merkmal, und darauf soll sich niemand
-       verlassen muessen. #}
     <button type="button"
-            class="-mx-2 rounded-t px-2 pt-1 pb-1.5 text-left border-b-2 transition
-                   {{ 'hover:bg-hair' if regal.count }}"
+            class="-mb-px rounded-t border-b-2 px-3 pt-1 pb-2 text-left transition
+                   {{ 'cursor-pointer hover:bg-hair' if regal.count else 'cursor-default' }}"
             :class="offen === '{{ regal.kind }}'
-                    ? 'border-accent text-accent bg-accent/10'
-                    : 'border-transparent'"
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-transparent {{ 'text-soft hover:text-ink' if regal.count else 'text-rule' }}'"
             @click="offen = offen === '{{ regal.kind }}' ? null : '{{ regal.kind }}'"
             {{ 'disabled' if not regal.count }}>
       <div class="font-serif text-xl font-semibold tabular-nums">{{ regal.count }}</div>
-      <div class="text-xs"
-           :class="offen === '{{ regal.kind }}' ? '' : '{{ 'text-soft' if regal.count else 'text-rule' }}'"
-           >{{ regal.label }}</div>
+      <div class="text-xs">{{ regal.label }}</div>
     </button>
     {% endfor %}
   </div>
 
   {% for regal in view.counts %}
   {% if regal.count %}
-  <div x-show="offen === '{{ regal.kind }}'" x-cloak
-       class="mt-4 border-t border-hair pt-3">
-    <p class="mb-2 text-[11px] tracking-wide text-soft uppercase">{{ regal.label }}</p>
+  <div x-show="offen === '{{ regal.kind }}'" x-cloak class="py-3">
     <ul class="divide-y divide-hair">
       {% for buch in regal.books %}
       <li class="flex items-baseline justify-between gap-3 py-1.5">
         {# Dasselbe Muster wie im Dashboard und auf der Buchseite: ein
-           Verweis, den man auch ohne Ueberfahren als solchen erkennt. Ein
-           blosses `hover:underline` sah in einer dichten Liste aus wie
-           Fliesstext. #}
+           Verweis, den man auch ohne Ueberfahren als solchen erkennt. #}
         <a href="/book/{{ buch.book_id }}"
            class="truncate text-sm text-accent underline decoration-accent/30
                   underline-offset-2 hover:decoration-accent">{{ buch.title }}</a>
@@ -66,6 +66,10 @@
   </div>
   {% endif %}
   {% endfor %}
+
+  {# Ohne diese Zeile schrumpft der Kasten auf die Reiter zusammen, sobald
+     nichts offen ist, und die Linie darunter klebt am Rand. #}
+  <div x-show="!offen" class="h-3"></div>
 </div>
 
 <h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
