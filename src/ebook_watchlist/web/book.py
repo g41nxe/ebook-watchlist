@@ -26,7 +26,7 @@ from ..ratings import (
     subject_of,
 )
 from ..reasons import short_why, why_shown
-from ..relations import RELATION_KINDS, RelationKind
+from ..relations import RELATION_KINDS, RelationKind, labelled
 from ..sources import registry
 from ..store import Store
 from .watchlist import SourceState
@@ -37,12 +37,12 @@ ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL)
 
 #: Was die Leserin über ein Buch sagen kann, in der Reihenfolge, in der es auf
 #: der Seite steht. Mehrere gelten gleichzeitig — das ist der Normalfall.
-KINDS: tuple[tuple[str, str], ...] = (
-    (str(RelationKind.WATCHING), "in Beobachtung"),
-    (str(RelationKind.OWNED), "im Besitz"),
-    (str(RelationKind.LIKED), "Mag ich"),
-    (str(RelationKind.DISLIKED), "Kein Interesse"),
-    (str(RelationKind.DISMISSED), "Ausgeschlossen"),
+KINDS: tuple[tuple[str, str], ...] = labelled(
+    RelationKind.WATCHING,
+    RelationKind.OWNED,
+    RelationKind.LIKED,
+    RelationKind.DISLIKED,
+    RelationKind.DISMISSED,
 )
 
 #: Nur für den Vergleich zweier Zeitstempel, von denen einer fehlen darf.

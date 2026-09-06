@@ -20,7 +20,7 @@ from ..rating import (
     load_rating_scheme,
 )
 from ..reasons import thema_name
-from ..relations import InterestKey, RelationKind
+from ..relations import InterestKey, RelationKind, labelled
 from ..store import Store
 
 #: Wie oft der lange Ausläufer gefegt wird — dieselbe Frist, die der Lauf
@@ -30,12 +30,12 @@ SWEEP_INTERVAL = timedelta(days=7)
 
 _WEEKDAYS = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
 
-_RELATION_LABELS: tuple[tuple[str, str], ...] = (
-    (str(RelationKind.WATCHING), "in Beobachtung"),
-    (str(RelationKind.OWNED), "im Besitz"),
-    (str(RelationKind.LIKED), "Mag ich"),
-    (str(RelationKind.DISLIKED), "Kein Interesse"),
-    (str(RelationKind.DISMISSED), "Ausgeschlossen"),
+_RELATION_LABELS: tuple[tuple[str, str], ...] = labelled(
+    RelationKind.WATCHING,
+    RelationKind.OWNED,
+    RelationKind.LIKED,
+    RelationKind.DISLIKED,
+    RelationKind.DISMISSED,
 )
 
 

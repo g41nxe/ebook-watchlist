@@ -31,6 +31,41 @@ class RelationKind(StrEnum):
     DISMISSED = "dismissed"
 
 
+#: Wie eine Beziehung gegenueber der Leserin heisst — **eine** Liste, aus der
+#: alle Ansichten lesen.
+#:
+#: Vorher schrieb sich jedes Modul seine eigene, und die waren
+#: auseinandergelaufen: ``owned`` hiess "besitze ich" auf der Buchseite,
+#: "besessen" im Profil, "Habe ich" im Stapel und "im Besitz" im
+#: Watchlist-Menue. Vier Namen fuer dieselbe Sache entstehen nicht aus
+#: Absicht, sondern daraus, dass es vier Stellen gab.
+#:
+#: Substantive, keine Ich-Saetze: Goodreads und StoryGraph benennen ihre
+#: Regale genauso ("Gelesen", "Aktuelle Lektuere"). Und keine zwei Namen, die
+#: sich nur durch ein "nicht" unterscheiden — die sehen beim Ueberfliegen
+#: gleich aus.
+RELATION_LABELS: dict[RelationKind, str] = {
+    RelationKind.WATCHING: "in Beobachtung",
+    RelationKind.OWNED: "im Besitz",
+    RelationKind.LIKED: "Mag ich",
+    RelationKind.DISLIKED: "Kein Interesse",
+    RelationKind.DISMISSED: "Ausgeschlossen",
+}
+
+
+def label_of(kind: RelationKind | str) -> str:
+    """Wie diese Beziehung heisst. Unbekanntes bleibt, wie es ist."""
+    try:
+        return RELATION_LABELS[RelationKind(kind)]
+    except ValueError:  # pragma: no cover - nur bei einer fremden Art
+        return str(kind)
+
+
+def labelled(*kinds: RelationKind) -> tuple[tuple[str, str], ...]:
+    """``(schluessel, name)`` in der angegebenen Reihenfolge."""
+    return tuple((str(kind), RELATION_LABELS[kind]) for kind in kinds)
+
+
 class InterestKey(StrEnum):
     """Wo das Werkzeug nach neuen Büchern sehen soll.
 

@@ -25,16 +25,14 @@ from ..models import MatchReason, Observation
 from ..rating import DEFAULT_THRESHOLD
 from ..ratings import BY_MODEL, subject_of
 from ..reasons import short_why, thema_name, why_shown
-from ..relations import RelationKind
+from ..relations import RelationKind, labelled
 from ..sources import registry
 from ..store import Store
 
 #: Was mit einem Stapel geschehen kann. Alle drei schreiben eine Beziehung —
 #: "verworfen" ist keine Löschung, sondern eine Aussage über das Buch.
-ACTIONS: tuple[tuple[str, str], ...] = (
-    (str(RelationKind.DISMISSED), "Ausgeschlossen"),
-    (str(RelationKind.OWNED), "im Besitz"),
-    (str(RelationKind.WATCHING), "in Beobachtung"),
+ACTIONS: tuple[tuple[str, str], ...] = labelled(
+    RelationKind.DISMISSED, RelationKind.OWNED, RelationKind.WATCHING
 )
 
 #: Wie viele Zeilen eine Seite zeigt. Der Rückstand ist dreistellig, und eine
