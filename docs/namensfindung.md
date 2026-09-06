@@ -1,7 +1,9 @@
 # Wie die Anwendung heißen soll
 
-Zusammengetragen am 6.9.2026. **Entschieden: „Buchfink".** Die Tagline steht
-noch aus; die Kandidaten stehen am Ende.
+Zusammengetragen am 6.9.2026. **Entschieden: „Buchfink — Weniger Suchen. Mehr Lesen.“**
+Die Tagline kam vom Nutzer und schlug alle Vorschläge unten: sie beschreibt
+nicht das Werkzeug, sondern das Leben mit ihm — der Sprung, den die
+Recherche als Unterschied zwischen guten und mittelmäßigen Namen beschreibt.
 
 Der Repository- und Paketname (`ebook-watchlist`) bleibt. Umbenannt wird, was
 man sieht: Kopfzeile, Seitentitel, README.

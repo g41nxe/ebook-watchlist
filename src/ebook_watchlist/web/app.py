@@ -180,7 +180,7 @@ def source_trouble(runs: list[RunRow]) -> list[str]:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="eBook-Watchlist", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Buchfink", docs_url=None, redoc_url=None)
     # Build output is not in the repository (ADR 20), so say so plainly rather
     # than serving an unstyled page that looks like a CSS bug.
     if not (STATIC / "app.css").is_file():

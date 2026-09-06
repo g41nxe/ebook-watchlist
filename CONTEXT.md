@@ -1,4 +1,4 @@
-# Context: eBook-Watchlist & Deal-Finder
+# Context: Buchfink
 
 ## Glossary
 

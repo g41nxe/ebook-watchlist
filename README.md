@@ -2,7 +2,9 @@
   <img src="docs/bilder/hero.png" alt="Die Vorschlagsseite: Funde mit Cover, Sternen und einer Zeile, warum sie in Frage kommen" width="900">
 </p>
 
-# eBook-Watchlist & Deal-Finder
+# Buchfink
+
+**Weniger Suchen. Mehr Lesen.**
 
 Ein persönliches Werkzeug, das jeden Tag nachsieht, ob ein Titel von meiner
 Watchlist in der Bibliothek ausleihbar geworden ist oder im Shop billiger — und
@@ -273,7 +275,7 @@ einfach auf diese Datei — die ganze Kommandozeile bei `schtasks` zu hinterlege
 heißt sonst, sich mit den Anführungszeichen-Regeln von `cmd` zu prügeln.
 
 ```bash
-schtasks /create /tn "eBook-Watchlist" /sc daily /st 06:00 /tr "C:\Pfad\zum\repo\scripts\run-daily.cmd"
+schtasks /create /tn "Buchfink" /sc daily /st 06:00 /tr "C:\Pfad\zum\repo\scripts\run-daily.cmd"
 ```
 
 ### Linux / Raspberry Pi — systemd-Timer
@@ -282,7 +284,7 @@ schtasks /create /tn "eBook-Watchlist" /sc daily /st 06:00 /tr "C:\Pfad\zum\repo
 
 ```ini
 [Unit]
-Description=eBook-Watchlist & Deal-Finder
+Description=Buchfink
 
 [Service]
 Type=oneshot
@@ -294,7 +296,7 @@ ExecStart=%h/ebook-watchlist/scripts/run-daily.sh
 
 ```ini
 [Unit]
-Description=Taeglicher eBook-Watchlist-Lauf
+Description=Taeglicher Buchfink-Lauf
 
 [Timer]
 OnCalendar=*-*-* 06:00:00

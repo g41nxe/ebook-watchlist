@@ -25,7 +25,7 @@ DEFAULT_PORT = 8437
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="ebw-web", description="Serve the local eBook-Watchlist dashboard."
+        prog="ebw-web", description="Serve the local Buchfink dashboard."
     )
     parser.add_argument("--host", default=os.environ.get("EBW_WEB_HOST", DEFAULT_HOST))
     parser.add_argument(
