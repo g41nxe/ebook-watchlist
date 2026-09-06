@@ -250,6 +250,15 @@ def entries(
     relations = store.relations(
         profile_slug, kind=str(RelationKind.WATCHING), active_only=not include_paused
     )
+    # Wer nicht mehr beobachtet wird, steht nicht auf der Watchlist. Die
+    # Beziehung bleibt trotzdem stehen — auf der Buchseite liest sie sich
+    # danach als "Frueher: beobachtet" (ADR 18, Ticket 48).
+    abgeschlossen = {
+        row.book_id
+        for kind in (RelationKind.OWNED, RelationKind.DISMISSED)
+        for row in store.relations(profile_slug, kind=str(kind))
+    }
+    relations = [row for row in relations if row.book_id not in abgeschlossen]
     book_ids = [relation.book_id for relation in relations]
     latest = store.latest_by_book(profile_slug, book_ids)
 
@@ -308,6 +317,27 @@ def add(store: Store, profile_slug: str, *, title: str, author: str | None, now:
     )
     store.put_relation(profile_slug, book.id, str(RelationKind.WATCHING), now=now)
     return book.id
+
+
+def finish(
+    store: Store, profile_slug: str, book_id: int, kind: str, *, now: datetime
+) -> None:
+    """Einen Eintrag abschliessen: gekauft, oder nicht mehr interessant.
+
+    Zwei Wirkungen in einem Vorgang, und das ist der ganze Punkt des Tickets:
+    ``put_relation`` fasst immer nur **eine** Art an. Wer bisher auf der
+    Buchseite "besitze ich" klickte, bekam ``owned`` dazu — ``watching`` blieb
+    aktiv, das Buch wurde weiter abgerufen und weiter gemeldet. Genau der
+    Fall, der bei *Ausloeschung* auffiel: ausgegraut und trotzdem als
+    ausleihbar markiert (Ticket 48).
+
+    Stillgelegt, nicht geloescht: dass ein Buch einmal beobachtet wurde, ist
+    selbst eine Auskunft (ADR 18).
+    """
+    if kind not in (str(RelationKind.OWNED), str(RelationKind.DISMISSED)):
+        return
+    store.put_relation(profile_slug, book_id, kind, now=now)
+    store.deactivate_relation(profile_slug, book_id, str(RelationKind.WATCHING), now=now)
 
 
 def set_restriction(

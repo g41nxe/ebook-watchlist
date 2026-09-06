@@ -111,7 +111,7 @@ def test_a_paused_entry_still_shows_on_the_page(client: TestClient, db: Store) -
 
     body = client.get("/watchlist").text
     assert book.title in body
-    assert "fortsetzen" in body
+    assert "wieder prüfen" in body
 
 
 # --- auf eine Art Quelle einschraenken --------------------------------------
@@ -122,7 +122,7 @@ def test_an_entry_can_be_restricted_to_one_kind_of_source(
 ) -> None:
     book = db.books()[0]
 
-    client.post(f"/watchlist/{book.id}/restrict", data={"restrict": "library"})
+    client.post(f"/book/{book.id}/restrict", data={"restrict": "library"})
 
     relation = next(
         r for r in db.relations_of("test", book.id) if r.kind == RelationKind.WATCHING
@@ -134,9 +134,9 @@ def test_an_empty_restriction_means_every_source_not_none(
     client: TestClient, db: Store
 ) -> None:
     book = db.books()[0]
-    client.post(f"/watchlist/{book.id}/restrict", data={"restrict": "shop"})
+    client.post(f"/book/{book.id}/restrict", data={"restrict": "shop"})
 
-    client.post(f"/watchlist/{book.id}/restrict", data={"restrict": ""})
+    client.post(f"/book/{book.id}/restrict", data={"restrict": ""})
 
     relation = next(
         r for r in db.relations_of("test", book.id) if r.kind == RelationKind.WATCHING
@@ -147,7 +147,7 @@ def test_an_empty_restriction_means_every_source_not_none(
 def test_an_unknown_restriction_is_refused(client: TestClient, db: Store) -> None:
     """Jede Schreibaktion geht durch dieselbe Pruefung wie der Lader (Ticket 05)."""
     book = db.books()[0]
-    response = client.post(f"/watchlist/{book.id}/restrict", data={"restrict": "beam"})
+    response = client.post(f"/book/{book.id}/restrict", data={"restrict": "beam"})
 
     assert response.status_code == 500
     relation = next(
@@ -162,7 +162,7 @@ def test_restricting_keeps_the_note(client: TestClient, db: Store) -> None:
         "test", book.id, str(RelationKind.WATCHING), now=NOW, note="wichtig"
     )
 
-    client.post(f"/watchlist/{book.id}/restrict", data={"restrict": "library"})
+    client.post(f"/book/{book.id}/restrict", data={"restrict": "library"})
 
     relation = next(
         r for r in db.relations_of("test", book.id) if r.kind == RelationKind.WATCHING

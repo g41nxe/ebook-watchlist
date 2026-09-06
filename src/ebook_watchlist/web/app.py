@@ -250,7 +250,6 @@ def create_app() -> FastAPI:
                 "profile": profile,
                 "asset_version": asset_version(),
                 "entries": [e for e in alle if e.needs_choice] if nur_unklar else alle,
-                "restrictions": watchlist.RESTRICTIONS,
                 "message": message,
                 "offene_wahl": offen,
                 "nur_unklar": nur_unklar,
@@ -301,8 +300,15 @@ def create_app() -> FastAPI:
             )
         return RedirectResponse("/watchlist", status_code=303)
 
-    @app.post("/watchlist/{book_id}/restrict")
-    def watchlist_restrict(book_id: int, restrict: str = Form("")) -> RedirectResponse:
+    @app.post("/book/{book_id}/restrict")
+    def book_restrict(book_id: int, restrict: str = Form("")) -> RedirectResponse:
+        """An welchen Quellen dieses Buch geprueft wird.
+
+        Auf der Buchseite und nicht mehr in der Watchlist-Zeile: das ist eine
+        **Einstellung**, keine Handlung, und sie stand dort im selben Menue
+        wie die Abschluesse — was aus dem Menue eine Resterampe machte
+        (docs/research/row-actions-and-overflow-menus.md, Ticket 48).
+        """
         profile = load_profile()
         # Leer heisst "alle eingeschalteten Quellen", nicht "keine". Ein
         # unbekannter Wert scheitert in der Validierung des Ladens (Ticket 05).
@@ -311,6 +317,23 @@ def create_app() -> FastAPI:
             profile.slug,
             book_id,
             restrict or None,
+            now=datetime.now(),
+        )
+        return RedirectResponse(f"/book/{book_id}", status_code=303)
+
+    @app.post("/watchlist/{book_id}/abschliessen")
+    def watchlist_finish(book_id: int, kind: str = Form(...)) -> RedirectResponse:
+        """Gekauft, oder nicht mehr interessant — und damit von der Liste.
+
+        Setzt die Beziehung **und** legt das Beobachten still. Beides einzeln
+        zu tun war der Mangel: ``owned`` stand neben einem aktiven
+        ``watching``, und das Buch wurde weiter gemeldet (Ticket 48).
+        """
+        watchlist.finish(
+            _store_for(paths.db_path()),
+            load_profile().slug,
+            book_id,
+            kind,
             now=datetime.now(),
         )
         return RedirectResponse("/watchlist", status_code=303)
@@ -435,6 +458,7 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "page": page,
                 "kinds": book.KINDS,
+                "restrictions": watchlist.RESTRICTIONS,
                 "price_points": book.price_points(page.history),
             },
         )

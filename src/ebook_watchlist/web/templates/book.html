@@ -95,6 +95,27 @@
   {% endfor %}
 </div>
 
+{% if page.watching %}
+{# An welcher Art Quelle geprueft wird. Stand bis Ticket 48 im
+   Drei-Punkte-Menue der Watchlist-Zeile — dort war es der einzige Eintrag,
+   und es ist eine Einstellung, keine Handlung. Hier steht es bei den anderen
+   Angaben zu diesem Buch. #}
+<div class="mt-4 flex flex-wrap items-center gap-2">
+  <span class="text-xs text-soft">Prüfen bei</span>
+  {% for value, label in (("", "allen Quellen"), ("library", "nur Bibliothek"), ("shop", "nur Shop")) %}
+  <form method="post" action="/book/{{ page.book_id }}/restrict">
+    <input type="hidden" name="restrict" value="{{ value }}">
+    <button type="submit"
+            class="rounded-full border px-3 py-1 text-xs transition
+                   {{ 'border-accent bg-accent/10 text-accent'
+                      if (page.restrict or '') == value
+                      else 'border-rule text-soft hover:border-soft hover:text-ink' }}">
+      {{ label }}</button>
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% set past = page.relations | selectattr("is_history") | list %}
 {% if past %}
 {# Stillgelegt, nicht geloescht: "beobachtet, bis du es gekauft hast". #}

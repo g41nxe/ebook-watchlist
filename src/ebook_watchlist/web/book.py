@@ -160,6 +160,12 @@ class Page:
     profile_version: int | None
     #: Warum dieser Fund überhaupt hereinkam — nur bei Entdeckungen (Ticket 22).
     origin: Origin | None
+    #: An welcher Art Quelle geprüft wird — ``None`` heißt: an allen. Steht
+    #: hier und nicht mehr in der Watchlist-Zeile: das ist eine Einstellung
+    #: dieses Buchs, keine Handlung an der Liste (Ticket 48).
+    restrict: str | None = None
+    #: Ob das Buch überhaupt beobachtet wird — sonst gibt es nichts zu prüfen.
+    watching: bool = False
 
     @property
     def my_stars(self) -> int | None:
@@ -341,6 +347,11 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
         judgements=_judgements(store, book, seen),
         profile_version=current_version,
         origin=_origin(seen),
+        restrict=_details(known[str(RelationKind.WATCHING)]).get("restrict")
+        if str(RelationKind.WATCHING) in known
+        else None,
+        watching=str(RelationKind.WATCHING) in known
+        and known[str(RelationKind.WATCHING)].active,
     )
 
 
