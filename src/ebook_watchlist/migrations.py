@@ -22,7 +22,7 @@ from collections.abc import Callable, Sequence
 
 from sqlalchemy import Connection, Engine, inspect
 
-from .cleaning import without_teaser
+from .cleaning import clean_blurb, without_teaser
 
 Migration = Callable[[Connection], None]
 
@@ -411,6 +411,31 @@ def _the_detour_leaves_no_table(connection: Connection) -> None:
     connection.exec_driver_sql("DROP TABLE IF EXISTS reception")
 
 
+def _blurb_without_the_collapse_button(connection: Connection) -> None:
+    """Die andere Haelfte des Aufklapp-Knopfs (Ticket 40, Nachtrag).
+
+    Der Shop hat zwei: einen zum Aufklappen vor dem vollen Text ("alles
+    anzeigen expand_more") und einen zum Zuklappen dahinter ("weniger anzeigen
+    expand_less"). Migration 15 hat den ersten erwischt, den zweiten nicht —
+    ``clean_blurb`` streifte zwar die Ligatur ab, liess aber die blossen
+    Woerter stehen.
+
+    Gemessen: 110 von 2674 gespeicherten Texten enden auf "weniger anzeigen",
+    dieselben 110, die vorher doppelt waren. Aufgefallen ist es beim Lesen
+    eines Klappentexts auf dem Entwurf der Buchseite — also genau dort, wo ihn
+    zum ersten Mal jemand liest.
+    """
+    zeilen = connection.exec_driver_sql(
+        "SELECT id, blurb FROM observation WHERE blurb IS NOT NULL AND blurb != ''"
+    ).fetchall()
+    for zeile_id, blurb in zeilen:
+        gereinigt = clean_blurb(blurb)
+        if gereinigt and gereinigt != blurb:
+            connection.exec_driver_sql(
+                "UPDATE observation SET blurb = ? WHERE id = ?", (gereinigt, zeile_id)
+            )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -434,6 +459,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _observation_carries_the_vote,
     _how_many_voted,
     _the_detour_leaves_no_table,
+    _blurb_without_the_collapse_button,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

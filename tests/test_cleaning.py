@@ -103,3 +103,18 @@ def test_the_teaser_goes_where_the_full_text_repeats_it() -> None:
     doppelt = "Der Anfang ... alles anzeigen expand_more Der Anfang und der Rest."
 
     assert without_teaser(doppelt) == "Der Anfang und der Rest."
+
+
+def test_the_collapse_label_goes_too() -> None:
+    """Der Shop hat zwei Aufklapp-Knöpfe: einen vor dem vollen Text und einen
+    dahinter. Ticket 40 hat den ersten erwischt; beim zweiten blieb nach dem
+    Abstreifen der Ligatur die blosse Beschriftung stehen — in 110 von 2674
+    gespeicherten Texten."""
+    assert clean_blurb("Ein Satz. weniger anzeigen expand_less") == "Ein Satz."
+    assert clean_blurb("Ein Satz. weniger anzeigen") == "Ein Satz."
+
+
+def test_the_same_words_in_the_middle_of_a_sentence_stay() -> None:
+    satz = "Er wollte weniger anzeigen als nötig, und schwieg."
+
+    assert clean_blurb(satz) == satz

@@ -38,6 +38,15 @@ _TRAILING_MORE = re.compile(
 )
 _LOOSE_LIGATURE = re.compile(r"\s*\b(?:" + "|".join(_ICON_LIGATURES) + r")\b\s*")
 _WHITESPACE = re.compile(r"\s+")
+#: Die Beschriftung eines Aufklapp-Knopfs, ohne seine Ligatur. Ticket 40 hat
+#: den Knopf zum **Aufklappen** erwischt ("alles anzeigen"), den zum Zuklappen
+#: nicht: der steht am Ende des vollen Textes, und dort blieben nach dem
+#: Abstreifen der Ligatur die blossen Woerter stehen — in 110 von 2674
+#: gespeicherten Texten.
+_TRAILING_CONTROL = re.compile(
+    r"\s*(?:alles anzeigen|weniger anzeigen|mehr anzeigen|weiterlesen)\s*$",
+    re.IGNORECASE,
+)
 
 
 def clean_blurb(blurb: str | None) -> str | None:
@@ -52,7 +61,10 @@ def clean_blurb(blurb: str | None) -> str | None:
     text = _TRAILING_MORE.sub("", blurb)
     text = _LOOSE_LIGATURE.sub(" ", text)
     text = _WHITESPACE.sub(" ", text).strip()
-    return text or None
+    # Erst nach dem Zusammenziehen der Leerzeichen: die Ligatur stand hinter
+    # der Beschriftung, und solange sie dort klebte, war die Beschriftung
+    # nicht das Ende der Zeichenkette.
+    return _TRAILING_CONTROL.sub("", text).strip() or None
 
 
 #: Der Aufklapp-Knopf zwischen Anriss und vollem Text. Er steht in allen 110
