@@ -104,3 +104,52 @@ def test_a_bundle_advantage_is_reported_although_it_is_no_bargain() -> None:
 
     vorteil = advantage_for(beobachtung, PROFIL, preis)
     assert worth_announcing(beobachtung, PROFIL, bundle_advantage=vorteil) is True
+
+
+# --- der Weg bis in den Tagesbericht (Review nach 1.0) ----------------------
+
+
+def test_a_bundle_advantage_produces_a_first_sighting() -> None:
+    """Der Befund aus dem Review: `worth_announcing` kannte den Bündelvorteil,
+    aber `compare` reichte ihn nicht durch. Ein neu auftauchendes Bündel blieb
+    deshalb still, obwohl der Stapel es zeigte — die Entscheidung aus ADR 24
+    war nur zur Hälfte umgesetzt."""
+    from ebook_watchlist.diff import compute_deltas
+    from ebook_watchlist.models import DeltaKind
+
+    beobachtung = fund("Der Kruzifix-Killer / Der Vollstrecker")
+
+    ohne = compute_deltas([beobachtung], {}, PROFIL)
+    assert ohne == []
+
+    mit = compute_deltas(
+        [beobachtung], {}, PROFIL, lambda o: advantage_for(o, PROFIL, preis)
+    )
+    assert [delta.kind for delta in mit] == [DeltaKind.FIRST_SEEN]
+
+
+def test_the_digest_says_why_the_bundle_is_there() -> None:
+    """Ohne den Satz stünde ein Titel zu 12,99 € ohne erkennbaren Grund im
+    Tagesbericht — weder Schnäppchen noch Preissturz."""
+    from datetime import datetime
+
+    from ebook_watchlist.digest import build_digest
+    from ebook_watchlist.models import Delta, DeltaKind
+
+    beobachtung = fund("Der Kruzifix-Killer / Der Vollstrecker")
+    digest = build_digest(
+        profile_name="Test",
+        generated_at=datetime(2026, 9, 6, 10, 0),
+        since=None,
+        deltas=[Delta(DeltaKind.FIRST_SEEN, beobachtung, None)],
+        failures=[],
+        profile=PROFIL,
+        advantage_of=lambda o: advantage_for(o, PROFIL, preis),
+    )
+
+    texte = [
+        eintrag.detail or ""
+        for abschnitt in digest.sections
+        for eintrag in abschnitt.entries
+    ]
+    assert any("41 % gespart" in text for text in texte)

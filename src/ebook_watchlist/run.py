@@ -18,6 +18,7 @@ from pathlib import Path
 from filelock import FileLock, Timeout
 
 from . import gate, paths
+from .bundle_deal import advantage_finder
 from .cleaning import clean_blurb
 from .config import ConfigError, Profile, load_dismissals, load_owned, load_profile, load_watchlist
 from .configuration import NotSeeded
@@ -242,9 +243,13 @@ def _ask_the_library(store: Store, client: HttpClient, profile: Profile) -> None
     for isbn in offen:
         try:
             datensatz = bibliothek.about(isbn)
+        except RateLimited:
+            # 429 heisst Halt, und zwar fuer alles Weitere.
+            print("DNB: gedrosselt — Rest übersprungen", file=sys.stderr)
+            break
         except Exception as exc:  # noqa: BLE001 - eine Auskunft, nicht der Lauf
             print(f"DNB {isbn}: {type(exc).__name__}: {exc}", file=sys.stderr)
-            break
+            continue
         # Auch das Schweigen wird festgehalten, sonst fragt der naechste Lauf
         # dieselbe ISBN erneut.
         store.save_dnb(isbn, datensatz, now)
@@ -774,8 +779,13 @@ def _run(
         for source_name, interest_id in context.swept
         if store.is_interest_seeded(interest_id, source_name)
     }
+    # Einmal gebaut, von Vergleich und Tagesbericht benutzt: sonst meldet der
+    # Stapel einen Buendelvorteil, den der Tagesbericht nicht kennt.
+    buendelvorteil = advantage_finder(store, profile)
     deltas = suppress_unseeded_interests(
-        compute_deltas(observations, previous, profile), context.origin, seeded
+        compute_deltas(observations, previous, profile, buendelvorteil),
+        context.origin,
+        seeded,
     )
 
     store.append(run_id, profile.slug, observations, started_at)

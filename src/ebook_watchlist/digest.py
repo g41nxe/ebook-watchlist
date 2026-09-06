@@ -154,6 +154,7 @@ def _entry_for(
     delta: Delta,
     profile: Profile | None,
     judgements: dict[tuple[str, str], Rating],
+    advantage_of=None,
 ) -> tuple[str, DigestEntry]:
     current, previous = delta.current, delta.previous
 
@@ -176,6 +177,14 @@ def _entry_for(
         detail = f"{_format_price(previous.price_cents)} → {_format_price(current.price_cents)}"
     else:
         raise ValueError(f"no Digest section defined for delta kind {delta.kind!r}")
+
+    # Warum eine Sammelausgabe hier steht, sagt sonst niemand: sie ist weder
+    # ein Schnäppchen noch ein Preissturz, sondern billiger als ihre
+    # Einzelbände zusammen (ADR 24). Ohne diesen Satz stünde im Tagesbericht
+    # ein Titel zu 19,99 € ohne erkennbaren Grund.
+    vorteil = advantage_of(current) if advantage_of else None
+    if vorteil is not None:
+        detail = f"{vorteil.summary} · {detail}"
 
     section = _SECTION_BY_REASON[current.match_reason]
     flags = deal_flags(current, previous, profile) if profile else ()
@@ -200,12 +209,13 @@ def build_digest(
     profile: Profile | None = None,
     judgements: dict[tuple[str, str], Rating] | None = None,
     gate: GateNote | None = None,
+    advantage_of=None,
 ) -> Digest:
     buckets: dict[str, list[DigestEntry]] = {title: [] for title in SECTION_ORDER}
     judgements = judgements or {}
 
     for delta in deltas:
-        section, entry = _entry_for(delta, profile, judgements)
+        section, entry = _entry_for(delta, profile, judgements, advantage_of)
         buckets[section].append(entry)
 
     for item in attention or []:

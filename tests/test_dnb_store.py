@@ -1,0 +1,250 @@
+"""Was die DNB-Auskunft in der Datenbank tut (Ticket 42, ADR 25).
+
+Beim Review nach 1.0 fiel auf, dass diese fünf Wege — ``isbns_without_dnb``,
+``save_dnb``, ``contained_isbns``, ``prices_by_isbn`` und ``_ask_the_library``
+— keinen einzigen Test hatten. Das Auswerten der Antwort war gut geprüft, das
+Drumherum gar nicht.
+
+Kein Test hier geht ins Netz.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+
+import pytest
+
+from ebook_watchlist import paths
+from ebook_watchlist.dnb import Record
+from ebook_watchlist.models import MatchReason, Observation
+from ebook_watchlist.store import Store
+
+NOW = datetime(2026, 9, 6, 10, 0)
+#: Der Slug des Testprofils — nicht "default", das war ein Rateversuch.
+SLUG = "test"
+
+
+@pytest.fixture
+def db(data_dir: Path) -> Store:
+    return Store(paths.db_path())
+
+
+def gesehen(db: Store, isbn: str | None, preis: int | None = 999, nummer: str = "1") -> None:
+    run_id = db.start_run(SLUG, "cli", NOW)
+    db.append(
+        run_id,
+        SLUG,
+        [
+            Observation(
+                source="beam",
+                source_item_id=nummer,
+                title=f"Buch {nummer}",
+                match_reason=MatchReason.GENRE_CATEGORY,
+                isbn=isbn,
+                price_cents=preis,
+            )
+        ],
+        NOW,
+    )
+
+
+# --- wen fragen wir? --------------------------------------------------------
+
+
+def test_only_isbns_we_have_actually_seen_are_asked_about(db: Store) -> None:
+    gesehen(db, "9783644025028")
+
+    assert db.isbns_without_dnb(SLUG, 10) == ["9783644025028"]
+
+
+def test_an_observation_without_an_isbn_is_never_asked_about(db: Store) -> None:
+    """Die DNB antwortet über eine ISBN. Ohne eine gibt es nichts zu fragen."""
+    gesehen(db, None)
+
+    assert db.isbns_without_dnb(SLUG, 10) == []
+
+
+def test_the_budget_is_a_hard_limit(db: Store) -> None:
+    """Die DNB dokumentiert keine zulässige Anfragefrequenz — deshalb wird der
+    Rückstand über mehrere Läufe abgearbeitet (ADR 25)."""
+    for nummer in range(5):
+        gesehen(db, f"978000000000{nummer}", nummer=str(nummer))
+
+    assert len(db.isbns_without_dnb(SLUG, 2)) == 2
+
+
+def test_an_answered_isbn_is_not_asked_again(db: Store) -> None:
+    gesehen(db, "9783644025028")
+    db.save_dnb("9783644025028", Record(title="Ein Buch"), NOW)
+
+    assert db.isbns_without_dnb(SLUG, 10) == []
+
+
+def test_silence_is_recorded_too(db: Store) -> None:
+    """Neun von dreißig kennt die DNB nicht. Ohne diesen Vermerk fragte jeder
+    Lauf dieselben erneut — der teuerste denkbare Weg, nichts zu erfahren."""
+    gesehen(db, "9783644025028")
+    db.save_dnb("9783644025028", None, NOW)
+
+    assert db.isbns_without_dnb(SLUG, 10) == []
+
+
+# --- was wir aufheben -------------------------------------------------------
+
+
+def test_the_contained_volumes_survive(db: Store) -> None:
+    db.save_dnb(
+        "9783644025028",
+        Record(title="David Hunter: 3in1 Bundle", contains=("9783644200418", "9783644200616")),
+        NOW,
+    )
+
+    assert db.contained_isbns("9783644025028") == ("9783644200418", "9783644200616")
+
+
+def test_asking_twice_does_not_duplicate_the_volumes(db: Store) -> None:
+    """Ein zweiter Aufruf darf nichts verdoppeln — dieselbe Regel wie beim
+    Import (``ebw seed``)."""
+    datensatz = Record(contains=("9783644200418",))
+    db.save_dnb("9783644025028", datensatz, NOW)
+    db.save_dnb("9783644025028", datensatz, NOW)
+
+    assert db.contained_isbns("9783644025028") == ("9783644200418",)
+
+
+def test_a_book_the_library_does_not_know_contains_nothing(db: Store) -> None:
+    db.save_dnb("9783644025028", None, NOW)
+
+    assert db.contained_isbns("9783644025028") == ()
+
+
+# --- die Preise, mit denen verglichen wird ----------------------------------
+
+
+def test_prices_are_looked_up_by_isbn(db: Store) -> None:
+    gesehen(db, "9783644200418", preis=999)
+
+    assert db.prices_by_isbn(SLUG, "beam") == {"9783644200418": 999}
+
+
+def test_the_cheapest_edition_wins(db: Store) -> None:
+    """Derselbe Titel kann als mehrere Ausgaben dastehen. Für den Vergleich
+    zählt, was der Einzelband **mindestens** kostet."""
+    gesehen(db, "9783644200418", preis=1499, nummer="1")
+    gesehen(db, "9783644200418", preis=999, nummer="2")
+
+    assert db.prices_by_isbn(SLUG, "beam")["9783644200418"] == 999
+
+
+def test_a_free_title_is_no_price(db: Store) -> None:
+    """Null ist kein Preis, sondern Füllmaterial (ADR 19) — und eine Summe aus
+    Nullen wäre ein erfundener Vergleich."""
+    gesehen(db, "9783644200418", preis=0)
+
+    assert db.prices_by_isbn(SLUG, "beam") == {}
+
+
+def test_another_source_is_another_wallet(db: Store) -> None:
+    """Preise zweier Shops zu addieren wäre eine Summe, die niemand bezahlen
+    kann."""
+    gesehen(db, "9783644200418", preis=999)
+
+    assert db.prices_by_isbn(SLUG, "voebb") == {}
+
+
+# --- der Schritt im Lauf ----------------------------------------------------
+
+
+class Bibliothek:
+    """Zählt die Anfragen und antwortet der Reihe nach."""
+
+    def __init__(self, *antworten: str | Exception) -> None:
+        self.antworten = list(antworten)
+        self.gefragt: list[str] = []
+
+    def get(self, url: str, params: dict | None = None) -> str:
+        self.gefragt.append((params or {}).get("query", ""))
+        antwort = self.antworten.pop(0) if self.antworten else LEER
+        if isinstance(antwort, Exception):
+            raise antwort
+        return antwort
+
+
+LEER = (
+    '<?xml version="1.0"?><searchRetrieveResponse>'
+    "<numberOfRecords>0</numberOfRecords></searchRetrieveResponse>"
+)
+MIT_BAND = (
+    '<?xml version="1.0"?><searchRetrieveResponse><numberOfRecords>1</numberOfRecords>'
+    '<record><datafield tag="245"><subfield code="a">Ein Bundle</subfield></datafield>'
+    '<datafield tag="770"><subfield code="i">Enthält</subfield>'
+    '<subfield code="z">9783644200418</subfield></datafield></record>'
+    "</searchRetrieveResponse>"
+)
+
+
+def test_the_run_asks_at_most_the_budget(db: Store, monkeypatch) -> None:
+    """Der Rückstand wird über mehrere Läufe abgearbeitet, nicht an einem Tag."""
+    from dataclasses import replace
+
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.run import _ask_the_library
+
+    for nummer in range(5):
+        gesehen(db, f"978000000000{nummer}", nummer=str(nummer))
+    client = Bibliothek()
+
+    _ask_the_library(db, client, replace(load_profile(), dnb_budget=2))
+
+    assert len(client.gefragt) == 2
+
+
+def test_the_run_records_what_it_learned(db: Store) -> None:
+    from dataclasses import replace
+
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.run import _ask_the_library
+
+    gesehen(db, "9783644025028")
+
+    _ask_the_library(db, Bibliothek(MIT_BAND), replace(load_profile(), dnb_budget=5))
+
+    assert db.contained_isbns("9783644025028") == ("9783644200418",)
+    assert db.isbns_without_dnb(SLUG, 10) == []
+
+
+def test_a_throttled_library_stops_the_rest(db: Store) -> None:
+    """429 heißt Halt, und zwar für alles Weitere — dieselbe Regel wie beim
+    Shop."""
+    from dataclasses import replace
+
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.http import RateLimited
+    from ebook_watchlist.run import _ask_the_library
+
+    for nummer in range(3):
+        gesehen(db, f"978000000000{nummer}", nummer=str(nummer))
+    client = Bibliothek(RateLimited("429"), MIT_BAND, MIT_BAND)
+
+    _ask_the_library(db, client, replace(load_profile(), dnb_budget=5))
+
+    assert len(client.gefragt) == 1
+
+
+def test_one_broken_answer_does_not_stop_the_others(db: Store) -> None:
+    """Der Befund aus dem Review: ein 404 brach den ganzen Stapel ab, obwohl
+    er nur diese eine Auskunft kosten darf."""
+    from dataclasses import replace
+
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.http import NotFound
+    from ebook_watchlist.run import _ask_the_library
+
+    for nummer in range(3):
+        gesehen(db, f"978000000000{nummer}", nummer=str(nummer))
+    client = Bibliothek(NotFound("weg"), MIT_BAND, MIT_BAND)
+
+    _ask_the_library(db, client, replace(load_profile(), dnb_budget=5))
+
+    assert len(client.gefragt) == 3

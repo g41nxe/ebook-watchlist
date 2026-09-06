@@ -134,3 +134,42 @@ def _vorteil(
         volumes=bände, singles_cents=einzeln, price_cents=observation.price_cents
     )
     return vorteil if vorteil.saved_pct >= profile.min_discount_pct else None
+
+
+def advantage_finder(store, profile):
+    """Eine Funktion, die zu einer Beobachtung ihren Buendelvorteil sagt.
+
+    Einmal gebaut, viele Male gefragt: die Preistabellen werden hier **einmal**
+    geholt und nicht je Buch. Dieselbe Funktion bedient den Stapel, den
+    Tagesbericht und die Meldelogik — sonst gaebe es den Vorteil an einer
+    Stelle und an der anderen nicht, und genau das war der Fall (Review nach
+    1.0).
+
+    Der Quellenname wird **gefragt**, nicht hingeschrieben: Preise zweier
+    Shops zu addieren waere eine Summe, die niemand bezahlen kann, also wird
+    je Shop verglichen.
+    """
+    from .sources import registry
+
+    tabellen = [
+        (
+            store.latest_prices_by_title(profile.slug, name),
+            store.prices_by_isbn(profile.slug, name),
+        )
+        for name in registry.shops(profile)
+    ]
+
+    def finde(observation):
+        for nach_titel, nach_isbn in tabellen:
+            vorteil = advantage_for(
+                observation,
+                profile,
+                nach_titel.get,
+                contained=store.contained_isbns,
+                price_of_isbn=nach_isbn.get,
+            )
+            if vorteil is not None:
+                return vorteil
+        return None
+
+    return finde

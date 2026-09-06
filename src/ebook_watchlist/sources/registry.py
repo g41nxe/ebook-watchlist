@@ -84,6 +84,17 @@ def label(profile: Profile, name: str) -> str:
     return LIBRARY if category(profile, name) == "library" else SHOP
 
 
+def shops(profile: Profile) -> list[str]:
+    """Die Namen der Quellen, bei denen man kaufen kann.
+
+    Gefragt, statt ``"beam"`` hinzuschreiben: der Quellenname ist Konfiguration,
+    und er war schon einmal an drei Stellen in die Oberflaeche gerutscht
+    (Ticket 05, Review). Wer Preise vergleicht, meint *einen Shop*, nicht
+    diesen.
+    """
+    return [name for name in profile.sources if category(profile, name) == "shop"]
+
+
 _BUILDERS: dict[str, Callable[[str, dict, HttpClient], Source]] = {
     "fake": _build_fake,
     "voebb": _build_voebb,

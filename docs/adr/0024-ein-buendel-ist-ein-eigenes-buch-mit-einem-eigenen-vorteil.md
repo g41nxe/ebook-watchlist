@@ -84,6 +84,19 @@ deshalb in den Rangschlüssel, direkt hinter den exakten Titel.
 Das Bündel geht dabei nicht verloren: es ist ein eigenes Buch und wird über
 seine Beziehung gefunden, nicht über die Watchlist-Verknüpfung.
 
+## Nachtrag aus dem Review nach 1.0
+
+Die Entscheidung war zunächst nur zur Hälfte umgesetzt: `worth_announcing`
+kannte den Bündelvorteil, aber `diff.compare` reichte ihn nicht durch. Der
+Stapel zeigte ihn, der **Tagesbericht schwieg** — ein neu auftauchendes
+Bündel zu 12,99 € wäre nie gemeldet worden. Genau die Asymmetrie, vor der
+ADR 19 warnt, nur andersherum.
+
+Repariert: `compare` und `compute_deltas` nehmen die Auskunft entgegen, der
+Tagesbericht nennt den Satz („2 Bände für 12,99 € statt 21,98 € — 41 %
+gespart"), und **eine** Stelle rechnet ihn aus (`bundle_deal.advantage_finder`)
+— vorher hätte es zwei geben können, die auseinanderlaufen.
+
 ## Consequences
 
 - **Vier neue Meldungen, keine Flut** — und keine davon wird heute gemeldet,
