@@ -1,6 +1,7 @@
-"""Nimmt das Titelbild der README auf.
+"""Nimmt die Bilder der README auf.
 
-    uv run python scripts/make_hero.py
+    uv run python scripts/make_hero.py            # das Titelbild
+    uv run python scripts/make_hero.py buchseite  # die Buchseite
 
 Voraussetzung: die Oberfläche läuft (``uv run python -m ebook_watchlist.web``).
 
@@ -23,11 +24,14 @@ import urllib.request
 from pathlib import Path
 
 WURZEL = Path(__file__).resolve().parent.parent
-SZENE = WURZEL / "scripts" / "hero.html"
-ZIEL = WURZEL / "docs" / "bilder" / "hero.png"
-OBERFLAECHE = "http://127.0.0.1:8439/vorschlaege"
 
-BREITE, HOEHE = 1600, 900
+#: Name -> (Szene, Ziel, Seite der Oberflaeche, Breite, Hoehe).
+#: Eine Szene je Bild, weil jede Seite eine andere Hoehe braucht; das
+#: Fensterbild drumherum ist dasselbe.
+SZENEN = {
+    "hero": ("hero.html", "hero.png", "/vorschlaege", 1600, 900),
+    "buchseite": ("buchseite.html", "buchseite.png", "/book/47", 1600, 1160),
+}
 
 #: Die Klammern in "ProgramFiles(x86)" sind kein gueltiger Formatname —
 #: deshalb die Umgebungsvariablen einzeln nachschlagen statt zu formatieren.
@@ -50,20 +54,28 @@ def browser() -> str:
             return str(pfad)
     raise SystemExit("weder Chrome noch Edge gefunden")
 
-def oberflaeche_laeuft() -> bool:
+def oberflaeche_laeuft(seite: str) -> bool:
     """Sonst zeigt das Bild einen leeren Rahmen — und das fiele erst auf,
     wenn es schon in der README steht."""
     try:
-        with urllib.request.urlopen(OBERFLAECHE, timeout=5) as antwort:
+        with urllib.request.urlopen(f"http://127.0.0.1:8439{seite}", timeout=5) as antwort:
             return antwort.status == 200
     except OSError:
         return False
 
 
-def main() -> int:
-    if not oberflaeche_laeuft():
+def main(argumente: list[str] | None = None) -> int:
+    name = (argumente or sys.argv[1:] or ["hero"])[0]
+    if name not in SZENEN:
+        print(f"unbekannte Szene {name!r} — bekannt: {', '.join(SZENEN)}", file=sys.stderr)
+        return 2
+    szene_datei, ziel_datei, seite, BREITE, HOEHE = SZENEN[name]
+    SZENE = WURZEL / "scripts" / szene_datei
+    ZIEL = WURZEL / "docs" / "bilder" / ziel_datei
+
+    if not oberflaeche_laeuft(seite):
         print(
-            f"Die Oberfläche antwortet nicht auf {OBERFLAECHE} — erst "
+            f"Die Oberfläche antwortet nicht auf http://127.0.0.1:8439{seite} — erst "
             "'uv run python -m ebook_watchlist.web --port 8439' starten.",
             file=sys.stderr,
         )

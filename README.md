@@ -14,6 +14,10 @@ Darüber hinaus schlägt es Bücher vor, die es noch nicht kennt. Ein Modell hä
 jeden Fund gegen ein schriftlich festgehaltenes **Leseprofil** und begründet in
 einem Satz, warum ein Buch in Frage kommt — oder eben nicht.
 
+Nichts davon wird weggeworfen: jede Beobachtung wird **angehängt**, nie
+überschrieben. Zu jedem Titel gibt es deshalb eine eigene Seite, auf der der
+ganze Verlauf steht — jeder Preis, jede Verfügbarkeit, mit Datum und Quelle.
+
 Fokus: **deutschsprachige Literatur**. Zwei Quellen:
 
 | Quelle | Art | Was sie liefert |
@@ -112,7 +116,7 @@ uv run python -m ebook_watchlist.web
 ```
 
 Danach unter `http://<rechner>:8437/` erreichbar, auch vom Telefon im selben
-Netz. Vier Seiten:
+Netz. Vier Seiten und eine je Buch:
 
 | Seite | Wofür |
 | --- | --- |
@@ -120,6 +124,22 @@ Netz. Vier Seiten:
 | **Watchlist** | die beobachteten Titel mit Preis und Verfügbarkeit je Quelle |
 | **Vorschläge** | der Stapel: Funde mit Cover, Sternen und Pitch, entscheidbar in einem Rutsch |
 | **Profil** | Leseprofil und Bewertungsschema, nur lesend |
+| **Buchseite** | alles zu *einem* Titel: Preis und Verfügbarkeit je Quelle, Klappentext, Bewertungen, der ganze beobachtete Verlauf |
+
+<p align="center">
+  <img src="docs/bilder/buchseite.png" width="900"
+       alt="Die Buchseite: Cover mit Schnäppchen-Abzeichen, je eine Kachel für Shop und Bibliothek, Klappentext, Bewertung und die Tabelle aller Beobachtungen">
+</p>
+
+Die **Buchseite** beantwortet zuerst, wonach man sieht: was kostet es, ist es
+zu haben, und wann wurde das zuletzt geprüft. Jede Quelle bekommt eine eigene
+Kachel mit ihrem eigenen Zeitpunkt — zwei Quellen können zu verschiedenen
+Zeiten gesprochen haben. Die Kachel ist zugleich der Weg dorthin.
+
+Von hier aus lässt sich ein Titel **einzeln nachprüfen**, ohne einen ganzen
+Lauf zu starten: gemessen dauert das 2,1 Sekunden. Hält gerade ein großer Lauf
+die Sperre, stellt sich die Prüfung an und sagt das auch — es könnte ja sein,
+dass der große Lauf an diesem Titel schon vorbei ist.
 
 Farbe bedeutet überall dasselbe: **grün = Bibliothek**, **bernstein = Shop**.
 
@@ -137,7 +157,7 @@ laufenden Lauf, und umgekehrt.
 
 **Läuft im Betrieb.** Zwei Quellen, anhängende Aufzeichnung, buchweite
 Entscheidungen, Bewertungstor mit echten Urteilen, Oberfläche, täglicher Lauf.
-645 Tests, 22 ADRs.
+803 Tests, 27 ADRs.
 
 Bekannte Lücken — vollständig in
 [docs/offene-punkte.md](docs/offene-punkte.md):
@@ -146,12 +166,16 @@ Bekannte Lücken — vollständig in
   deshalb auf dem Stapel landen und ein vollständiges Urteil bekommen.
 - **Bündel** („Titel A / Titel B", „3in1") werden keinem Watchlist-Titel
   zugeordnet, und ihr Preis ist kein Preis für den gesuchten Band.
-- **Keine Metadatenquelle.** Reihe, Bandnummer und die kanonische Schreibweise
-  fehlen; die DNB ist recherchiert, aber nicht angebunden.
 - **Die Übersichtsseite zeigt die Maschine, nicht die Bücher** — Läufe und
   Quellenzustand statt „was gibt es Neues".
-- **Neun Watchlist-Titel sind ungelöst**: der Matcher findet ihre deutsche
-  Ausgabe nicht sicher genug.
+- **Vier von siebzehn Watchlist-Titeln sind im Shop ungelöst**: zwei findet er
+  gar nicht, bei zweien ist er sich nicht sicher genug. Bei der Bibliothek
+  sind es vierzehn — die meisten Titel führt die Onleihe schlicht nicht.
+- **Erst ein Watchlist-Titel hat einen Klappentext.** Die Quellen liefern ihn
+  inzwischen beide; es fehlt der Lauf, der ihn holt.
+- **Watchlist-Titel bekommen kein Maschinen-Urteil.** Sie sind gewollt, also
+  entscheidet das Tor über sie nichts — ein Urteil wäre trotzdem eine
+  Auskunft (Ticket 55).
 
 Später: Vormerkungen mit Login, Bücher in mehreren Sprachen, ähnliche Bücher zu
 gemochten finden, Calibre-Anbindung.
@@ -320,12 +344,14 @@ ausfallen oder doppelt laufen. Beides ist unkritisch.
 - [docs/rundgang.md](docs/rundgang.md) — **hier anfangen**: was das Werkzeug
   kann und wie es funktioniert, ohne den Code zu lesen
 - [CONTEXT.md](CONTEXT.md) — Glossar, englischer Name und deutsches Wort
-- [docs/adr/](docs/adr) — die 22 festgehaltenen Entscheidungen
+- [docs/adr/](docs/adr) — die 27 festgehaltenen Entscheidungen
 - [docs/leseprofil.yaml](docs/leseprofil.yaml) — der Lesegeschmack, als Prosa
 - [docs/bewertungsschema.yaml](docs/bewertungsschema.yaml) — wie ein Buch
   dagegen gehalten und in Sterne übersetzt wird
 - [docs/offene-punkte.md](docs/offene-punkte.md) — was fehlt, und welche
   Behauptungen sich unterwegs als falsch erwiesen haben
+- [docs/namensfindung.md](docs/namensfindung.md) — wie das Werkzeug zu seinem
+  Namen kam, und an welchen vier Irrtümern je eine ganze Runde scheiterte
 - [.agents/skills/](.agents/skills) — `buch-bewerten`, `leseprofil-schaerfen`
 - [docs/research/title-matching-practices.md](docs/research/title-matching-practices.md)
   — wie MARC, ONIX, Primo und Open Library Titel zuordnen, und was das für
