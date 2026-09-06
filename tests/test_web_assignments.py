@@ -245,3 +245,40 @@ def test_the_book_inherits_the_cover_of_the_chosen_edition(
     )
 
     assert db.book(buch.id).cover_file == file_name(bild)
+
+
+def test_the_last_decision_does_not_land_on_an_empty_filter(
+    client: TestClient, db: Store
+) -> None:
+    """Der Filter ist zum Abarbeiten da. War es die letzte Frage, fuehrt er in
+    eine leere Liste — kein Fehler, aber eine Sackgasse."""
+    buch_id = unklar(db, ("Red Rising", "https://beam.invalid/1"))
+
+    antwort = client.post(
+        f"/watchlist/{buch_id}/zuordnen",
+        data={"source": "beam", "was": "keiner", "zurueck": "/watchlist?nur=unklar"},
+        follow_redirects=False,
+    )
+
+    assert antwort.headers["location"] == "/watchlist"
+
+
+def test_while_something_is_open_the_filter_holds(client: TestClient, db: Store) -> None:
+    profile = load_profile()
+    erstes = unklar(db, ("Red Rising", "https://beam.invalid/1"))
+    zweites = db.find_or_create_book(isbn=None, title="Noch eins", author="Wer", now=NOW)
+    db.put_relation(profile.slug, zweites.id, str(RelationKind.WATCHING), now=NOW)
+    db.put_book_source(
+        zweites.id, "beam", outcome=str(LinkOutcome.UNSURE), url=None, resolved_at=NOW,
+        reason="unklar",
+        candidates=[{"title": "Noch eins", "author": "Wer", "url": "https://x/9",
+                     "cover_url": None}],
+    )
+
+    antwort = client.post(
+        f"/watchlist/{erstes}/zuordnen",
+        data={"source": "beam", "was": "keiner", "zurueck": "/watchlist?nur=unklar"},
+        follow_redirects=False,
+    )
+
+    assert antwort.headers["location"] == "/watchlist?nur=unklar"

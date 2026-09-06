@@ -431,7 +431,16 @@ def create_app() -> FastAPI:
         # Dorthin zurueck, wo entschieden wurde. Vorher stand hier fest
         # ``?nur=unklar``: wer aus der vollen Liste heraus bestaetigte, landete
         # danach in der gefilterten — und sah seinen Eintrag nicht mehr.
-        return RedirectResponse(_zurueck(zurueck), status_code=303)
+        ziel = _zurueck(zurueck)
+        # War es die letzte offene Frage, fuehrt der Filter in eine leere
+        # Liste. Das ist kein Fehler, aber eine Sackgasse: die Seite sagt
+        # "Nichts offen" und verlangt einen weiteren Klick, um wieder etwas
+        # zu sehen. Dann lieber gleich die ganze Liste.
+        if ziel.endswith("?nur=unklar") and not any(
+            eintrag.needs_choice for eintrag in watchlist.entries(store, load_profile())
+        ):
+            ziel = "/watchlist"
+        return RedirectResponse(ziel, status_code=303)
 
 
     # --- Buchseite (Ticket 07) ---------------------------------------------
