@@ -208,12 +208,6 @@
   /* Die ganze Kachel ist der Verweis. Beim Ueberfahren tritt der Rahmen in
      der Farbe der Quelle hervor und das Wasserzeichen wird kraeftiger — mehr
      braucht es nicht, um zu sagen "hier kann man klicken". */
-  .kachel-klickbar { transition: border-color 0.15s, background-color 0.15s }
-  .kachel-klickbar:hover {
-    border-color: currentColor;
-    background: color-mix(in oklab, currentColor 6%, var(--color-card));
-  }
-  .kachel-klickbar:hover .kachelbild { opacity: 0.18 }
 
   /* Klappentext: verkuerzt, aufklappbar — dasselbe Muster, das der Shop
      selbst benutzt, nur ohne dass sein Knopf im gespeicherten Text landet. */
@@ -232,3 +226,21 @@
     .tun { min-height: 44px }
   }
 }
+
+/* Bewusst ausserhalb jeder Ebene: Tailwinds Hilfsklassen liegen in
+   `utilities`, und die kommt nach `base` — eine Regel dort verliert gegen
+   `.border-rule`, egal wie spezifisch sie ist. Nicht zugeordnete Regeln
+   schlagen jede Ebene, und genau das braucht der Rahmen beim Ueberfahren. */
+.kachel-klickbar {
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.kachel-klickbar.kachel-klickbar:hover {
+  border-color: currentColor;
+  background: color-mix(in oklab, currentColor 6%, var(--color-card));
+}
+.kachel-klickbar:hover .kachelbild {
+  opacity: 0.18;
+}
+
+/* Der Schliesser des Bearbeiten-Aufklappers: nur sichtbar, solange offen ist. */
+details[open] > button.tun[aria-label="Schließen"] { display: block; }

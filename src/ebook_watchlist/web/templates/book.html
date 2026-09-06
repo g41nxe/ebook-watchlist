@@ -192,13 +192,23 @@
    ein (weder Suche noch Zuordnung noch Bewertung), und sie kommt aus
    `notes:` in der Watchlist-Datei. Ein Feld, das sie ueberschreibt, liesse
    Datei und Datenbank auseinanderlaufen — fuer nichts. #}
-<details id="berichtigen" class="mt-2">
+<details id="berichtigen" class="relative mt-2">
   <summary class="inline-flex cursor-pointer list-none items-center gap-1.5 rounded py-1
                   text-xs text-soft hover:text-ink hover:underline underline-offset-2">
     <svg class="i"><use href="#ic-doc"/></svg>Titel und Autor:in ändern
   </summary>
+  {# Zuklappen ohne zu speichern. `details` kann das von sich aus nicht: das
+     `open`-Attribut faellt nur, wenn jemand das `summary` trifft. Das X steht
+     auf dessen Hoehe am rechten Rand — dort, wo man einen Schliesser sucht,
+     und weit genug von "Speichern" weg, dass sich beides nicht verwechselt.
+     Nur sichtbar, solange offen ist: zugeklappt gibt es nichts zu schliessen. #}
+  <button type="button" title="Schließen" aria-label="Schließen"
+          onclick="this.closest('details').open = false"
+          class="tun absolute top-0 right-0 hidden rounded p-1 text-soft hover:text-ink">
+    <svg class="i"><use href="#ic-x"/></svg></button>
   <form method="post" action="/book/{{ page.book_id }}/bearbeiten"
-        class="mt-2 flex flex-wrap items-end gap-3 rounded-lg border border-rule bg-card p-4">
+        class="mt-2 flex flex-wrap items-end gap-3 rounded-lg border border-rule
+               bg-card p-4">
     <label class="flex flex-col gap-1">
       <span class="text-[11px] font-medium text-soft">Titel</span>
       <input name="title" required autocomplete="off" value="{{ page.title }}"
@@ -217,10 +227,6 @@
     {# Zuklappen ohne zu speichern. `details` kennt dafuer nichts von sich aus:
        das `open`-Attribut faellt nur, wenn jemand das `summary` trifft — und
        das steht oben, ausserhalb des Blicks, sobald das Formular offen ist. #}
-    <button type="button" title="Schließen" aria-label="Schließen"
-            onclick="this.closest('details').open = false"
-            class="tun ml-auto rounded p-1.5 text-soft hover:text-ink">
-      <svg class="i"><use href="#ic-x"/></svg></button>
     <p class="w-full text-xs text-soft">
       Ein geänderter Titel wirft die Zuordnungen weg und wird sofort neu gesucht.</p>
   </form>
