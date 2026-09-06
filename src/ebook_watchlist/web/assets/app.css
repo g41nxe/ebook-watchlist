@@ -72,10 +72,19 @@
     width: 20px;
     height: 20px;
     border-radius: 9999px;
-    color: #fff;
+    /* Die Papierfarbe, nicht Weiss: im Dunkelmodus werden Gruen und Bernstein
+       aufgehellt, damit sie auf dunklem Grund tragen — ein weisses Symbol
+       darin faellt damit auf einen Kontrast von 2,2, und 3,0 ist die
+       Untergrenze fuer ein Zeichen, das etwas bedeutet. Mit `paper` kippt es
+       im Dunkeln auf dunkel und steht bei 8,8. Hell aendert sich nichts. */
+    color: var(--color-paper);
     box-shadow: 0 0 0 2px var(--color-paper), 0 1px 3px rgb(0 0 0 / 0.45);
   }
   .badge svg {
+    /* `block`, weil ein inline-SVG sonst auf der Schriftlinie sitzt und die
+       Unterlaenge es im Kreis nach unten schiebt — sichtbar erst, wenn man
+       zwei Abzeichen uebereinander stellt. */
+    display: block;
     width: 12px;
     height: 12px;
     stroke: currentColor;
@@ -84,6 +93,12 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+
+  /* Das Preisschild ist ein Zipfel: sein Flaechenschwerpunkt liegt 1,04 von
+     24 Einheiten oben links der Rahmenmitte, und mittig gesetzt haengt es
+     schief im Kreis. Bei 12 Pixeln sind das 0,52 Pixel — wenig, aber neben
+     dem symmetrischen Haus der Bibliothek sieht man es. */
+  .badge svg.zipfel { transform: translate(0.52px, 0.52px) }
 
   /* Was erst mit Alpine Sinn ergibt, bleibt ohne Alpine unsichtbar: faellt das
      Skript aus, ist die Seite eine gewoehnliche Formularseite und nicht eine
