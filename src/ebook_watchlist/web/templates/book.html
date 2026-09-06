@@ -97,14 +97,14 @@
         </div>
         <div class="relative">
           {% if sichtung and sichtung.price %}
-          <span class="block font-serif text-xl leading-none font-medium tabular-nums
+          <span class="block font-serif text-lg leading-none font-medium tabular-nums
                        {{ 'text-amber' if sichtung.deal else 'text-ink' }}">{{ sichtung.price }}</span>
           {% elif sichtung and sichtung.availability %}
-          <span class="block text-xl leading-none font-medium
+          <span class="block text-lg leading-none font-medium
                        {{ 'text-accent' if sichtung.availability == 'ausleihbar' else 'text-ink' }}"
                 >{{ sichtung.availability }}</span>
           {% else %}
-          <span class="block text-xl leading-none font-medium text-soft">{{ state.label }}</span>
+          <span class="block text-lg leading-none font-medium text-soft">{{ state.label }}</span>
           {% endif %}
           {# Der Zeitpunkt gehoert zu *dieser* Quelle: zwei Quellen koennen zu
              verschiedenen Zeiten gesprochen haben, heute nur zufaellig
