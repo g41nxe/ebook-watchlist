@@ -358,3 +358,47 @@ def test_a_contradicting_author_ends_the_question() -> None:
     )
 
     assert resolution.confidence is Confidence.NO_MATCH
+
+
+def test_a_nameless_candidate_does_not_mask_a_named_one() -> None:
+    """Der Befund aus dem Review: `worth_confirming` wurde nur an `best`
+    geprüft, und die Rangfolge wusste nichts davon. Ein autorloser Kandidat mit
+    ähnlicherem Titel verdeckte damit einen tiefer stehenden, der die richtige
+    Autor:in nennt — Ergebnis `no_match`, obwohl es etwas zu fragen gab."""
+    resolution = match(
+        Query(title="Autorität", author="Jeff VanderMeer"),
+        [
+            Candidate(title="Autorität heute", author=None),
+            Candidate(title="Autorität und die Grenzen der Macht", author="VanderMeer, Jeff"),
+        ],
+    )
+
+    assert resolution.best.candidate.author == "VanderMeer, Jeff"
+    assert resolution.confidence is Confidence.PROVISIONAL
+
+
+def test_an_exact_title_without_an_author_still_beats_a_contained_one() -> None:
+    """Die Stelle im Sortierschlüssel ist heikel: weiter vorne hätte das
+    fehlende Autorfeld einen exakten Titel hinter einen bloß enthaltenen
+    sortiert."""
+    query = Query(title="Kugelblitz", author="Cixin Liu")
+    exakt = score(query, Candidate(title="Kugelblitz", author=None))
+    enthalten = score(query, Candidate(title="Kugelblitz und Donner", author="Liu, Cixin"))
+
+    assert exakt.sort_key < enthalten.sort_key
+
+
+def test_the_reason_says_which_of_the_two_it_was() -> None:
+    """„Nennt niemanden" und „nennt jemand anderen" sind zwei verschiedene
+    Auskünfte."""
+    ohne = match(
+        Query(title="Autorität", author="VanderMeer"),
+        [Candidate(title="Neue Autorität – Das Handbuch", author=None)],
+    )
+    falsch = match(
+        Query(title="Dark Matter", author="Blake Crouch"),
+        [Candidate(title="Dark Matter and Dark Energy", author="Brian Clegg")],
+    )
+
+    assert "keine Autor:in" in ohne.reason
+    assert "andere Autor:in" in falsch.reason

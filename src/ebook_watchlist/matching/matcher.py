@@ -102,6 +102,9 @@ class Scored:
     #: Art wie ``id_conflict``: "Kim Mannix" statt "Blake Crouch" ist kein
     #: schwaches Indiz, sondern eine andere Person (ADR 23, Nachtrag).
     author_conflict: bool = False
+    #: Gefragt wurde nach einer Autor:in, der Kandidat nennt **keine**. Kein
+    #: Widerspruch — aber auch nichts, was sich bestaetigen liesse (Ticket 53).
+    author_missing: bool = False
     #: Der Kandidat ist eine Sammelausgabe, die Anfrage nicht. Bisher waren
     #: "Der Kruzifix-Killer" und "Der Kruzifix-Killer / Der Vollstrecker"
     #: ununterscheidbar — beide exakter Titel, beide exakter Autor —, und wer
@@ -131,6 +134,11 @@ class Scored:
             # nicht auf der Watchlist, und sie ist ein eigenes Buch (ADR 24).
             1 if self.is_bundle else 0,
             0 if self.title_contained else 1,
+            # **Nach** ``title_contained`` und vor der Aehnlichkeit: unter
+            # sonst gleichwertigen Kandidaten steht der hinten, zu dem sich
+            # nichts bestaetigen laesst. Weiter vorne haette es einen exakten
+            # Titel ohne Autorfeld hinter einen bloss enthaltenen sortiert.
+            1 if self.author_missing else 0,
             -(self.title_fuzzy // 5),
             0 if self.author_exact else 1,
             -(self.author_fuzzy // 5),
@@ -264,6 +272,7 @@ def score(query: Query, candidate: Candidate, source_rank: int = 0) -> Scored:
         # einer ist — keine zweite Zahl daneben. Ein fehlendes Autorfeld auf
         # einer der beiden Seiten ist Nichtwissen und kein Widerspruch.
         author_conflict=authors_contradict(query.author, candidate.author),
+        author_missing=bool(query.author) and not candidate.author,
     )
 
 
@@ -369,9 +378,7 @@ def worth_confirming(scored: Scored, query: Query) -> bool:
     (10 %) — aber **null** in der Anfrage, fuer die die Regel gebaut wurde,
     und 21 von 96 in den beiden, die den Fehler ausgeloest haben.
     """
-    if scored.author_conflict:
-        return False
-    return not (query.author and not scored.candidate.author)
+    return not (scored.author_conflict or scored.author_missing)
 
 
 def _is_tied(best: Scored, runner_up: Scored) -> bool:
@@ -411,11 +418,15 @@ def _confidence(query: Query, ranked: Sequence[Scored]) -> tuple[Confidence, str
                 "der gesuchte Titel steckt im gefundenen — bitte bestätigen",
             )
         if best.title_contained:
-            # Enthalten schon, aber niemand kann die Frage beantworten: der
-            # Kandidat nennt keine Autor:in oder eine andere (Ticket 53).
+            # Enthalten schon, aber niemand kann die Frage beantworten
+            # (Ticket 53). Welcher der beiden Gruende es ist, gehoert in die
+            # Begruendung: "nennt niemanden" und "nennt jemand anderen" sind
+            # fuer die Leserin zwei verschiedene Auskuenfte.
             return (
                 Confidence.NO_MATCH,
-                "der Titel steckt zwar im gefundenen, aber die Autor:in passt nicht dazu",
+                "der Titel steckt im gefundenen, aber dort steht eine andere Autor:in"
+                if best.author_conflict
+                else "der Titel steckt im gefundenen, aber dort steht keine Autor:in",
             )
         return (
             Confidence.NO_MATCH,
