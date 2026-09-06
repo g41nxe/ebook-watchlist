@@ -1,0 +1,87 @@
+<!doctype html><meta charset="utf-8"><title>Abzeichen: Kontrast</title>
+<style>
+:root{color-scheme:light dark}
+body{margin:0;font:14px/1.5 ui-sans-serif,system-ui,sans-serif;background:#faf8f4;color:#29231e}
+.dunkel{background:#0f0f13;color:#e6e4e0}
+section{padding:28px 32px}
+h1{font:600 20px/1.3 ui-serif,Georgia,serif;margin:0 0 4px}
+h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.6;margin:28px 0 12px}
+p.hinweis{max-width:60ch;opacity:.75;margin:0 0 8px}
+.reihe{display:flex;flex-wrap:wrap;gap:22px}
+.fall{width:150px}
+.fall .titel{font-weight:600;margin-bottom:2px}
+.fall .zahl{font-variant-numeric:tabular-nums;font-size:12px;opacity:.7}
+.cover{position:relative;width:74px;height:108px;border-radius:6px;margin-bottom:8px;
+  background:linear-gradient(150deg,#3a3f52,#1d2030);box-shadow:0 1px 3px rgb(0 0 0/.4)}
+.marke{position:absolute;top:-6px;right:-6px;display:flex;flex-direction:column;gap:5px}
+.badge{display:flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:999px;color:#fff}
+.badge svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.schlecht{color:#b4442f;font-weight:600}
+.gut{color:#2f7d4f;font-weight:600}
+.dunkel .schlecht{color:#e8836e}.dunkel .gut{color:#7fd39f}
+</style>
+<svg style="display:none">
+  <symbol id="ic-lib" viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 10v10h14V10"/><path d="M9.5 20v-6h5v6"/></symbol>
+  <symbol id="ic-tag" viewBox="0 0 24 24"><path d="M3 11V4a1 1 0 0 1 1-1h7l9 9-8 8z"/><circle cx="7.5" cy="7.5" r="1.3"/></symbol>
+</svg>
+
+<script>
+const FAELLE = [
+ {id:"A", titel:"A — heute", lib:"var(--a)", tag:"var(--t)", ink:"#fff", ring:1,
+  hell:"7,2 / 5,6", dunkel:"2,2 / 2,2", note:"weiß auf der Themenfarbe"},
+ {id:"B", titel:"B — Tinte statt Weiß", lib:"var(--a)", tag:"var(--t)", ink:"var(--tief)", ring:1,
+  hell:"7,2 / 5,6", dunkel:"8,8 / 8,9", note:"im Dunkelmodus kippt das Symbol auf dunkel"},
+ {id:"C", titel:"C — feste Marke", lib:"#28605a", tag:"#876125", ink:"#fff", ring:1,
+  hell:"7,2 / 5,6", dunkel:"7,2 / 5,6", note:"das Abzeichen ändert die Farbe nie"},
+ {id:"D", titel:"D — mittlerer Ton", lib:"#1b8278", tag:"#a26e22", ink:"#fff", ring:1,
+  hell:"4,6 / 4,4", dunkel:"4,6 / 4,4", note:"eine Farbe, die in beiden Modi trägt"},
+ {id:"E", titel:"E — dickerer Strich", lib:"var(--a)", tag:"var(--t)", ink:"#fff", ring:1, dick:1,
+  hell:"7,2 / 5,6", dunkel:"2,2 / 2,2", note:"nur die Linie, die Farbe bleibt"},
+];
+function bau(wo, dunkel){
+  const r = document.createElement("div"); r.className = "reihe";
+  for (const f of FAELLE){
+    const d = document.createElement("div"); d.className = "fall";
+    const schwach = (dunkel ? f.dunkel : f.hell).split(" / ").some(x => parseFloat(x.replace(",",".")) < 3);
+    d.innerHTML = `
+      <div class="cover"><span class="marke">
+        <span class="badge" style="background:${f.lib};color:${f.ink};
+              box-shadow:0 0 0 2px var(--grund),0 1px 3px rgb(0 0 0/.45)">
+          <svg style="${f.dick?'stroke-width:3.1':''}"><use href="#ic-lib"/></svg></span>
+        <span class="badge" style="background:${f.tag};color:${f.ink};
+              box-shadow:0 0 0 2px var(--grund),0 1px 3px rgb(0 0 0/.45)">
+          <svg style="${f.dick?'stroke-width:3.1':''}"><use href="#ic-tag"/></svg></span>
+      </span></div>
+      <div class="titel">${f.titel}</div>
+      <div class="zahl">Kontrast <span class="${schwach?'schlecht':'gut'}">${dunkel?f.dunkel:f.hell}</span></div>
+      <div class="zahl">${f.note}</div>`;
+    r.appendChild(d);
+  }
+  wo.appendChild(r);
+}
+</script>
+
+<section style="--a:#28605a;--t:#876125;--tief:#0f0f13;--grund:#faf8f4">
+  <h1>Das Abzeichen auf dem Cover</h1>
+  <p class="hinweis">Gemessen ist der Kontrast zwischen dem Symbol und der Fläche darunter,
+    als Verhältnis nach WCAG. Für ein Zeichen, das etwas bedeutet, gilt 3,0 als Untergrenze —
+    darunter steht es zwar da, ist aber nicht mehr sicher zu erkennen.
+    Zwei Zahlen je Fall: Bibliothek / Schnäppchen.</p>
+  <h2>Helle Seite</h2>
+  <div id="hell"></div>
+</section>
+
+<section class="dunkel" style="--a:#82bbb3;--t:#ccac76;--tief:#0f0f13;--grund:#0f0f13">
+  <h2>Dunkle Seite — hier entsteht das Problem</h2>
+  <p class="hinweis">Im Dunkelmodus werden Grün und Bernstein aufgehellt, damit sie auf
+    dunklem Grund lesbar bleiben. Das weiße Symbol darin verliert dadurch seinen Halt:
+    2,2 statt 7,2.</p>
+  <div id="dunkel"></div>
+</section>
+
+<script>
+  bau(document.getElementById("hell"), false);
+  bau(document.getElementById("dunkel"), true);
+</script>
