@@ -13,8 +13,11 @@
   {# Das Cover traegt dieselben Abzeichen wie in den Listen, nur groesser:
      hier ist es viermal so gross wie in einer Zeile, und das Listenmass
      wirkte daneben verloren (Ticket 52). #}
-  <div class="relative shrink-0">
-  <div class="h-36 w-24 overflow-hidden rounded shadow-[0_2px_8px_rgba(0,0,0,.4)]">
+  {# Das Cover schliesst unten mit den Kacheln ab: es waechst mit der Spalte
+     daneben, statt eine feste Hoehe zu haben. Wie hoch die wird, haengt
+     davon ab, was das Buch mitbringt — ISBN und Reihe sind wahlweise. #}
+  <div class="relative w-24 shrink-0 self-stretch">
+  <div class="h-full min-h-36 w-24 overflow-hidden rounded shadow-[0_2px_8px_rgba(0,0,0,.4)]">
     {% if page.cover_file %}
     <img src="/covers/{{ page.cover_file }}" alt="" class="h-full w-full object-cover">
     {% else %}
@@ -108,10 +111,10 @@
       </{{ "a" if gefunden else "div" }}>
       {% endfor %}
     </div>
-    {% include "_book_status.html" %}
     {% endif %}
 
-    {% if page.note %}
+    {# leer — Notiz und Zeitpunkt stehen unter dem Kopf #}
+    {% if False %}
     {# Die wertvollste Zeile des Eintrags, und bis Ticket 52 unsichtbar: bei
        15 von 17 Watchlist-Titeln gefuellt, und in ihr standen die
        Originaltitel, die vier Umbenennungen geloest haben. #}
@@ -137,6 +140,18 @@
     {% endif %}
   </div>
 </div>
+
+{% include "_book_status.html" %}
+
+{% if page.note %}
+{# Die wertvollste Zeile des Eintrags, und bis Ticket 52 unsichtbar: bei 15
+   von 17 Watchlist-Titeln gefuellt, und in ihr standen die Originaltitel, die
+   vier Umbenennungen geloest haben. #}
+<p class="mt-3 text-sm text-soft italic">{{ page.note }}
+  <a href="#berichtigen" class="ml-1 text-xs not-italic text-accent underline
+                                decoration-accent/30 underline-offset-2
+                                hover:decoration-accent">ändern</a></p>
+{% endif %}
 
 {# Eine falsche automatische Zuordnung wird hier sichtbar: der Vergleich ist
    absichtlich stumpf und entscheidet nichts, er macht nur aufmerksam (ADR 8). #}
