@@ -7,7 +7,7 @@
    Zeile ohne ihn zurueckgibt, hoert die Seite von selbst auf zu fragen —
    dasselbe Muster wie `_run_panel.html`, kein Websocket (ADR 3). #}
 <p id="buch-stand-{{ page.book_id }}"
-   class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-soft"
+   class="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-soft"
    {% if check and check.busy %}
    hx-get="/book/{{ page.book_id }}/nachsehen"
    hx-trigger="every 2s"

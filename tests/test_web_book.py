@@ -567,3 +567,36 @@ def test_the_longer_blurb_wins(db: Store) -> None:
     schreibe("Kurz …")
 
     assert db.book(buch.id).blurb == "Der ganze Text, viel laenger als der Anriss."
+
+
+def test_the_title_can_be_corrected_from_the_book_page(client: TestClient, db: Store) -> None:
+    """Bis hierher gab es das Umbenennen nur auf der Watchlist, und dort nur,
+    wenn keine Quelle den Titel fand (ADR 27). Es ist aber eine Eigenschaft
+    dieses Buchs."""
+    profile = load_profile()
+    buch = db.find_or_create_book(isbn=None, title="Dunkle Gefilde", author="Morgan", now=NOW)
+    db.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+    db.put_book_source(buch.id, "beam", outcome="not_found", url=None, resolved_at=NOW, reason="")
+
+    client.post(f"/book/{buch.id}/bearbeiten",
+                data={"title": "Profit", "author": "Richard K. Morgan", "note": "Konzernduelle."})
+
+    assert db.book(buch.id).title == "Profit"
+    # Die Zuordnung faellt weg — sie galt fuer den alten Titel.
+    assert db.get_book_source(buch.id, "beam") is None
+
+
+def test_the_note_can_be_written_and_cleared(client: TestClient, db: Store) -> None:
+    """Ersetzen, nicht ergänzen: sonst ließe sich eine Notiz schreiben, aber
+    nie wieder löschen."""
+    profile = load_profile()
+    buch = db.find_or_create_book(isbn=None, title="Egal", author="Wer", now=NOW)
+    db.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+
+    client.post(f"/book/{buch.id}/bearbeiten",
+                data={"title": "Egal", "author": "Wer", "note": "Band 1."})
+    assert view.build(db, profile, buch.id).note == "Band 1."
+
+    client.post(f"/book/{buch.id}/bearbeiten",
+                data={"title": "Egal", "author": "Wer", "note": ""})
+    assert view.build(db, profile, buch.id).note is None

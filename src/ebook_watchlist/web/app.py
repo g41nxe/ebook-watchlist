@@ -536,6 +536,30 @@ def create_app() -> FastAPI:
             },
         )
 
+    @app.post("/book/{book_id}/bearbeiten")
+    def book_edit(
+        book_id: int,
+        title: str = Form(...),
+        author: str = Form(""),
+        note: str = Form(""),
+    ) -> RedirectResponse:
+        """Titel, Autor:in und Notiz an einer Stelle aendern (ADR 27).
+
+        Bisher gab es das Umbenennen nur auf der Watchlist, und dort nur,
+        wenn keine Quelle den Titel fand. Es ist aber eine Eigenschaft
+        *dieses Buchs* — und die Notiz erst recht.
+
+        Aendert sich der Titel, fallen die Zuordnungen weg und der enge Lauf
+        sucht sofort neu (Ticket 51). Die Notiz allein loest nichts aus: sie
+        steht fuer die Leserin da, nicht fuer die Suche.
+        """
+        store = _store_for(paths.db_path())
+        profile = load_profile()
+        watchlist.set_note(store, profile.slug, book_id, note, now=datetime.now())
+        if store.rename_book(book_id, title=title, author=author or None):
+            rechecker.start(book_id)
+        return RedirectResponse(f"/book/{book_id}", status_code=303)
+
     @app.post("/book/{book_id}/nachsehen")
     def book_recheck(request: Request, book_id: int) -> HTMLResponse:
         """Diesen einen Eintrag jetzt pruefen — von seiner eigenen Seite aus.

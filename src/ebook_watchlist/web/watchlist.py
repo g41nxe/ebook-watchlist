@@ -340,6 +340,27 @@ def finish(
     store.deactivate_relation(profile_slug, book_id, str(RelationKind.WATCHING), now=now)
 
 
+def set_note(
+    store: Store, profile_slug: str, book_id: int, note: str | None, *, now: datetime
+) -> None:
+    """Was die Leserin sich selbst zu dem Buch notiert hat.
+
+    Ersetzen, nicht ergaenzen — sonst liesse sich eine Notiz schreiben, aber
+    nie wieder loeschen. Dieselbe Ueberlegung wie bei ``set_restriction``.
+    """
+    details = {}
+    for relation in store.relations_of(profile_slug, book_id):
+        if relation.kind == RelationKind.WATCHING:
+            details = _details(relation)
+            break
+    details.pop("note", None)
+    if note and note.strip():
+        details["note"] = note.strip()
+    store.set_relation_details(
+        profile_slug, book_id, str(RelationKind.WATCHING), details, now=now
+    )
+
+
 def set_restriction(
     store: Store, profile_slug: str, book_id: int, restrict: str | None, *, now: datetime
 ) -> None:
