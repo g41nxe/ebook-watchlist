@@ -35,7 +35,7 @@
   {# Die Linie traegt die Reiter — und erscheint deshalb erst, wenn einer
      offen ist. Zugeklappt lag sie sonst als freischwebender Strich unter den
      Zahlen und trennte nichts von nichts. #}
-  <div class="flex flex-wrap gap-x-2"
+  <div class="flex flex-wrap justify-center gap-x-6"
        :class="offen ? 'border-b border-rule' : ''">
     {% for regal in view.counts %}
     <button type="button"
