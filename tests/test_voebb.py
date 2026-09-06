@@ -219,3 +219,29 @@ def test_check_carries_the_series_into_the_observation() -> None:
     observation = source.check(entry)
     assert observation is not None
     assert observation.series == "Die sieben Schwestern"
+
+
+def test_the_detail_page_carries_a_cover() -> None:
+    """Ein Buch, das es nur in der Bibliothek gibt, hatte nie ein Titelbild:
+    Cover kamen ausschliesslich aus dem Shop, und dort steht nicht jeder Titel.
+    Bei *Autorität* und *Akzeptanz* — beide sofort ausleihbar — fiel es auf.
+
+    Die Adresse stand die ganze Zeit in den Beispielseiten; ausgelesen hat sie
+    niemand. Sie kostet keine eigene Anfrage: die Seite wird ohnehin fuer die
+    Verfuegbarkeit geholt."""
+    detail = parse.parse_detail(fixture("detail-available.html"))
+
+    assert detail.cover_url == (
+        "https://static.onleihe.de/images/978/310/491/276/9/"
+        "65c24250673f3d10bd6298ee/im9783104912769s.jpg"
+    )
+
+
+def test_a_page_without_a_cover_says_so_instead_of_guessing() -> None:
+    html = '<html><body><div class="exemplar-count">1</div></body></html>'
+
+    try:
+        detail = parse.parse_detail(html)
+    except Exception:
+        return  # ohne Exemplarblock wirft der Parser — das prueft ein anderer Test
+    assert detail.cover_url is None

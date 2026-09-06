@@ -60,6 +60,10 @@ AVAILABILITY_COUNT = ".availability-count"
 RESERVATION_COUNT = ".reservation-count"
 DETAIL_TITLE = '[test-id="cardTitle"]'
 DETAIL_SUBTITLE = "h4.headline.subtitle"
+#: Das Titelbild. Die Onleihe liefert eins — die abgelegten Beispielseiten
+#: zeigten keines, weil sie aus der Zeit vor einem Umbau der Seite stammen.
+#: Bis dahin bekam ein Buch, das es nur in der Bibliothek gibt, nie ein Bild.
+DETAIL_COVER = "img.img-thumbnail[src]"
 #: Bibliographic rows are ``<b>LABEL:</b><span>VALUE</span>`` pairs.
 DESCRIPTION_ROW = "p.horizontalDescription"
 

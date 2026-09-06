@@ -48,6 +48,9 @@ class Detail:
     #: die das tut (ADR 17).
     series: str | None = None
     isbn: str | None = None
+    #: Adresse des Titelbilds. Kostet keine eigene Anfrage — es steht auf der
+    #: Seite, die ohnehin fuer die Verfuegbarkeit geholt wird.
+    cover_url: str | None = None
 
     @property
     def availability(self) -> Availability:
@@ -106,7 +109,22 @@ def parse_detail(html: str) -> Detail:
         available_copies=available,
         reservations=reservations,
         available_from=available_from,
+        cover_url=_cover(page),
     )
+
+
+def _cover(page) -> str | None:
+    """Die Adresse des Titelbilds, falls die Seite eins nennt.
+
+    Ein Buch, das es nur in der Bibliothek gibt, hatte bis dahin nie ein Bild:
+    Cover kamen ausschliesslich aus dem Shop, und dort steht nicht jeder Titel.
+    Bei *Autoritaet* und *Akzeptanz* — beide sofort ausleihbar — fiel es auf.
+    """
+    node = page.select_one(sel.DETAIL_COVER)
+    if node is None:
+        return None
+    src = node.get("src")
+    return src if isinstance(src, str) and src.strip() else None
 
 
 @dataclass(frozen=True, slots=True)
