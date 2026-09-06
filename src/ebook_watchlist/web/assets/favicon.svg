@@ -12,20 +12,32 @@
     Das Schild im Abzeichen ist gefüllt und nicht als Umriss gezeichnet: bei
     16 Pixeln ist ein Umriss von einem Viertelpixel nichts mehr.
   -->
+  <!--
+    Die Farben sind die der Oberfläche, nicht eigene: das Buch traegt das
+    Gruen der Bibliothek (`--color-accent`), das Abzeichen das Bernstein des
+    Shops (`--color-amber`) — dieselbe Zuordnung, die jede Zeile der Liste
+    macht. Vorher war das Buch blattgruen und die Marke sandfarben; das war
+    huebsch und gehoerte zu nichts.
+
+    Ausgeschrieben als Hex, nicht als `oklch()` oder `var()`: ein Favicon wird
+    ohne das Stilblatt der Seite gezeichnet, und manche Zeichner (Tab-Leisten,
+    Lesezeichen, das Betriebssystem) sind alt. Die Werte sind aus den Marken
+    der Oberflaeche umgerechnet und stehen daneben.
+  -->
   <style>
-    .deckel { fill: #4d7c43 }
-    .ruecken{ fill: #38602f }
-    .zeile  { fill: #7fa876 }
-    .ring   { fill: #17181c }
-    .marke  { fill: #c9a377 }
-    .schild { fill: #ffffff }
+    .deckel { fill: #28605a }  /* --color-accent  oklch(0.45 0.06 185) */
+    .ruecken{ fill: #124641 }  /* dasselbe, dunkler: der Ruecken liegt hinten */
+    .zeile  { fill: #85aea8 }  /* dasselbe, heller: Schrift auf dem Deckel */
+    .ring   { fill: #29231e }  /* --color-ink */
+    .marke  { fill: #876125 }  /* --color-amber  oklch(0.52 0.09 75) */
+    .schild { fill: #faf8f4 }  /* --color-paper */
     @media (prefers-color-scheme: dark) {
-      .deckel { fill: #6d9c62 }
-      .ruecken{ fill: #4e7a43 }
-      .zeile  { fill: #a8c9a0 }
-      .ring   { fill: #f2efe8 }
-      .marke  { fill: #d9b78d }
-      .schild { fill: #2a2620 }
+      .deckel { fill: #6da59d }  /* --color-accent (dunkel) */
+      .ruecken{ fill: #467d76 }
+      .zeile  { fill: #b9d9d4 }
+      .ring   { fill: #e6e4e0 }  /* --color-ink (dunkel) */
+      .marke  { fill: #ccac76 }  /* --color-amber (dunkel) */
+      .schild { fill: #0f0f13 }  /* --color-paper (dunkel) */
     }
   </style>
 

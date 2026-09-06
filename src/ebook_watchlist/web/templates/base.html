@@ -20,7 +20,6 @@
 {# Ein Sprite statt einer Icon-Schrift: keine Fremdanfrage, kein Nachladen,
    und die Icons erben Farbe und Groesse vom Text (ADR 20). #}
 <svg class="hidden" aria-hidden="true">
-  <symbol id="ic-book" viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></symbol>
   <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2"/></symbol>
   <symbol id="ic-doc" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4M9 13h6M9 17h4"/></symbol>
   <symbol id="ic-warn" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5h.01"/></symbol>
@@ -44,7 +43,12 @@
 
 <header class="sticky top-0 z-20 border-b border-rule bg-card/85 backdrop-blur">
   <div class="mx-auto flex max-w-3xl items-center gap-3 px-6 py-3">
-    <svg class="i text-[19px] text-accent"><use href="#ic-book"/></svg>
+    {# Dasselbe Bild wie im Tab, buchstaeblich dieselbe Datei: ein Zeichen,
+       das die Anwendung meint, sollte nicht zweimal gezeichnet sein und
+       auseinanderlaufen. Als `img`, weil das Favicon seine Farben selbst
+       mitbringt — `currentColor` wuerde sie verwerfen. #}
+    <img src="{{ url_for('static', path='favicon.svg') }}?v={{ asset_version }}"
+         alt="" width="22" height="22" class="shrink-0">
     <div>
       <div class="font-semibold tracking-tight">eBook-Watchlist</div>
       {% block subtitle %}{% endblock %}
