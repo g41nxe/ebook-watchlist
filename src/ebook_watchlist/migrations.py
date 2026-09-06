@@ -356,6 +356,61 @@ def _blurb_stands_once(connection: Connection) -> None:
             )
 
 
+def _reception_was_a_detour(connection: Connection) -> None:
+    """Eine eigene Tabelle fuer fremde Stimmen — und wieder zurueck (Ticket 54).
+
+    Diese Nummer tut **nichts** und bleibt trotzdem stehen. Sie hat einmal
+    ``reception`` angelegt, geschluesselt nach ``(subject, source)`` — eine
+    Achse zu viel, denn ``rating`` traegt seit ADR 19 genau diesen Schluessel
+    als ``(subject, origin)``, und eine weitere Quelle ist dort eine weitere
+    Herkunft, kein zweites Schema.
+
+    Sie zu **ersetzen** war der eigentliche Fehler: jede Datei, die sie schon
+    gelaufen war, ueberspringt den Nachfolger fuer immer (ADR 16). Genau das
+    ist passiert und hat ``rating.votes`` auf einer Datei mit
+    ``user_version = 17`` fehlen lassen. Aufgeraeumt wird deshalb angehaengt,
+    in ``_the_detour_leaves_no_table``.
+    """
+
+
+def _observation_carries_the_vote(connection: Connection) -> None:
+    """Was die Quelle ueber die Stimmen sagte, als sie es sagte (Ticket 54).
+
+    Zwei ganze Zahlen je Zeile — anders als der Klappentext, dessen
+    Mitschreiben rund zehn Megabyte im Jahr kostete. Und anders als dieser ist
+    es eine echte Zeitreihe: eine Durchschnittsnote wandert, und wann sie
+    wanderte, ist eine Auskunft.
+    """
+    add_column(connection, "observation", "rating", "INTEGER")
+    add_column(connection, "observation", "rating_votes", "INTEGER")
+
+
+def _how_many_voted(connection: Connection) -> None:
+    """Auf wie vielen Stimmen eine fremde Bewertung ruht (Ticket 54).
+
+    Fuer die eigenen Urteile bedeutungslos — dort steht *eine* Stimme, die des
+    Modells oder der Leserin. Fuer eine Bibliotheks- oder Shop-Bewertung ist
+    die Zahl der halbe Wert der Angabe: 5,0 aus einer Stimme ist keine
+    Auskunft, 2,8 aus 1641 schon. Gemessen an Google Books liegt der Median
+    unserer Buecher bei **einer** Stimme
+    (``docs/research/reader-ratings-sources.md``).
+
+    Eine Spalte statt einer eigenen Tabelle: ``rating`` ist bereits nach
+    ``(subject, origin)`` geschluesselt (ADR 19).
+    """
+    add_column(connection, "rating", "votes", "INTEGER")
+
+
+def _the_detour_leaves_no_table(connection: Connection) -> None:
+    """Die verworfene ``reception``-Tabelle wegraeumen.
+
+    Angehaengt statt in Nummer 16 nachgetragen: eine Datei, die 16 schon
+    gelaufen ist, sieht deren neuen Inhalt nie (ADR 16). Genau eine solche
+    Datei gibt es.
+    """
+    connection.exec_driver_sql("DROP TABLE IF EXISTS reception")
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     _backfill_seeded_scopes,
     _add_blurb_columns,
@@ -375,6 +430,10 @@ MIGRATIONS: tuple[Migration, ...] = (
     _add_dnb_columns,
     _dnb_is_keyed_by_isbn,
     _blurb_stands_once,
+    _reception_was_a_detour,
+    _observation_carries_the_vote,
+    _how_many_voted,
+    _the_detour_leaves_no_table,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -18,8 +18,10 @@ from ..models import Availability, MatchReason
 from ..rating import RatingUnavailable, load_leseprofil
 from ..ratings import (
     BY_CONVERSATION,
+    BY_LIBRARY_READERS,
     BY_MODEL,
     BY_READER,
+    FOREIGN_ORIGINS,
     HUMAN_ORIGINS,
     LABELS,
     book_subject,
@@ -33,7 +35,9 @@ from .watchlist import SourceState
 
 #: Die Reihenfolge, in der Urteile auf der Seite stehen: was ein Mensch gesagt
 #: hat, zuerst.
-ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL)
+#: Zuletzt die fremden Stimmen: sie sind Auskunft ueber das Buch, nicht ueber
+#: die Passung zum Profil (Ticket 54).
+ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL, BY_LIBRARY_READERS)
 
 #: Was die Leserin über ein Buch sagen kann, in der Reihenfolge, in der es auf
 #: der Seite steht. Mehrere gelten gleichzeitig — das ist der Normalfall.
@@ -44,6 +48,10 @@ KINDS: tuple[tuple[str, str], ...] = labelled(
     RelationKind.DISLIKED,
     RelationKind.DISMISSED,
 )
+
+#: Herkuenfte, deren Urteil an einer *Ausgabe* haengt statt am Buch der
+#: Leserin — das Tor (ADR 18) und fremde Leserstimmen (Ticket 54).
+_AT_THE_FIND: frozenset[str] = frozenset({BY_MODEL}) | FOREIGN_ORIGINS
 
 #: Nur für den Vergleich zweier Zeitstempel, von denen einer fehlen darf.
 _EPOCH = datetime.min
@@ -125,15 +133,27 @@ class Judgement:
 
     origin: str
     label: str
-    stars: int
+    stars: float
     reason: str
     confidence: str
     profile_version: int
     when: datetime | None
+    #: Auf wie vielen Stimmen die Angabe ruht — nur bei fremden Urteilen.
+    votes: int | None = None
 
     @property
     def is_human(self) -> bool:
         return self.origin in HUMAN_ORIGINS
+
+    @property
+    def is_foreign(self) -> bool:
+        """Fremde Leserstimmen — weder das Werkzeug noch die Leserin.
+
+        Sie sagen etwas ueber das *Buch*, nicht ueber die Passung zum Profil,
+        und duerfen deshalb nicht neben einem Modellurteil stehen, als waeren
+        sie dasselbe (Ticket 54).
+        """
+        return self.origin in FOREIGN_ORIGINS
 
     def stale(self, current: int | None) -> bool:
         """Gegen eine ältere Profilfassung gefällt — und deshalb nur noch Auskunft.
@@ -141,7 +161,12 @@ class Judgement:
         Gilt nur für Maschinenurteile: was ein Mensch gesagt hat, verfällt
         nicht, wenn er sein Profil schärft.
         """
-        return not self.is_human and current is not None and self.profile_version != current
+        if self.is_human or self.is_foreign:
+            # Eine fremde Durchschnittsnote ist kein Urteil gegen das Profil.
+            # Sie kann deshalb auch nicht gegen eine aeltere Fassung gefaellt
+            # worden sein.
+            return False
+        return current is not None and self.profile_version != current
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,9 +281,11 @@ def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
     rows = store.ratings_for(subjects)
     found: dict[str, object] = {}
     for (subject, origin), row in rows.items():
-        # Nur das Modell darf am Fund hängen: eine Leserin-Bewertung unter
-        # einem Fund-Schlüssel gäbe es nur, wenn jemand sie dort hinschriebe.
-        if origin != BY_MODEL and subject != of_book:
+        # Am *Fund* darf hängen, was über eine Ausgabe spricht: das Urteil des
+        # Tors und fremde Leserstimmen, die zu einer ISBN gehören. Was ein
+        # Mensch gesagt hat, hängt dagegen am Buch — unter einem Fund-Schlüssel
+        # gäbe es das nur, wenn jemand es dort hinschriebe (Ticket 54).
+        if origin not in _AT_THE_FIND and subject != of_book:
             continue
         previous = found.get(origin)
         if previous is None or (row.rated_at or _EPOCH) > (previous.rated_at or _EPOCH):
@@ -273,6 +300,7 @@ def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
             confidence=row.confidence,
             profile_version=row.profile_version,
             when=row.rated_at,
+            votes=row.votes,
         )
         for origin in ORIGIN_ORDER
         if (row := found.get(origin)) is not None

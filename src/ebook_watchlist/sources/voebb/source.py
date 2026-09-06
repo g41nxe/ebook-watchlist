@@ -93,6 +93,8 @@ class VoebbSource(LibrarySource):
             reservation_count=detail.reservations,
             available_from=detail.available_from,
             cover_url=detail.cover_url,
+            rating=detail.rating,
+            rating_votes=detail.votes,
             url=url,
         )
 

@@ -51,6 +51,10 @@ class Detail:
     #: Adresse des Titelbilds. Kostet keine eigene Anfrage — es steht auf der
     #: Seite, die ohnehin fuer die Verfuegbarkeit geholt wird.
     cover_url: str | None = None
+    #: Was die Leserschaft der Bibliothek im Schnitt vergeben hat, 0 bis 5.
+    rating: int | None = None
+    #: Auf wie vielen Stimmen dieser Schnitt ruht.
+    votes: int | None = None
 
     @property
     def availability(self) -> Availability:
@@ -110,7 +114,36 @@ def parse_detail(html: str) -> Detail:
         reservations=reservations,
         available_from=available_from,
         cover_url=_cover(page),
+        rating=_rating(page),
+        votes=_votes(page),
     )
+
+
+def _rating(page) -> int | None:
+    """Der Durchschnitt der Leserstimmen, als Zahl gefuellter Sterne.
+
+    Die Seite zeigt ihn **nur** als Sternbild und rundet dabei: die
+    Trefferkarte nannte fuer *Autoritaet* 2.8, hier stehen 2 von 5. Fuer eine
+    Regel mit dem Angelpunkt "3 ist Durchschnitt" kann das den Ausschlag geben
+    — der genauere Wert steht auf der Karte und liesse sich bei der Zuordnung
+    mitnehmen (Ticket 51).
+    """
+    block = page.select_one(sel.DETAIL_RATING)
+    if block is None:
+        return None
+    if not block.select(sel.DETAIL_RATING_STAR):
+        return None
+    return len(block.select(sel.DETAIL_RATING_FILLED))
+
+
+def _votes(page) -> int | None:
+    """Wie viele Stimmen dahinterstehen. Ohne sie ist der Schnitt wertlos."""
+    label = page.select_one(sel.DETAIL_VOTES)
+    wert = label.find_next("dd") if label is not None else None
+    if wert is None:
+        return None
+    ziffern = re.sub(r"[^0-9]", "", wert.get_text(" ", strip=True))
+    return int(ziffern) if ziffern else None
 
 
 def _cover(page) -> str | None:

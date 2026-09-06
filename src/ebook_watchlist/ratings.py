@@ -27,8 +27,20 @@ BY_MODEL = "model"
 BY_CONVERSATION = "conversation"
 #: Die Leserin selbst.
 BY_READER = "reader"
+#: Die Leserschaft der Bibliothek — ein Durchschnitt aus vielen fremden
+#: Stimmen, keine Aussage ueber das Leseprofil (Ticket 54). Steht hier und
+#: nicht in einer eigenen Tabelle, weil ``rating`` schon nach
+#: ``(subject, origin)`` geschluesselt ist: eine weitere Quelle ist eine
+#: weitere Herkunft (ADR 19).
+BY_LIBRARY_READERS = "voebb_readers"
 
-RATING_ORIGINS: frozenset[str] = frozenset({BY_MODEL, BY_CONVERSATION, BY_READER})
+RATING_ORIGINS: frozenset[str] = frozenset(
+    {BY_MODEL, BY_CONVERSATION, BY_READER, BY_LIBRARY_READERS}
+)
+
+#: Fremde Stimmen: kein Urteil gegen das Leseprofil, also auch nicht an eine
+#: Profilversion gebunden und von keiner neuen Fassung entwertet.
+FOREIGN_ORIGINS: frozenset[str] = frozenset({BY_LIBRARY_READERS})
 
 #: Was ein Mensch gesagt hat. Verfällt nicht mit einer neuen Profilversion,
 #: und wird von keinem Modellurteil überschrieben.
@@ -38,6 +50,7 @@ LABELS: dict[str, str] = {
     BY_MODEL: "vom Werkzeug bewertet",
     BY_CONVERSATION: "im Gespräch bewertet",
     BY_READER: "deine Bewertung",
+    BY_LIBRARY_READERS: "Leser:innen der Bibliothek",
 }
 
 

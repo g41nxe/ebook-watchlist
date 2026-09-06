@@ -73,7 +73,9 @@ class RatingUnavailable(Exception):
 
 @dataclass(frozen=True, slots=True)
 class Rating:
-    stars: int
+    #: Ganzzahlig bei eigenen Urteilen; fremde Stimmen bringen
+    #: Nachkommastellen mit (Ticket 54).
+    stars: float
     reason: str
     #: ``belegt`` | ``teils`` | ``vermutet`` — das Schema verlangt sie, weil ein
     #: Urteil über einen 219 Zeichen langen Anriss etwas anderes ist als eines

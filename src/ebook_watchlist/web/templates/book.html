@@ -162,7 +162,11 @@
   {% endif %}
 </div>
 
-{% set machine = page.judgements | rejectattr("is_human") | list %}
+{# Fremde Stimmen stehen fuer sich. Sie sagen etwas ueber das *Buch*, nicht
+   ueber die Passung zum Leseprofil — und duerfen deshalb nicht neben einem
+   Modellurteil stehen, als waeren sie dasselbe (ADR 19, Ticket 54). #}
+{% set fremd = page.judgements | selectattr("is_foreign") | list %}
+{% set machine = page.judgements | rejectattr("is_human") | rejectattr("is_foreign") | list %}
 {% if machine %}
 <ul class="mt-4 space-y-3">
   {% for judgement in machine %}
@@ -189,6 +193,35 @@
     {% if judgement.reason %}
     <p class="mt-1.5 text-sm text-ink/80">{{ judgement.reason }}</p>
     {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if fremd %}
+<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm
+           font-semibold text-soft">
+  <svg class="i"><use href="#ic-lib"/></svg>Was andere Leser:innen sagen
+</h2>
+<p class="mb-3 max-w-xl text-xs text-soft">
+  Ein Durchschnitt aus fremden Stimmen — keine Aussage darüber, ob das Buch zu
+  dir passt. Dafür stehen die Sterne oben.
+</p>
+<ul class="space-y-3">
+  {% for stimme in fremd %}
+  <li class="rounded-lg border border-rule bg-card px-4 py-3">
+    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <span class="font-semibold tabular-nums text-ink">{{ stimme.stars | sterne }}</span>
+      <span class="text-xs text-soft">von 5</span>
+      <span class="text-sm text-soft">{{ stimme.label }}</span>
+      {% if stimme.votes %}
+      <span class="rounded bg-hair px-1.5 py-0.5 text-[11px] text-soft tabular-nums">
+        {{ stimme.votes }} Stimmen</span>
+      {% endif %}
+      {% if stimme.when %}
+      <span class="text-xs text-soft">{{ stimme.when.strftime("%d.%m.%Y") }}</span>
+      {% endif %}
+    </div>
   </li>
   {% endfor %}
 </ul>

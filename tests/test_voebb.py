@@ -245,3 +245,21 @@ def test_a_page_without_a_cover_says_so_instead_of_guessing() -> None:
     except Exception:
         return  # ohne Exemplarblock wirft der Parser — das prueft ein anderer Test
     assert detail.cover_url is None
+
+
+def test_the_detail_page_carries_what_the_readers_said() -> None:
+    """Die einzige Quelle im Projekt mit belastbaren Stimmen — gemessen 22 bis
+    1641 je Titel, gegen einen Median von *einer* Stimme bei Google Books
+    (docs/research/reader-ratings-sources.md)."""
+    detail = parse.parse_detail(fixture("detail-unavailable.html"))
+
+    assert detail.rating == 4
+    assert detail.votes == 1641
+
+
+def test_a_page_without_a_rating_block_says_nothing() -> None:
+    """Nicht jeder Titel hat Stimmen — dann steht dort auch keine Null."""
+    detail = parse.parse_detail(fixture("detail-available.html"))
+
+    assert detail.rating is None
+    assert detail.votes is None

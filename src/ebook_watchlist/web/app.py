@@ -59,7 +59,20 @@ def _sum_chars(text: str) -> int:
     return sum(ord(char) for char in text or "")
 
 
+def _sterne(value: float | None) -> str:
+    """Sterne so schreiben, wie man sie sagt.
+
+    Die Spalte traegt seit Ticket 54 Nachkommastellen, weil fremde Stimmen sie
+    mitbringen — die Onleihe nennt 2.8. Eigene Urteile sind ganzzahlig, und
+    "4.0 von 5" waere fuer sie eine Genauigkeit, die es nicht gibt.
+    """
+    if value is None:
+        return ""
+    return str(int(value)) if float(value).is_integer() else f"{value:.1f}".replace(".", ",")
+
+
 TEMPLATES.env.filters["sum_chars"] = _sum_chars
+TEMPLATES.env.filters["sterne"] = _sterne
 
 #: Digest files are named by the Run that wrote them. Serving anything else
 #: from the data directory would turn a read-only page into a file browser.

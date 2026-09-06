@@ -88,6 +88,11 @@ class Observation:
     #: Adresse des Titelbilds bei der Quelle. Wird einmal geholt und lokal
     #: abgelegt, nie verlinkt (Ticket 15).
     cover_url: str | None = None
+    #: Was die Leserschaft der Quelle im Schnitt vergeben hat, 0 bis 5 — und
+    #: auf wie vielen Stimmen das ruht. Ohne die Anzahl ist der Schnitt
+    #: wertlos: 5,0 aus einer Stimme ist keine Auskunft (Ticket 54).
+    rating: int | None = None
+    rating_votes: int | None = None
     #: Nur gesetzt, wo eine Source die Reihe ausdrücklich benennt.
     series: str | None = None
     observed_at: datetime | None = None

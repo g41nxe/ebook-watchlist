@@ -14,6 +14,7 @@ from pathlib import Path
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     Index,
     Integer,
     String,
@@ -95,6 +96,9 @@ class ObservationRow(Base):
     #: Watchlist-Titel fiel das nie auf, weil die Bilder im selben Lauf geholt
     #: werden; für eine Entdeckung ging sie jedes Mal verloren (Ticket 15).
     cover_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Der Schnitt der Leserstimmen dieser Quelle und ihre Anzahl (Ticket 54).
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rating_votes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
 
     # Serves the max-id-per-item lookup that every diff starts with.
@@ -233,7 +237,12 @@ class RatingRow(Base):
     #: Wer geurteilt hat. Solange es nur eine Herkunft gab, war das entbehrlich;
     #: mit den Urteilen aus dem Gespräch und denen der Leserin sind es drei.
     origin: Mapped[str] = mapped_column(String, default="model")
-    stars: Mapped[int] = mapped_column(Integer)
+    #: Nachkommastellen sind erlaubt, weil fremde Stimmen sie mitbringen: die
+    #: Onleihe nennt auf ihrer Trefferkarte 2.8, und zwischen 2 und 3 liegt bei
+    #: einer Regel mit dem Angelpunkt "3 ist Durchschnitt" die Entscheidung.
+    #: Die eigenen Urteile bleiben ganzzahlig — das erzwingt das Schema
+    #: (``rating.parse_answer``), nicht die Spalte (Ticket 54).
+    stars: Mapped[float] = mapped_column(Float)
     confidence: Mapped[str] = mapped_column(String)
     reason: Mapped[str] = mapped_column(String)
     #: Ein Satz für die Leserin, warum das Buch in Frage kommt — im Digest und
@@ -385,6 +394,8 @@ def _to_observation(row: ObservationRow) -> Observation:
         category=row.category,
         url=row.url,
         cover_url=row.cover_url,
+        rating=row.rating,
+        rating_votes=row.rating_votes,
         observed_at=row.observed_at,
     )
 
@@ -1221,7 +1232,7 @@ class Store:
         self,
         subject: str,
         *,
-        stars: int,
+        stars: float,
         confidence: str,
         reason: str,
         profile_version: int,
@@ -1516,6 +1527,8 @@ class Store:
                     url=obs.url,
                     blurb=obs.blurb,
                     cover_url=obs.cover_url,
+                    rating=obs.rating,
+                    rating_votes=obs.rating_votes,
                     subtitle=obs.subtitle,
                     isbn=obs.isbn,
                     series=obs.series,

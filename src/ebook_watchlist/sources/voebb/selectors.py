@@ -64,6 +64,15 @@ DETAIL_SUBTITLE = "h4.headline.subtitle"
 #: zeigten keines, weil sie aus der Zeit vor einem Umbau der Seite stammen.
 #: Bis dahin bekam ein Buch, das es nur in der Bibliothek gibt, nie ein Bild.
 DETAIL_COVER = "img.img-thumbnail[src]"
+#: Was die Leserschaft der Bibliothek sagt. Der Durchschnitt steht nur als
+#: Sternbild — gefuellte Sterne zaehlen; die Suchkarte nennt ihn genauer
+#: (``cardAverageVote``), aber die sehen wir nur bei der Zuordnung.
+DETAIL_RATING = '[test-id="rating"]'
+DETAIL_RATING_STAR = ".ic_star"
+DETAIL_RATING_FILLED = ".ic_star.active"
+#: Die Anzahl steht in einer eigenen Beschreibungsliste, nicht in den
+#: ``horizontalDescription``-Zeilen wie Autor:in und Reihe.
+DETAIL_VOTES = "dt.user-vote"
 #: Bibliographic rows are ``<b>LABEL:</b><span>VALUE</span>`` pairs.
 DESCRIPTION_ROW = "p.horizontalDescription"
 

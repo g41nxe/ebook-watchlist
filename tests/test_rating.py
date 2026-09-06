@@ -1088,3 +1088,52 @@ def test_a_good_envelope_still_yields_its_result() -> None:
     huelle = json.dumps({"is_error": False, "result": '{"stars": 4}'})
 
     assert _cli_text(huelle) == '{"stars": 4}'
+
+
+def test_foreign_voices_stand_beside_the_tool_not_instead_of_it(store: Store) -> None:
+    """Keine eigene Tabelle: `rating` ist schon nach (subject, origin)
+    geschlüsselt, und genau darauf kommt eine weitere Quelle dazu (ADR 19,
+    Ticket 54)."""
+    from datetime import datetime
+
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL, subject_of
+    from ebook_watchlist.run import _record_foreign_ratings
+
+    fund = Observation(
+        source="voebb", source_item_id="1", title="Die sieben Schwestern",
+        author="Riley, Lucinda", match_reason=MatchReason.WATCHLIST,
+        isbn="9783641117009", rating=4, rating_votes=1641,
+    )
+    store.put_rating(subject_of(fund), stars=2, confidence="teils", reason="Modell",
+                     profile_version=2, now=datetime(2026, 9, 6), origin=BY_MODEL)
+
+    _record_foreign_ratings(store, [fund])
+
+    fremd = store.rating(subject_of(fund), 0, origin=BY_LIBRARY_READERS)
+    assert fremd.stars == 4
+    assert fremd.votes == 1641
+    assert fremd.confidence == "belegt"
+    # Das eigene Urteil bleibt unberührt daneben stehen.
+    assert store.rating(subject_of(fund), 2, origin=BY_MODEL).stars == 2
+
+
+def test_a_single_voice_is_not_evidence(store: Store) -> None:
+    """Fünf von sieben Bewertungen unseres Korpus ruhen bei Google Books auf
+    einer einzigen Stimme. Der Wert wird festgehalten, gilt aber nicht als
+    belegt — und ohne Anzahl wird gar nichts geschrieben."""
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.ratings import BY_LIBRARY_READERS, subject_of
+    from ebook_watchlist.run import _record_foreign_ratings
+
+    knapp = Observation(source="voebb", source_item_id="2", title="Kaum Stimmen",
+                        author="Wer", match_reason=MatchReason.WATCHLIST,
+                        isbn="9780000000002", rating=5, rating_votes=3)
+    ohne = Observation(source="voebb", source_item_id="3", title="Gar keine",
+                       author="Wer", match_reason=MatchReason.WATCHLIST,
+                       isbn="9780000000003", rating=5, rating_votes=None)
+
+    _record_foreign_ratings(store, [knapp, ohne])
+
+    assert store.rating(subject_of(knapp), 0, origin=BY_LIBRARY_READERS).confidence == "teils"
+    assert store.rating(subject_of(ohne), 0, origin=BY_LIBRARY_READERS) is None

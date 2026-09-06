@@ -456,6 +456,48 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
     return [geholt.get(o.key, o) for o in observations]
 
 
+def _record_foreign_ratings(store: Store, observations: Sequence[Observation]) -> None:
+    """Was fremde Leser:innen sagen, neben das eigene Urteil stellen (Ticket 54).
+
+    Keine eigene Tabelle: ``rating`` ist bereits nach ``(subject, origin)``
+    geschluesselt, und genau darauf kommt eine weitere Quelle spaeter dazu
+    (ADR 19). Die Bibliothek ist die vierte Herkunft neben Modell, Gespraech
+    und Leserin.
+
+    ``profile_version`` ist **0**: eine fremde Durchschnittsnote ist kein
+    Urteil gegen das Leseprofil und veraltet deshalb auch nicht mit einer
+    neuen Fassung. Und ``ebw rate`` schlaegt ausdruecklich ``(subject,
+    BY_MODEL)`` nach, sieht diese Zeilen also gar nicht.
+
+    Die Anzahl entscheidet ueber die Sicherheit, nicht ueber den Wert: gemessen
+    an Google Books ruhen fuenf von sieben Bewertungen unseres Korpus auf einer
+    **einzigen** Stimme (``docs/research/reader-ratings-sources.md``). Wo die
+    Anzahl fehlt, wird nichts geschrieben — ein Schnitt ohne sie ist keine
+    Auskunft.
+    """
+    from .ratings import BY_LIBRARY_READERS, subject_of
+
+    now = datetime.now()
+    for observation in observations:
+        if observation.rating is None or not observation.rating_votes:
+            continue
+        stimmen = observation.rating_votes
+        store.put_rating(
+            subject_of(observation),
+            stars=observation.rating,
+            # Wenige Stimmen sind kein Beleg. Die Grenze ist keine erfundene
+            # Zahl, sondern die kleinste, ab der ueberhaupt etwas gemittelt
+            # wird: unter zehn Stimmen entscheidet eine einzige Meinung ueber
+            # einen halben Stern.
+            confidence="belegt" if stimmen >= 10 else "teils",
+            reason=f"Durchschnitt der Leser:innen aus {stimmen} Stimmen",
+            profile_version=0,
+            now=now,
+            origin=BY_LIBRARY_READERS,
+            votes=stimmen,
+        )
+
+
 def _fetch_candidate_covers(store: Store, profile: Profile, client: HttpClient) -> None:
     """Titelbilder fuer die Ausgaben, zwischen denen die Leserin waehlen soll.
 
@@ -843,6 +885,7 @@ def _run(
     # Beobachtung geschrieben war — dieselbe Regel wie beim Tor eine Zeile
     # weiter unten: ein Ausfall kostet nie Geschichte.
     _fetch_covers(store, client, observations)
+    _record_foreign_ratings(store, observations)
     _fetch_candidate_covers(store, profile, client)
     _ask_the_library(store, client, profile)
 

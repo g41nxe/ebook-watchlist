@@ -442,3 +442,41 @@ def test_the_gates_verdict_on_a_discovery_without_an_isbn_is_found_too(
     assert "vom Werkzeug bewertet" in body
     assert "Achse D: isoliert." in body
     assert "noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
+
+
+def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:
+    """Eine 4 vom Modell ist ein Vorschlag, eine 4 aus 1641 fremden Stimmen ist
+    etwas ganz anderes. Sie dürfen nicht im selben Kasten stehen (ADR 19,
+    Ticket 54)."""
+    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL
+
+    buch = db.find_or_create_book(
+        isbn="9783641117009", title="Die sieben Schwestern", author="Riley", now=NOW
+    )
+    db.put_rating(f"book:{buch.id}", stars=4, confidence="belegt", reason="Modell",
+                  profile_version=2, now=NOW, origin=BY_MODEL)
+    db.put_rating(f"book:{buch.id}", stars=4, confidence="belegt",
+                  reason="Durchschnitt der Leser:innen aus 1641 Stimmen",
+                  profile_version=0, now=NOW, origin=BY_LIBRARY_READERS, votes=1641)
+
+    body = client.get(f"/book/{buch.id}").text
+
+    assert "Was andere Leser:innen sagen" in body
+    assert "1641 Stimmen" in body
+    # Und ausdrücklich *nicht* als veraltetes Modellurteil gebrandmarkt: die
+    # Profilversion 0 heißt "nicht gegen das Profil gefällt", nicht "veraltet".
+    assert "gegen Profil 0" not in body
+
+
+def test_a_foreign_voice_never_goes_stale(db) -> None:
+    """Sie ist kein Urteil gegen das Leseprofil und verfällt deshalb nicht,
+    wenn die Leserin ihr Profil schärft."""
+    from ebook_watchlist.ratings import BY_LIBRARY_READERS
+    from ebook_watchlist.web.book import Judgement
+
+    stimme = Judgement(origin=BY_LIBRARY_READERS, label="Leser:innen", stars=4.0,
+                       reason="", confidence="belegt", profile_version=0,
+                       when=None, votes=1641)
+
+    assert stimme.is_foreign
+    assert not stimme.stale(2)
