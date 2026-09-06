@@ -43,12 +43,15 @@
 
 <header class="sticky top-0 z-20 border-b border-rule bg-card/85 backdrop-blur">
   <div class="mx-auto flex max-w-3xl items-center gap-3 px-6 py-3">
-    {# Dasselbe Bild wie im Tab, buchstaeblich dieselbe Datei: ein Zeichen,
-       das die Anwendung meint, sollte nicht zweimal gezeichnet sein und
-       auseinanderlaufen. Als `img`, weil das Favicon seine Farben selbst
-       mitbringt — `currentColor` wuerde sie verwerfen. #}
-    <img src="{{ url_for('static', path='favicon.svg') }}?v={{ asset_version }}"
-         alt="" class="h-10 w-10 shrink-0">
+    {# Der Namensgeber, und hier nicht dieselbe Datei wie im Tab.
+       Urspruenglich war es eine: ein Zeichen, das die Anwendung meint, sollte
+       nicht zweimal gezeichnet sein. Der Vogel traegt die 40 px der Kopfzeile,
+       aber nicht die 16 des Tabs — dort zerfaellt er zu einem Kruemel, waehrend
+       das gezeichnete Zeichen als Rechteck mit Abzeichen lesbar bleibt
+       (`docs/bilder/buchfink-groessen.html`). Zwei Groessen, zwei Zeichen; wer
+       eines aendert, muss ans andere denken. #}
+    <img src="{{ url_for('static', path='buchfink.png') }}?v={{ asset_version }}"
+         alt="" width="40" height="40" class="h-10 w-10 shrink-0">
     <div>
       <div class="font-semibold tracking-tight">Buchfink</div>
       {# Die Zeile der Anwendung, auf jeder Seite dieselbe. Vorher stand hier

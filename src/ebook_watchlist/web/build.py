@@ -49,7 +49,12 @@ class Library:
 
 
 #: Fertige Dateien, die nur an ihren Platz muessen.
-ICONS = ("favicon.svg",)
+#:
+#: Zwei Zeichen, nicht eins: der Buchfink traegt die Kopfzeile bei 40 px, das
+#: gezeichnete Zeichen den Browser-Tab bei 16. Gemessen an
+#: ``docs/bilder/buchfink-groessen.html`` — bei 16 px zerfaellt der Vogel zu
+#: einem Kruemel, waehrend Rechteck und Abzeichen noch unterscheidbar sind.
+ICONS = ("favicon.svg", "buchfink.png")
 
 LIBRARIES = (
     Library(
