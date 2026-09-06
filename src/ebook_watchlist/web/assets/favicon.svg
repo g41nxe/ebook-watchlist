@@ -1,77 +1,59 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!--
-    Ein Buch mit einem Preisschild-Abzeichen an der Ecke — dieselbe Geste, die
-    die Oberfläche auf jedem Cover macht: das Buch ist die Sache, das Abzeichen
-    sagt, warum es gerade zählt (ADR 20).
+    Das Zeichen der Anwendung ist genau das, was eine Zeile der Liste zeigt,
+    wenn zu einem Buch noch kein Cover geholt wurde und der Shop es gerade
+    guenstig fuehrt: der gezeichnete Ruecken aus `_cover.html` mit dem
+    Schnaeppchen-Abzeichen an der Ecke. Nicht aehnlich, sondern dieselben
+    Zahlen — Rechteck 44x64 mit rx 2, Ruecken 5 breit, drei Zeilen bei y 16,
+    21 und 40; Abzeichen 20 Durchmesser, 4 ueber die obere und rechte Kante
+    hinaus, Ring 2 breit, Symbol 12 mit Strichstaerke 2,4.
 
-    Nachgezeichnet statt als PNG eingebunden: so schärft es mit dem Bildschirm
-    mit und kann auf Hell/Dunkel reagieren. Der schwarze Ring des Abzeichens
-    wird im Dunkelmodus hell — sonst verschwände er in einer dunklen
-    Tab-Leiste, und das Abzeichen zerfiele in zwei Flecken.
+    Der Farbton: die Liste waehlt ihn je Titel aus 160 bis 187, damit sich
+    zwei Buecher nebeneinander unterscheiden. Ein Zeichen hat keinen Titel,
+    also steht hier die Mitte, 174 — derselbe Ton wie `color-accent`.
 
-    Das Schild im Abzeichen ist gefüllt und nicht als Umriss gezeichnet: bei
-    16 Pixeln ist ein Umriss von einem Viertelpixel nichts mehr.
-  -->
-  <!--
-    Die Farben sind die der Oberfläche, nicht eigene: das Buch traegt das
-    Gruen der Bibliothek (die Marke `color-accent`), das Abzeichen das Bernstein des
-    Shops (`color-amber`) — dieselbe Zuordnung, die jede Zeile der Liste
-    macht. Vorher war das Buch blattgruen und die Marke sandfarben; das war
-    huebsch und gehoerte zu nichts.
+    Umgerechnet wird ueber eine Gruppe: die Zeile misst mit dem Abzeichen
+    50 x 70, das Zeichen ist 32 x 32, also Faktor 32/70 = 0,457 und die
+    Breite (22,86) mittig gesetzt.
 
-    Ausgeschrieben als Hex, nicht als oklch() oder var(): ein Favicon wird
-    ohne das Stilblatt der Seite gezeichnet, und manche Zeichner (Tab-Leisten,
-    Lesezeichen, das Betriebssystem) sind alt. Die Werte sind aus den Marken
-    der Oberflaeche umgerechnet und stehen daneben.
+    Bewusst in Kauf genommen: das Preisschild ist hier ein Umriss wie in der
+    Liste, kein gefuelltes Schild. Bei 40 Pixeln in der Kopfzeile traegt das;
+    im Tab bei 16 Pixeln ist die Linie nur noch 0,27 Pixel breit und damit
+    blass. Genauigkeit vor Lesbarkeit im Kleinsten — so war es gewuenscht.
   -->
   <style>
-    .deckel { fill: #28605a }  /* --color-accent  oklch(0.45 0.06 185) */
-    .ruecken{ fill: #124641 }  /* dasselbe, dunkler: der Ruecken liegt hinten */
-    .zeile  { fill: #85aea8 }  /* dasselbe, heller: Schrift auf dem Deckel */
-    .ring   { fill: #29231e }  /* --color-ink */
-    .marke  { fill: #876125 }  /* --color-amber  oklch(0.52 0.09 75) */
-    .schild { fill: #faf8f4 }  /* --color-paper */
+    .deckel { fill: hsl(174 30% 30%) }
+    .ruecken{ fill: hsl(174 32% 21%) }
+    .zeile1 { fill: hsl(174 24% 60%) }
+    .zeile2 { fill: hsl(174 24% 53%) }
+    .zeile3 { fill: hsl(174 24% 46%) }
+    .ring   { fill: #faf8f4 }
+    .marke  { fill: #876125 }
+    .schild { stroke: #faf8f4 }
     @media (prefers-color-scheme: dark) {
-      .deckel { fill: #6da59d }  /* --color-accent (dunkel) */
-      .ruecken{ fill: #467d76 }
-      .zeile  { fill: #b9d9d4 }
-      .ring   { fill: #e6e4e0 }  /* --color-ink (dunkel) */
-      .marke  { fill: #ccac76 }  /* --color-amber (dunkel) */
-      .schild { fill: #0f0f13 }  /* --color-paper (dunkel) */
+      .ring   { fill: #0f0f13 }
+      .marke  { fill: #ccac76 }
+      .schild { stroke: #0f0f13 }
     }
   </style>
 
-  <!-- Der Buchdeckel mit abgesetztem Rücken. -->
-  <rect class="deckel" x="4" y="4" width="18.6" height="24" rx="1.6"/>
-  <path class="ruecken" d="M5.6 4H7v24H5.6A1.6 1.6 0 0 1 4 26.4V5.6A1.6 1.6 0 0 1 5.6 4z"/>
+  <g transform="translate(4.57 0) scale(0.457) translate(0 6)">
+    <!-- Der Ruecken, wie ihn `_cover.html` zeichnet. -->
+    <rect class="deckel" width="44" height="64" rx="2"/>
+    <rect class="ruecken" width="5" height="64"/>
+    <rect class="zeile1" x="12" y="16" width="22" height="1.5" rx="0.75"/>
+    <rect class="zeile2" x="12" y="21" width="16" height="1.5" rx="0.75"/>
+    <rect class="zeile3" x="12" y="40" width="12" height="1.5" rx="0.75"/>
 
-  <!-- Drei Zeilen als Andeutung von Schrift. -->
-  <rect class="zeile" x="9.1" y="10.0" width="8.4" height="1.5" rx="0.75"/>
-  <rect class="zeile" x="9.1" y="13.0" width="5.4" height="1.5" rx="0.75"/>
-  <rect class="zeile" x="9.1" y="21.3" width="5.4" height="1.5" rx="0.75"/>
-
-  <!-- Das Abzeichen an der oberen rechten Ecke. -->
-  <circle class="ring" cx="23.2" cy="8.8" r="5.9"/>
-  <circle class="marke" cx="23.2" cy="8.8" r="4.85"/>
-  <!--
-    Dasselbe Preisschild wie in der Liste (`ic-tag`), Punkt fuer Punkt derselbe
-    Pfad — nur gefuellt statt als Umriss: bei 16 Pixeln waere eine Linie von
-    einem Viertelpixel nichts mehr. Das Loch ist ein Kreis in der Farbe des
-    Abzeichens, so wie es in der Liste die Karte durchscheinen laesst.
-
-    Der Pfad ist fuer 24x24 gezeichnet. Die Transformation setzt nicht seine
-    Rahmenmitte auf die des Abzeichens, sondern seinen Flaechenschwerpunkt
-    (10,46 / 10,46): das Schild ist ein Zipfel, seine Masse liegt oben links,
-    und auf die Rahmenmitte gesetzt haengt es sichtbar schief im Kreis.
-    Verkleinert auf 0,45, damit auch die aeusserste Ecke (3,3) drin bleibt:
-    10,55 * 0,45 = 4,75 gegen einen Radius von 4,85.
-
-    Die Farben sind dieselben wie beim Abzeichen der Liste (`.badge`): das
-    Schild traegt die Papierfarbe, nicht Weiss — im Dunkelmodus kippt es
-    damit auf dunkel und behaelt seinen Kontrast.
-  -->
-  <g transform="translate(23.2 8.8) scale(0.45) translate(-10.46 -10.46)">
-    <path class="schild" d="M3 11V4a1 1 0 0 1 1-1h7l9 9-8 8z"/>
-    <circle class="marke" cx="7.5" cy="7.5" r="1.3"/>
+    <!-- Das Abzeichen: Mitte (38, 6), Ring 2 breit in der Seitenfarbe. -->
+    <circle class="ring" cx="38" cy="6" r="12"/>
+    <circle class="marke" cx="38" cy="6" r="10"/>
+    <!-- `ic-tag`, 12 gross, mit dem Ausgleich von 0,52 aus `.badge svg.zipfel`. -->
+    <g transform="translate(38.52 6.52) scale(0.5) translate(-12 -12)"
+       class="schild" fill="none" stroke-width="2.4"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11V4a1 1 0 0 1 1-1h7l9 9-8 8z"/>
+      <circle cx="7.5" cy="7.5" r="1.3"/>
+    </g>
   </g>
 </svg>
