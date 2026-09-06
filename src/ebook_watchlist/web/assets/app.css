@@ -242,5 +242,7 @@
   opacity: 0.18;
 }
 
-/* Der Schliesser des Bearbeiten-Aufklappers: nur sichtbar, solange offen ist. */
-details[open] > button.tun[aria-label="Schließen"] { display: block; }
+/* Ein Aufklapper, dessen Zeile im offenen Zustand "Schliessen" sagt. */
+details > summary > .auf,
+details[open] > summary > .zu { display: none; }
+details[open] > summary > .auf { display: inline-flex; }

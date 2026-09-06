@@ -192,20 +192,18 @@
    ein (weder Suche noch Zuordnung noch Bewertung), und sie kommt aus
    `notes:` in der Watchlist-Datei. Ein Feld, das sie ueberschreibt, liesse
    Datei und Datenbank auseinanderlaufen — fuer nichts. #}
-<details id="berichtigen" class="relative mt-2">
+<details id="berichtigen" class="mt-2">
+  {# Der Aufklapper ist sein eigener Schliesser: offen sagt dieselbe Zeile
+     "Abbrechen" mit einem X. Ein zweiter Knopf daneben waere ein zweiter Ort
+     fuer dieselbe Handlung — und neben "Speichern" sieht Verwerfen aus wie
+     eine Alternative dazu, was es nicht ist. #}
   <summary class="inline-flex cursor-pointer list-none items-center gap-1.5 rounded py-1
                   text-xs text-soft hover:text-ink hover:underline underline-offset-2">
-    <svg class="i"><use href="#ic-doc"/></svg>Titel und Autor:in ändern
+    <span class="zu inline-flex items-center gap-1.5">
+      <svg class="i"><use href="#ic-doc"/></svg>Titel und Autor:in ändern</span>
+    <span class="auf inline-flex items-center gap-1.5">
+      <svg class="i"><use href="#ic-x"/></svg>Abbrechen</span>
   </summary>
-  {# Zuklappen ohne zu speichern. `details` kann das von sich aus nicht: das
-     `open`-Attribut faellt nur, wenn jemand das `summary` trifft. Das X steht
-     auf dessen Hoehe am rechten Rand — dort, wo man einen Schliesser sucht,
-     und weit genug von "Speichern" weg, dass sich beides nicht verwechselt.
-     Nur sichtbar, solange offen ist: zugeklappt gibt es nichts zu schliessen. #}
-  <button type="button" title="Schließen" aria-label="Schließen"
-          onclick="this.closest('details').open = false"
-          class="tun absolute top-0 right-0 hidden rounded p-1 text-soft hover:text-ink">
-    <svg class="i"><use href="#ic-x"/></svg></button>
   <form method="post" action="/book/{{ page.book_id }}/bearbeiten"
         class="mt-2 flex flex-wrap items-end gap-3 rounded-lg border border-rule
                bg-card p-4">
