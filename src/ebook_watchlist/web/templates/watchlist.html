@@ -146,74 +146,80 @@
       </form>
     </div>
     </div>
-  </li>
 
-  {% if entry.needs_choice %}
-  {# Entschieden wird hier, nicht auf einer eigenen Seite: der Titel, wie du
-     ihn geschrieben hast, steht eine Zeile darüber, und genau der hilft beim
-     Erkennen. Wählen ist ein Zustand, kein verstecktes Element — deshalb
-     braucht nichts davon Überfahren (Ticket 41). #}
-  <li class="pb-4">
-    <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen"
-          class="ml-15 border-l-2 border-danger/30 pl-3">
-      <input type="hidden" name="source" value="{{ entry.choice_source }}">
-      <p class="mb-1 text-xs text-soft">Welche Ausgabe ist es?
-        <span class="text-ink">({{ entry.candidates | length }})</span></p>
+    {% if entry.needs_choice %}
+    {# Entschieden wird hier, nicht auf einer eigenen Seite: der Titel, wie du
+       ihn geschrieben hast, steht direkt darueber, und genau der hilft beim
+       Erkennen. Zugeklappt, weil neun offene Zuordnungen die Watchlist sonst
+       in eine Aufgabenliste verwandeln — aufgeklappt wird sie per Klick
+       (Ticket 41). Der Block sitzt im selben `li` wie der Eintrag und beginnt
+       an derselben Kante wie dessen Titel: ein eigenes `li` haette den
+       Listen-Trenner zwischen ein Buch und seine eigene Frage gezogen. #}
+    <details class="w-full pl-15">
+      <summary class="inline-flex cursor-pointer list-none items-center gap-1.5
+                      rounded py-1 text-xs font-medium text-danger
+                      hover:underline underline-offset-2">
+        <svg class="i"><use href="#ic-warn"/></svg>
+        Welche Ausgabe ist es?
+        <span class="text-soft">({{ entry.candidates | length }})</span>
+      </summary>
 
-      <div class="streifen">
-        {% for kandidat in entry.candidates %}
-        <label class="wahl">
-          {# Nichts ist vorausgewählt: der Matcher konnte die Ausgaben nicht
-             unterscheiden — eine davon vorzuwählen sähe aus wie eine
-             Empfehlung, die es nicht gibt. `required` sorgt dafür, dass
-             „Das ist es" ohne Wahl nicht stillschweigend nichts tut. #}
-          <input type="radio" name="url" required
-                 value="{{ kandidat.url or '' }}">
-          <span class="feld">
-            {% if kandidat.cover_file %}
-            <img src="/covers/{{ kandidat.cover_file }}" alt="">
-            {% else %}
-            {# Kein Bild geholt: ein gezeichneter Rücken statt eines leeren
-               Kastens, damit die Reihe nicht auseinanderfällt. #}
-            <span class="block aspect-[2/3] w-full rounded-sm"
-                  style="background: hsl({{ (kandidat.title | sum_chars) % 360 }} 24% 34%)"></span>
-            {% endif %}
-            <span class="haken">&#10003;</span>
-          </span>
-          <span class="beschriftung mt-1 block text-[11px] leading-tight">
-            {{ kandidat.title }}
-            {% if kandidat.is_bundle %}
-            <span class="mt-0.5 block text-amber">
-              {% if kandidat.volumes %}{{ kandidat.volumes | length }} Bände
-              {% else %}Sammelausgabe{% endif %}</span>
-            {% endif %}
-          </span>
-        </label>
-        {% endfor %}
-      </div>
+      <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen"
+            class="mt-1 rounded-lg border border-rule bg-paper p-3">
+        <input type="hidden" name="source" value="{{ entry.choice_source }}">
 
-      <div class="mt-2 flex flex-wrap items-center gap-2 border-t border-hair pt-2">
-        <button type="submit" name="was" value="bestaetigen"
-                class="tun rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm
-                       font-medium text-accent hover:bg-accent/25">Das ist es</button>
-        <button type="submit" name="was" value="keiner"
-                class="tun rounded border border-rule bg-card px-3 py-1.5 text-sm text-soft
-                       hover:border-danger hover:bg-danger/10 hover:text-danger"
-                title="Keine dieser Ausgaben ist es — dieselben werden nicht noch
-                       einmal vorgelegt, eine neue schon">Keiner davon</button>
-      </div>
-    </form>
-    {% if entry.rejected %}
-    <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen"
-          class="ml-15 mt-1 pl-3">
-      <input type="hidden" name="source" value="{{ entry.choice_source }}">
-      <button type="submit" name="was" value="zurueck"
-              class="text-xs text-soft underline underline-offset-2 hover:text-ink">
-        {{ entry.rejected | length }} abgelehnt — wieder anzeigen</button>
-    </form>
+        <div class="streifen">
+          {% for kandidat in entry.candidates %}
+          <label class="wahl">
+            {# Nichts ist vorausgewaehlt: der Matcher konnte die Ausgaben nicht
+               unterscheiden — eine davon vorzuwaehlen saehe aus wie eine
+               Empfehlung, die es nicht gibt. `required` sorgt dafuer, dass
+               „Bestaetigen" ohne Wahl nicht stillschweigend nichts tut. #}
+            <input type="radio" name="url" required
+                   value="{{ kandidat.url or '' }}">
+            <span class="feld">
+              {% if kandidat.cover_file %}
+              <img src="/covers/{{ kandidat.cover_file }}" alt="">
+              {% else %}
+              {# Kein Bild geholt: ein gezeichneter Ruecken statt eines leeren
+                 Kastens, damit die Reihe nicht auseinanderfaellt. #}
+              <span class="block aspect-[2/3] w-full rounded-sm"
+                    style="background: hsl({{ (kandidat.title | sum_chars) % 360 }} 24% 34%)"></span>
+              {% endif %}
+              <span class="haken">&#10003;</span>
+            </span>
+            <span class="beschriftung mt-1 block text-[11px] leading-tight">
+              {{ kandidat.title }}
+              {% if kandidat.is_bundle %}
+              <span class="mt-0.5 block text-amber">
+                {% if kandidat.volumes %}{{ kandidat.volumes | length }} Bände
+                {% else %}Sammelausgabe{% endif %}</span>
+              {% endif %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <button type="submit" name="was" value="bestaetigen"
+                  class="tun rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm
+                         font-medium text-accent hover:bg-accent/25">Bestätigen</button>
+          <button type="submit" name="was" value="keiner" formnovalidate
+                  class="tun rounded border border-rule bg-card px-3 py-1.5 text-sm text-soft
+                         hover:border-danger hover:bg-danger/10 hover:text-danger"
+                  title="Keine dieser Ausgaben ist es — dieselben werden nicht noch
+                         einmal vorgelegt, eine neue schon">Nichts passt</button>
+          {% if entry.rejected %}
+          <button type="submit" name="was" value="zurueck" formnovalidate
+                  class="ml-auto text-xs text-soft underline underline-offset-2
+                         hover:text-ink">
+            {{ entry.rejected | length }} abgelehnt — wieder anzeigen</button>
+          {% endif %}
+        </div>
+      </form>
+    </details>
     {% endif %}
   </li>
-  {% endif %}
   {% endfor %}
 </ul>
 {% endblock %}
