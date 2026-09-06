@@ -536,6 +536,38 @@ def create_app() -> FastAPI:
             },
         )
 
+    @app.post("/book/{book_id}/nachsehen")
+    def book_recheck(request: Request, book_id: int) -> HTMLResponse:
+        """Diesen einen Eintrag jetzt pruefen — von seiner eigenen Seite aus.
+
+        Den engen Lauf gab es bisher nur im Menue der Watchlist-Zeile
+        (Ticket 51). Gebraucht wird er hier: wer gerade einen Titel berichtigt
+        oder eine Zuordnung bestaetigt hat, steht auf der Buchseite.
+        """
+        rechecker.start(book_id)
+        return _buch_stand(request, book_id)
+
+    @app.get("/book/{book_id}/nachsehen")
+    def book_recheck_status(request: Request, book_id: int) -> HTMLResponse:
+        """Dasselbe Fragment, das der POST liefert — htmx fragt hier nach."""
+        return _buch_stand(request, book_id)
+
+    def _buch_stand(request: Request, book_id: int) -> HTMLResponse:
+        profile = load_profile()
+        page = book.build(_store_for(paths.db_path()), profile, book_id)
+        if page is None:
+            raise HTTPException(status_code=404, detail="kein solches Buch")
+        return TEMPLATES.TemplateResponse(
+            request,
+            "_book_status.html",
+            {
+                "page": page,
+                "check": rechecker.state(book_id),
+                "now": datetime.now(),
+                "profile": profile,
+            },
+        )
+
     @app.post("/book/{book_id}/relation")
     def book_relation(
         book_id: int, kind: str = Form(...), active: str = Form("")

@@ -42,7 +42,11 @@
   {% endif %}
   </div>
 
-  <div class="min-w-0 flex-1">
+  {# Mindestens so hoch wie das Cover und mittig gesetzt: wie viel hier steht,
+     haengt davon ab, was das Buch mitbringt — ISBN, Reihe, Notiz, Herkunft
+     sind alle wahlweise. Ohne das Mindestmass ragte das Cover bei einem
+     kargen Buch unten heraus. #}
+  <div class="flex min-h-36 min-w-0 flex-1 flex-col justify-center">
     <div class="flex flex-wrap items-baseline gap-x-3">
       <h1 class="font-serif text-2xl font-semibold tracking-tight">{{ page.title }}</h1>
       {% if page.watching %}
@@ -104,10 +108,7 @@
       </{{ "a" if gefunden else "div" }}>
       {% endfor %}
     </div>
-    {% if page.seen %}
-    <p class="mt-1 text-xs text-soft tabular-nums">
-      aktualisiert am {{ page.seen.strftime("%d.%m. %H:%M") }}</p>
-    {% endif %}
+    {% include "_book_status.html" %}
     {% endif %}
 
     {% if page.note %}
@@ -181,7 +182,7 @@
    Modell ein Vorschlag (ADR 17). Ein gemeinsamer Durchschnitt waere genau die
    Vermischung, die das verhindern soll. #}
 <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-  <span class="w-28 shrink-0 text-sm text-soft">Deine Sterne</span>
+  <span class="w-28 shrink-0 text-sm text-soft">Meine Bewertung</span>
   <span class="flex items-center gap-0.5">
     {% for value in range(1, 6) %}
     {% set on = page.my_stars is not none and value <= page.my_stars %}
@@ -219,12 +220,17 @@
   {% for judgement in machine %}
   <li class="rounded-lg border border-rule bg-card px-4 py-3">
     <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <span class="flex items-center gap-0.5 text-soft">
+      <span class="flex items-center gap-0.5 text-gold">
         {% for value in range(1, 6) %}
         <svg class="i" {% if value <= judgement.stars %}style="fill:currentColor"{% endif %}>
           <use href="#ic-star"/></svg>
         {% endfor %}
       </span>
+      {# Die Zahl neben den Sternen: fuenf Symbole abzuzaehlen ist Arbeit, die
+         eine Ziffer abnimmt. Dieselbe Schreibweise wie bei den fremden
+         Stimmen. #}
+      <span class="text-sm tabular-nums text-soft">
+        <span class="font-semibold text-ink">{{ judgement.stars | sterne }}</span>&nbsp;/&nbsp;5</span>
       <span class="text-sm text-soft">{{ judgement.label }}</span>
       <span class="rounded bg-hair px-1.5 py-0.5 text-[11px] text-soft">{{ judgement.confidence }}</span>
       {% if judgement.when %}
@@ -258,9 +264,11 @@
   {% for stimme in fremd %}
   <li class="rounded-lg border border-rule bg-card px-4 py-3">
     <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <span class="font-semibold tabular-nums text-ink">{{ stimme.stars | sterne }}</span>
-      <span class="text-xs text-soft">von 5</span>
-      <span class="text-sm text-soft">{{ stimme.label }}</span>
+      {# Eine Aussage, eine Schriftgroesse: "2 von 5" stand vorher in drei
+         verschiedenen (16, 12 und 14 px) und las sich dadurch wie drei
+         Angaben. Hervorgehoben wird nur die Zahl. #}
+      <span class="text-sm tabular-nums text-soft">
+        <span class="font-semibold text-ink">{{ stimme.stars | sterne }}</span>&nbsp;/&nbsp;5</span>
       {% if stimme.votes %}
       <span class="rounded bg-hair px-1.5 py-0.5 text-[11px] text-soft tabular-nums">
         {{ stimme.votes }} Stimmen</span>
@@ -268,14 +276,29 @@
       {% if stimme.when %}
       <span class="text-xs text-soft">{{ stimme.when.strftime("%d.%m.%Y") }}</span>
       {% endif %}
+      {# Woher die Stimme kommt, steht am rechten Rand: es ist die Herkunft
+         der Angabe und nicht Teil der Aussage. #}
+      <span class="ml-auto text-xs text-soft">Quelle: {{ stimme.label }}</span>
     </div>
   </li>
   {% endfor %}
 </ul>
 {% endif %}
 
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-accent">
+{# Der enge Lauf sitzt an der Ueberschrift der Geschichte, nicht unter den
+   Kacheln: er schreibt eine neue Zeile in genau diese Tabelle. Ein Symbol
+   statt eines Wortes — was es tut, sagt der Tooltip (Ticket 51). #}
+<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm
+           font-semibold text-accent">
   Was beobachtet wurde
+  {% if page.watching %}
+  <form class="ml-auto" hx-post="/book/{{ page.book_id }}/nachsehen"
+        hx-target="#buch-stand-{{ page.book_id }}" hx-swap="outerHTML">
+    <button type="submit" title="jetzt nachsehen"
+            class="flex rounded p-1 text-soft hover:bg-hair hover:text-accent">
+      <svg class="i"><use href="#ic-refresh"/></svg></button>
+  </form>
+  {% endif %}
 </h2>
 {% if not page.has_history %}
 <p class="py-2 text-sm text-soft italic">

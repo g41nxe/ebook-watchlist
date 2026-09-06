@@ -1,0 +1,35 @@
+{# Wann dieses Buch zuletzt abgerufen wurde — und der Knopf, es jetzt zu tun.
+
+   Eigene Datei, weil zwei Wege sie rendern: die Buchseite, und der enge Lauf,
+   der genau diese Zeile austauscht, sobald er ein Ergebnis hat (Ticket 51).
+
+   Der Trigger steht nur dran, solange etwas laeuft; sobald der Server die
+   Zeile ohne ihn zurueckgibt, hoert die Seite von selbst auf zu fragen —
+   dasselbe Muster wie `_run_panel.html`, kein Websocket (ADR 3). #}
+<p id="buch-stand-{{ page.book_id }}"
+   class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-soft"
+   {% if check and check.busy %}
+   hx-get="/book/{{ page.book_id }}/nachsehen"
+   hx-trigger="every 2s"
+   hx-target="this"
+   hx-swap="outerHTML"
+   {% endif %}>
+  {% if check and check.busy %}
+  {% if check.label(now=now) == "sucht …" %}
+  <span class="flex items-center gap-1.5 text-accent">
+    <svg class="i animate-spin"><use href="#ic-spin"/></svg>sucht …</span>
+  {% else %}
+  <span class="flex items-center gap-1.5">
+    <svg class="i"><use href="#ic-hourglass"/></svg>wartet auf den laufenden Lauf …</span>
+  {% endif %}
+  {% else %}
+  {% if page.seen %}
+  <span class="tabular-nums">aktualisiert am {{ page.seen.strftime("%d.%m. %H:%M") }}</span>
+  {% else %}
+  <span class="italic">noch nicht gesucht</span>
+  {% endif %}
+  {% if check and check.trouble %}
+  <span class="text-danger">{{ check.trouble }}</span>
+  {% endif %}
+  {% endif %}
+</p>
