@@ -27,10 +27,15 @@
            class="w-52 rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink
                   outline-none focus:border-accent">
   </label>
-  <button type="submit"
-          class="rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm font-medium
-                 text-accent hover:bg-accent/20">Anlegen</button>
-  <span class="text-xs text-soft">wird sofort gesucht</span>
+  {# Knopf und Hinweis in einer eigenen Gruppe: das Formular richtet seine
+     Felder an der Unterkante aus (`items-end`), und daran haengend sass der
+     Hinweis auf der Schriftlinie des Knopfes statt auf seiner Mitte. #}
+  <div class="flex items-center gap-3">
+    <button type="submit"
+            class="rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm font-medium
+                   text-accent hover:bg-accent/20">Anlegen</button>
+    <span class="text-xs text-soft">wird sofort gesucht</span>
+  </div>
 </form>
 
 {# Die Kopfleiste sagt, dass etwas offen ist, und ist gleichzeitig der Filter
