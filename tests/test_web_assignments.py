@@ -65,7 +65,8 @@ def test_every_candidate_is_offered_not_just_the_winner(client: TestClient, db: 
     body = client.get("/watchlist?nur=unklar").text
 
     assert "Red Rising - Asche" in body
-    assert body.count("bestaetigen") == 2
+    # Ein Formular je Eintrag, eine Karte je Kandidat.
+    assert body.count('class="wahl"') == 2
 
 
 def test_confirming_says_a_human_decided(client: TestClient, db: Store) -> None:
@@ -83,29 +84,31 @@ def test_confirming_says_a_human_decided(client: TestClient, db: Store) -> None:
     assert json.loads(zeile.details)["outcome"] == str(LinkOutcome.CONFIRMED)
 
 
-def test_a_rejected_candidate_is_not_offered_again(client: TestClient, db: Store) -> None:
+def test_none_of_them_rejects_the_whole_group(client: TestClient, db: Store) -> None:
     buch_id = unklar(
         db, ("Red Rising", "https://beam.invalid/1"), ("Falsch", "https://beam.invalid/2")
     )
 
     client.post(
         f"/watchlist/{buch_id}/zuordnen",
-        data={"source": "beam", "url": "https://beam.invalid/2", "was": "ablehnen"},
+        data={"source": "beam", "was": "keiner"},
     )
 
-    eintrag = next(e for e in watchlist.entries(db, load_profile()) if e.needs_choice)
-    assert [k.title for k in eintrag.candidates] == ["Red Rising"]
-    assert len(eintrag.rejected) == 1
+    # „Keiner davon" trifft die ganze gezeigte Gruppe: einen einzelnen
+    # abzulehnen gibt es nicht mehr (Ticket 41).
+    assert not any(e.needs_choice for e in watchlist.entries(db, load_profile()))
+    eintrag = next(e for e in watchlist.entries(db, load_profile()) if e.book_id == buch_id)
+    assert len(eintrag.rejected) == 2
 
 
 def test_a_rejection_can_be_taken_back(client: TestClient, db: Store) -> None:
     """Ein Irrtum beim Wegklicken darf nicht dauerhaft sein (ADR 18)."""
     buch_id = unklar(db, ("Red Rising", "https://beam.invalid/1"))
-    db.reject_candidate(buch_id, "beam", "https://beam.invalid/1", now=NOW)
+    db.reject_candidates(buch_id, "beam", ["https://beam.invalid/1"], now=NOW)
 
     client.post(
         f"/watchlist/{buch_id}/zuordnen",
-        data={"source": "beam", "url": "https://beam.invalid/1", "was": "zurueck"},
+        data={"source": "beam", "was": "zurueck"},
     )
 
     eintrag = next(e for e in watchlist.entries(db, load_profile()) if e.needs_choice)
@@ -116,8 +119,8 @@ def test_a_rejection_can_be_taken_back(client: TestClient, db: Store) -> None:
 def test_rejecting_twice_records_it_once(db: Store) -> None:
     buch_id = unklar(db, ("Red Rising", "https://beam.invalid/1"))
 
-    db.reject_candidate(buch_id, "beam", "https://beam.invalid/1", now=NOW)
-    db.reject_candidate(buch_id, "beam", "https://beam.invalid/1", now=NOW)
+    db.reject_candidates(buch_id, "beam", ["https://beam.invalid/1"], now=NOW)
+    db.reject_candidates(buch_id, "beam", ["https://beam.invalid/1"], now=NOW)
 
     zeile = db.get_book_source(buch_id, "beam")
     assert json.loads(zeile.details)["rejected"] == ["https://beam.invalid/1"]

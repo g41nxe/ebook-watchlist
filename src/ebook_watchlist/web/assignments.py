@@ -156,17 +156,24 @@ def confirm(store: Store, book_id: int, source: str, url: str, now) -> None:
     )
 
 
-def reject(store: Store, book_id: int, source: str, url: str, now) -> None:
-    """„Der ist es nicht" — und das hält.
+def reject_all(store: Store, book_id: int, source: str, now) -> None:
+    """„Keiner davon" — und das hält.
 
-    Festgehalten wird die **Adresse** des abgelehnten Kandidaten, nicht bloß
-    die Tatsache: derselbe Kandidat wird nicht noch einmal vorgelegt, ein neuer
-    schon. Umkehrbar, weil ein Irrtum beim Wegklicken sonst dauerhaft wäre
-    (ADR 18).
+    Abgelehnt wird die **gezeigte Gruppe**: dieselben Kandidaten kommen nicht
+    wieder, ein neuer schon. Einen einzelnen abzulehnen gibt es nicht mehr —
+    wählt man den richtigen, sind die anderen ohnehin erledigt (Ticket 41).
     """
-    store.reject_candidate(book_id, source, url, now=now, undo=False)
+    row = store.get_book_source(book_id, source)
+    if row is None:
+        return
+    details = _details(row)
+    urls = [roh.get('url') for roh in details.get('candidates') or [] if roh.get('url')]
+    if not urls and row.url:
+        # Zeilen aus der Zeit vor der Kandidatenliste tragen nur den Sieger.
+        urls = [row.url]
+    store.reject_candidates(book_id, source, urls, now=now)
 
 
-def restore(store: Store, book_id: int, source: str, url: str, now) -> None:
+def restore(store: Store, book_id: int, source: str, now) -> None:
     """Eine Ablehnung zurücknehmen."""
-    store.reject_candidate(book_id, source, url, now=now, undo=True)
+    store.restore_candidates(book_id, source, now=now)

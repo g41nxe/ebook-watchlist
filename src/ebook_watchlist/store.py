@@ -1013,6 +1013,43 @@ class Store:
                 session.expunge(row)
             return rows
 
+    def reject_candidates(
+        self, book_id: int, source: str, urls: Iterable[str], *, now: datetime
+    ) -> None:
+        """Alle gezeigten Kandidaten ablehnen — „keiner davon" (Ticket 41).
+
+        Festgehalten werden die **Adressen**, nicht bloss die Tatsache: dieselben
+        Kandidaten werden nicht noch einmal vorgelegt, ein **neuer** schon.
+        Einen einzelnen abzulehnen gibt es nicht mehr — waehlt man den
+        richtigen, sind die anderen ohnehin erledigt.
+        """
+        with self.session() as session:
+            row = session.get(BookSourceRow, (book_id, source))
+            if row is None:
+                return
+            details = json.loads(row.details or '{}')
+            abgelehnt = list(details.get('rejected') or [])
+            for url in urls:
+                if url and url not in abgelehnt:
+                    abgelehnt.append(url)
+            details['rejected'] = abgelehnt
+            row.details = json.dumps(details, ensure_ascii=False)
+            row.resolved_at = now
+            session.commit()
+
+    def restore_candidates(self, book_id: int, source: str, *, now: datetime) -> None:
+        """Eine Ablehnung zuruecknehmen — ein Irrtum beim Wegklicken darf nicht
+        dauerhaft sein (ADR 18)."""
+        with self.session() as session:
+            row = session.get(BookSourceRow, (book_id, source))
+            if row is None:
+                return
+            details = json.loads(row.details or '{}')
+            details['rejected'] = []
+            row.details = json.dumps(details, ensure_ascii=False)
+            row.resolved_at = now
+            session.commit()
+
     def reject_candidate(
         self, book_id: int, source: str, url: str, *, now: datetime, undo: bool = False
     ) -> None:

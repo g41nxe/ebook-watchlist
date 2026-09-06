@@ -352,10 +352,10 @@ def create_app() -> FastAPI:
         now = datetime.now()
         if was == "bestaetigen" and url:
             assignments.confirm(store, book_id, source, url, now)
-        elif was == "ablehnen" and url:
-            assignments.reject(store, book_id, source, url, now)
-        elif was == "zurueck" and url:
-            assignments.restore(store, book_id, source, url, now)
+        elif was == "keiner":
+            assignments.reject_all(store, book_id, source, now)
+        elif was == "zurueck":
+            assignments.restore(store, book_id, source, now)
         return RedirectResponse("/watchlist?nur=unklar", status_code=303)
 
 

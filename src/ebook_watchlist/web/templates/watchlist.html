@@ -151,61 +151,67 @@
   {% if entry.needs_choice %}
   {# Entschieden wird hier, nicht auf einer eigenen Seite: der Titel, wie du
      ihn geschrieben hast, steht eine Zeile darüber, und genau der hilft beim
-     Erkennen. Welche Ausgabe gemeint ist, ist eine Frage ans Auge — deshalb
-     das Titelbild (Ticket 41). #}
+     Erkennen. Wählen ist ein Zustand, kein verstecktes Element — deshalb
+     braucht nichts davon Überfahren (Ticket 41). #}
   <li class="pb-4">
-    <div class="ml-15 border-l-2 border-danger/30 pl-3">
-      <p class="mb-1.5 text-xs text-soft">Welche Ausgabe ist es?</p>
-      <div class="flex flex-wrap items-stretch gap-2">
+    <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen"
+          class="ml-15 border-l-2 border-danger/30 pl-3">
+      <input type="hidden" name="source" value="{{ entry.choice_source }}">
+      <p class="mb-1 text-xs text-soft">Welche Ausgabe ist es?
+        <span class="text-ink">({{ entry.candidates | length }})</span></p>
+
+      <div class="streifen">
         {% for kandidat in entry.candidates %}
-        <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen"
-              class="contents">
-          <input type="hidden" name="source" value="{{ entry.choice_source }}">
-          <input type="hidden" name="url" value="{{ kandidat.url or '' }}">
-          <button type="submit" name="was" value="bestaetigen"
-                  class="flex max-w-xs items-center gap-2 rounded border border-rule
-                         bg-card p-1.5 pr-3 text-left hover:border-accent
-                         hover:bg-accent/5">
-            {{ cover(kandidat.title, kandidat.cover_file, false, false) }}
-            <span class="min-w-0">
-              <span class="block truncate text-sm font-medium">{{ kandidat.title }}</span>
-              {% if kandidat.is_bundle %}
-              <span class="rounded bg-amber/15 px-1.5 py-0.5 text-[11px] font-medium
-                           text-amber">
-                {% if kandidat.volumes %}{{ kandidat.volumes | length }} Bände
-                {% else %}Sammelausgabe{% endif %}</span>
-              {% endif %}
-              <span class="block truncate text-xs text-soft">
-                {{ kandidat.author or "unbekannt" }}</span>
-            </span>
-          </button>
-          <button type="submit" name="was" value="ablehnen" title="Der ist es nicht"
-                  class="self-stretch rounded border border-dashed border-rule px-2
-                         text-xs text-soft hover:border-danger hover:text-danger"
-                  >✕</button>
-        </form>
+        <label class="wahl">
+          {# Nichts ist vorausgewählt: der Matcher konnte die Ausgaben nicht
+             unterscheiden — eine davon vorzuwählen sähe aus wie eine
+             Empfehlung, die es nicht gibt. `required` sorgt dafür, dass
+             „Das ist es" ohne Wahl nicht stillschweigend nichts tut. #}
+          <input type="radio" name="url" required
+                 value="{{ kandidat.url or '' }}">
+          <span class="feld">
+            {% if kandidat.cover_file %}
+            <img src="/covers/{{ kandidat.cover_file }}" alt="">
+            {% else %}
+            {# Kein Bild geholt: ein gezeichneter Rücken statt eines leeren
+               Kastens, damit die Reihe nicht auseinanderfällt. #}
+            <span class="block aspect-[2/3] w-full rounded-sm"
+                  style="background: hsl({{ (kandidat.title | sum_chars) % 360 }} 24% 34%)"></span>
+            {% endif %}
+            <span class="haken">&#10003;</span>
+          </span>
+          <span class="beschriftung mt-1 block text-[11px] leading-tight">
+            {{ kandidat.title }}
+            {% if kandidat.is_bundle %}
+            <span class="mt-0.5 block text-amber">
+              {% if kandidat.volumes %}{{ kandidat.volumes | length }} Bände
+              {% else %}Sammelausgabe{% endif %}</span>
+            {% endif %}
+          </span>
+        </label>
         {% endfor %}
       </div>
-      {% if entry.rejected %}
-      <details class="mt-2">
-        <summary class="cursor-pointer text-xs text-soft hover:text-ink">
-          {{ entry.rejected | length }} abgelehnt</summary>
-        <div class="mt-1 flex flex-wrap gap-2">
-          {% for kandidat in entry.rejected %}
-          <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen">
-            <input type="hidden" name="source" value="{{ entry.choice_source }}">
-            <input type="hidden" name="url" value="{{ kandidat.url or '' }}">
-            <button type="submit" name="was" value="zurueck"
-                    title="Ablehnung zurücknehmen"
-                    class="rounded border border-rule px-2 py-1 text-xs text-soft
-                           line-through hover:border-accent hover:text-accent
-                           hover:no-underline">{{ kandidat.title }}</button>
-          </form>
-          {% endfor %}
-        </div>
-      </details>
-      {% endif %}
-    </div>
+
+      <div class="mt-2 flex flex-wrap items-center gap-2 border-t border-hair pt-2">
+        <button type="submit" name="was" value="bestaetigen"
+                class="tun rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm
+                       font-medium text-accent hover:bg-accent/25">Das ist es</button>
+        <button type="submit" name="was" value="keiner"
+                class="tun rounded border border-rule bg-card px-3 py-1.5 text-sm text-soft
+                       hover:border-danger hover:bg-danger/10 hover:text-danger"
+                title="Keine dieser Ausgaben ist es — dieselben werden nicht noch
+                       einmal vorgelegt, eine neue schon">Keiner davon</button>
+      </div>
+    </form>
+    {% if entry.rejected %}
+    <form method="post" action="/watchlist/{{ entry.book_id }}/zuordnen"
+          class="ml-15 mt-1 pl-3">
+      <input type="hidden" name="source" value="{{ entry.choice_source }}">
+      <button type="submit" name="was" value="zurueck"
+              class="text-xs text-soft underline underline-offset-2 hover:text-ink">
+        {{ entry.rejected | length }} abgelehnt — wieder anzeigen</button>
+    </form>
+    {% endif %}
   </li>
   {% endif %}
   {% endfor %}

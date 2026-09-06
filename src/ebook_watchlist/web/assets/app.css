@@ -104,4 +104,84 @@
     stroke-linejoin: round;
     vertical-align: -0.13em;
   }
+
+  /* --- Zuordnung entscheiden (Ticket 41) --------------------------------
+     Ein Streifen statt einer umbrechenden Reihe: die Ausgaben werden
+     verglichen, und dafuer muessen sie nebeneinander liegen. Waehlen ist ein
+     Zustand (ein Formularfeld), keine Handlung — deshalb braucht nichts
+     davon Ueberfahren und alles funktioniert auf dem Telefon gleich. */
+  .streifen {
+    display: flex;
+    gap: 0.7rem;
+    overflow-x: auto;
+    padding: 0.25rem 0.25rem 0.4rem;
+    /* 'proximity', nicht 'mandatory': mandatory bremst den Schwung eines
+       Wischs und fuehlt sich auf dem Telefon klebrig an. */
+    scroll-snap-type: x proximity;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+  }
+  .streifen::-webkit-scrollbar { display: none }
+  .streifen > * { flex: 0 0 auto; width: 6.6rem; scroll-snap-align: start }
+
+  .wahl { display: block; cursor: pointer }
+  .wahl input { position: absolute; opacity: 0; width: 0; height: 0 }
+  .wahl .feld {
+    position: relative;
+    display: block;
+    border-radius: 0.35rem;
+    box-shadow: 0 0 0 1px var(--color-rule);
+  }
+  .wahl img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: 0.35rem;
+  }
+  /* Innerhalb des Covers: der Streifen scrollt, und was herausragt, wird
+     abgeschnitten — auch nach oben. Der Ring trennt trotzdem vom Bild,
+     genau wie bei den Cover-Abzeichen. */
+  .wahl .haken {
+    position: absolute;
+    top: 0.35rem;
+    left: 0.35rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 9999px;
+    display: grid;
+    place-items: center;
+    font-size: 0.75rem;
+    background: var(--color-accent);
+    color: #fff;
+    opacity: 0;
+    box-shadow: 0 0 0 2px var(--color-card), 0 1px 3px rgb(0 0 0 / 0.45);
+    transition: opacity 0.12s;
+  }
+  .wahl:has(:checked) .feld { box-shadow: 0 0 0 2px var(--color-accent) }
+  .wahl:has(:checked) .haken { opacity: 1 }
+  .wahl:hover .feld {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-accent) 55%, transparent);
+  }
+
+  /* Erst wenn eine Wahl steht, treten die anderen zurueck — vorher saehe die
+     Reihe aus, als waere sie deaktiviert. Entsaettigt statt abgedunkelt:
+     ein weisses Cover soll hell bleiben und nicht nach Ladefehler aussehen. */
+  .streifen:has(:checked) .wahl:not(:has(:checked)) .feld img {
+    filter: grayscale(0.9) brightness(0.8);
+    transition: filter 0.15s;
+  }
+  .streifen:has(:checked) .wahl:not(:has(:checked)) .beschriftung {
+    color: var(--color-soft);
+  }
+  /* Ueberfahren holt ein entsaettigtes Cover zurueck: vergleichen muss
+     moeglich bleiben. Auf dem Telefon geht das nur durch Antippen. */
+  .streifen:has(:checked) .wahl:not(:has(:checked)):hover .feld img {
+    filter: none;
+  }
+
+  /* Wo mit dem Finger bedient wird, gelten 44 px als Mindestmass. */
+  @media (hover: none) {
+    .tun { min-height: 44px }
+  }
 }
