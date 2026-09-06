@@ -215,6 +215,22 @@ _ORGANISATION_WORDS = frozenset(
 _NON_NAMES = frozenset({"unknown", "unbekannt", "diverse", "verschiedene"})
 
 
+def _looks_like_a_full_name(part: str) -> bool:
+    """Zwei Woerter allein reichen nicht — sie duerfen nicht beide Initialen sein.
+
+    ``split_authors`` liest ein Komma als Trenner zwischen Personen, sobald die
+    Haelfte der Teile wie ein voller Name aussieht. "Barnes, S. A." zerfiel
+    dadurch in **zwei** Menschen, weil "S. A." zwei durch Leerzeichen getrennte
+    Woerter hat; "Barnes, S.A." ohne Leerzeichen ging durch. Der Name gehoert
+    zu einer der acht Referenzautorinnen, und mit dem Autor-Widerspruch aus
+    Ticket 45 waere aus dem Schoenheitsfehler ein falsches Ergebnis geworden.
+    """
+    words = part.split()
+    if len(words) < 2:
+        return False
+    return any(len(word.strip(".")) > 1 for word in words)
+
+
 def split_authors(raw: str) -> list[str]:
     """Split a scraped author field into individual names.
 
@@ -240,7 +256,7 @@ def split_authors(raw: str) -> list[str]:
         if not segment:
             continue
         parts = [part.strip() for part in segment.split(",") if part.strip()]
-        full_names = sum(1 for part in parts if len(part.split()) >= 2)
+        full_names = sum(1 for part in parts if _looks_like_a_full_name(part))
         if len(parts) > 1 and full_names * 2 >= len(parts):
             authors.extend(parts)
         else:

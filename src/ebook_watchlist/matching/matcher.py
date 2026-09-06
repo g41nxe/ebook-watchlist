@@ -98,6 +98,10 @@ class Scored:
     #: Indiz, sondern ein **Widerspruch** — das Gegenstueck zu Primos negativem
     #: Gewicht (docs/research/title-matching-practices.md).
     id_conflict: bool = False
+    #: Beide Seiten nennen eine Autor:in, und eine verschiedene. Von derselben
+    #: Art wie ``id_conflict``: "Kim Mannix" statt "Blake Crouch" ist kein
+    #: schwaches Indiz, sondern eine andere Person (ADR 23, Nachtrag).
+    author_conflict: bool = False
     #: Der Kandidat ist eine Sammelausgabe, die Anfrage nicht. Bisher waren
     #: "Der Kruzifix-Killer" und "Der Kruzifix-Killer / Der Vollstrecker"
     #: ununterscheidbar — beide exakter Titel, beide exakter Autor —, und wer
@@ -111,6 +115,12 @@ class Scored:
         a point of noise."""
         return (
             0 if self.id_match else 1,
+            # Vor dem Titel, und das ist der Kern von Ticket 45: "Dark Matter"
+            # von Kim Mannix trifft den Titel exakt, "Dark Matter. Der
+            # Zeitenlaeufer" von Crouch nur enthalten — gesucht war aber
+            # Crouch. Stuende der Widerspruch hinter ``title_exact``, aenderte
+            # sich fuer diesen Fall gar nichts.
+            1 if self.author_conflict else 0,
             0 if self.title_exact else 1,
             # Ein nachweislich anderer Band steht hinten. Der Widerspruch hob
             # bisher nur die Sicherheitsstufe: bei 'Red Rising' kamen deshalb
@@ -250,6 +260,10 @@ def score(query: Query, candidate: Candidate, source_rank: int = 0) -> Scored:
         id_conflict=bool(query.identifier)
         and bool(candidate.identifier)
         and query.identifier != candidate.identifier,
+        # Dieselbe strenge Regel, die schon entscheidet, ob ein Autorentreffer
+        # einer ist — keine zweite Zahl daneben. Ein fehlendes Autorfeld auf
+        # einer der beiden Seiten ist Nichtwissen und kein Widerspruch.
+        author_conflict=authors_contradict(query.author, candidate.author),
     )
 
 
@@ -293,6 +307,38 @@ def author_matches(target: str, credited: str | None, threshold: int = STRONG_AU
     return False
 
 
+def authors_contradict(target: str | None, credited: str | None) -> bool:
+    """Nennen beide Seiten eine Person — und **verschiedene**?
+
+    Die Gegenrichtung zu :func:`author_matches`, und deshalb nicht einfach
+    dessen Verneinung. Bestaetigen darf nur, wer sicher ist; **widersprechen**
+    auch. Zwischen beidem liegt ein breites Feld: "F. Schätzing" ist Frank
+    Schätzing, nur mit weniger Information — `author_matches` sagt dazu Nein,
+    aber das ist kein Widerspruch, sondern Unwissen. Genau das hat der
+    bestehende Test ``prefers_exact_title_over_a_better_author_score``
+    aufgedeckt: mit der blossen Verneinung waere der exakte Titel hinter einen
+    anderen Band gerutscht.
+
+    Widersprochen wird deshalb erst, wenn die **tragenden** Namensteile
+    disjunkt sind — die laenger als zwei Zeichen, also im Wesentlichen ohne
+    Initialen. "Blake Crouch" gegen "Kim Mannix" hat nichts gemeinsam; "S.A.
+    Barnes" gegen "J.S. Barnes" teilt den Nachnamen und bleibt damit
+    unentschieden. Das ist bewusst vorsichtig: ein negatives Signal, das zu
+    oft ausschlaegt, waere schlimmer als eines, das manchmal schweigt.
+    """
+    if not target or not credited:
+        return False
+    if author_matches(target, credited):
+        return False
+    def tragende(raw: str) -> set[str]:
+        return {token for person in normalize_authors(raw) for token in person.substantial.split()}
+
+    wanted, found = tragende(target), tragende(credited)
+    if not wanted or not found:
+        return False
+    return wanted.isdisjoint(found)
+
+
 def _is_tied(best: Scored, runner_up: Scored) -> bool:
     """Two hits we cannot honestly tell apart — the case Calibre punts to its GUI."""
     return (
@@ -306,6 +352,10 @@ def _is_tied(best: Scored, runner_up: Scored) -> bool:
         # Dasselbe fuer die Bandnummer: was einen anderen Band nennt, ist
         # nicht 'gleich gut' wie etwas, das keinen nennt.
         and best.volume_conflict == runner_up.volume_conflict
+        # Und fuer die Person: wer der falschen zugeschrieben ist, ist nicht
+        # "gleich gut" wie jemand mit der richtigen. Ohne das bekam die
+        # Leserin fuer 'Dark Matter' genau eine Karte vorgelegt — die falsche.
+        and best.author_conflict == runner_up.author_conflict
     )
 
 

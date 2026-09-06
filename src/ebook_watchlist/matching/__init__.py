@@ -7,6 +7,7 @@ from .matcher import (
     Resolution,
     Scored,
     author_matches,
+    authors_contradict,
     match,
     score,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "Resolution",
     "Scored",
     "author_matches",
+    "authors_contradict",
     "fold",
     "match",
     "normalize_author",

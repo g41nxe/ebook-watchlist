@@ -11,8 +11,10 @@ from ebook_watchlist.matching import (
     Candidate,
     Confidence,
     Query,
+    authors_contradict,
     match,
     normalize_author,
+    normalize_authors,
     normalize_title,
     score,
     split_authors,
@@ -240,3 +242,61 @@ def test_the_list_is_capped() -> None:
 
 def test_nothing_found_offers_nothing() -> None:
     assert match(Query(title="Faust"), []).indistinguishable == ()
+
+
+# --- Widerspruch der Person (Ticket 45) -----------------------------------
+
+
+def test_a_contradicting_author_loses_against_the_right_one() -> None:
+    """Der Anlass: „Dark Matter" von Blake Crouch stand auf der Watchlist, im
+    Shop trafen drei fremde Bücher den Titel exakt, und das richtige war das
+    einzige mit übereinstimmender Autor:in — und verlor (ADR 23, Nachtrag)."""
+    query = Query(title="Dark Matter", author="Blake Crouch")
+    fremd = score(query, Candidate(title="Dark Matter", author="Kim Mannix"))
+    richtig = score(query, Candidate(title="Dark Matter. Der Zeitenläufer", author="Crouch, Blake"))
+
+    assert fremd.author_conflict
+    assert not richtig.author_conflict
+    assert richtig.sort_key < fremd.sort_key
+
+
+def test_the_wrong_author_is_not_offered_as_an_equal_choice() -> None:
+    """Der eigentliche Schaden lag in `_is_tied`: der Leserin wäre genau eine
+    Karte vorgelegt worden — die falsche."""
+    query = Query(title="Dark Matter", author="Blake Crouch")
+    resolution = match(
+        query,
+        [
+            Candidate(title="Dark Matter", author="Kim Mannix"),
+            Candidate(title="A Dark Matter", author="Doug Johnstone"),
+            Candidate(title="Dark Matter. Der Zeitenläufer", author="Crouch, Blake"),
+        ],
+    )
+
+    assert [c.title for c in resolution.indistinguishable] == ["Dark Matter. Der Zeitenläufer"]
+
+
+def test_an_abbreviated_given_name_is_not_a_contradiction() -> None:
+    """„F. Schätzing" ist Frank Schätzing, nur mit weniger Information.
+    `author_matches` sagt dazu Nein — als Widerspruch zu lesen wäre falsch."""
+    assert not authors_contradict("Frank Schätzing", "F. Schätzing")
+
+
+def test_a_shared_surname_leaves_it_undecided() -> None:
+    """Bewusst vorsichtig: ein negatives Signal, das zu oft ausschlägt, wäre
+    schlimmer als eines, das manchmal schweigt."""
+    assert not authors_contradict("S.A. Barnes", "J.S. Barnes")
+
+
+def test_a_missing_author_field_is_not_a_contradiction() -> None:
+    """Nichtwissen widerspricht nicht."""
+    assert not authors_contradict("Blake Crouch", None)
+    assert not authors_contradict(None, "Doug Johnstone")
+
+
+def test_a_surname_with_spaced_initials_stays_one_person() -> None:
+    """`split_authors` las das Komma als Trenner zwischen Personen, weil
+    „S. A." zwei durch Leerzeichen getrennte Wörter hat. Ohne die Korrektur
+    hätte der Autor-Widerspruch eine richtige Zuordnung verschlechtert."""
+    assert split_authors("Barnes, S. A.") == ["Barnes, S. A."]
+    assert normalize_authors("Barnes, S. A.")[0].full == "s a barnes"
