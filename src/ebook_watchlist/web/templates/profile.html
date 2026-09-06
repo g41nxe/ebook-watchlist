@@ -31,14 +31,22 @@
    Alpine statt fuenf `details`: die Liste soll darunter in voller Breite
    aufgehen statt in einer Rasterspalte (ADR 20). #}
 <div x-data="{ offen: null }"
-     class="rounded-lg border border-rule bg-card px-5 pt-4">
-  <div class="flex flex-wrap gap-x-2 border-b border-rule">
+     class="rounded-lg border border-rule bg-card px-5 pt-4 pb-4">
+  {# Die Linie traegt die Reiter — und erscheint deshalb erst, wenn einer
+     offen ist. Zugeklappt lag sie sonst als freischwebender Strich unter den
+     Zahlen und trennte nichts von nichts. #}
+  <div class="flex flex-wrap gap-x-2"
+       :class="offen ? 'border-b border-rule' : ''">
     {% for regal in view.counts %}
     <button type="button"
-            class="-mb-px rounded-t border-b-2 px-3 pt-1 pb-2 text-left transition
+            class="-mb-px rounded-t border-b-2 px-3 pt-1 pb-2 text-center transition
                    {{ 'cursor-pointer hover:bg-hair' if regal.count else 'cursor-default' }}"
+            {# Neutral, nicht gruen: Gruen heisst auf dieser Seite "Autor:in"
+               und Amber "Thema". Welcher Reiter offen ist, ist keine
+               Kategorie, sondern ein Zustand der Bedienung — er nimmt keine
+               der beiden Bedeutungen in Anspruch. #}
             :class="offen === '{{ regal.kind }}'
-                    ? 'border-accent bg-accent/10 text-accent'
+                    ? 'border-ink bg-hair text-ink'
                     : 'border-transparent {{ 'text-soft hover:text-ink' if regal.count else 'text-rule' }}'"
             @click="offen = offen === '{{ regal.kind }}' ? null : '{{ regal.kind }}'"
             {{ 'disabled' if not regal.count }}>
@@ -50,15 +58,18 @@
 
   {% for regal in view.counts %}
   {% if regal.count %}
-  <div x-show="offen === '{{ regal.kind }}'" x-cloak class="py-3">
+  <div x-show="offen === '{{ regal.kind }}'" x-cloak class="pt-3">
     <ul class="divide-y divide-hair">
       {% for buch in regal.books %}
       <li class="flex items-baseline justify-between gap-3 py-1.5">
-        {# Dasselbe Muster wie im Dashboard und auf der Buchseite: ein
-           Verweis, den man auch ohne Ueberfahren als solchen erkennt. #}
+        {# Kein Akzentgruen: auf dieser Seite bedeutet Gruen "Autor:in" und
+           Amber "Thema" (siehe die Farbtokens). Ein Buch ist keine dritte
+           Kategorie daneben, sondern der Gegenstand — es traegt deshalb die
+           Serifenschrift, so wie ueberall sonst auch, und eine gedaempfte
+           Unterstreichung sagt, dass man darauf klicken kann. #}
         <a href="/book/{{ buch.book_id }}"
-           class="truncate text-sm text-accent underline decoration-accent/30
-                  underline-offset-2 hover:decoration-accent">{{ buch.title }}</a>
+           class="truncate font-serif text-sm underline decoration-rule
+                  underline-offset-2 hover:decoration-ink">{{ buch.title }}</a>
         <span class="shrink-0 truncate text-xs text-soft">{{ buch.author or "unbekannt" }}</span>
       </li>
       {% endfor %}
@@ -67,9 +78,6 @@
   {% endif %}
   {% endfor %}
 
-  {# Ohne diese Zeile schrumpft der Kasten auf die Reiter zusammen, sobald
-     nichts offen ist, und die Linie darunter klebt am Rand. #}
-  <div x-show="!offen" class="h-3"></div>
 </div>
 
 <h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
