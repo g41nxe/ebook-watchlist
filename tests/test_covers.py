@@ -328,3 +328,68 @@ def test_the_detail_page_cover_is_kept_when_the_blurb_is_fetched(data_dir: Path)
     assert zurueck[0].cover_url == "https://beam.invalid/gross_600x600.jpg"
     gespeichert = store.latest_observations(profile.slug, [("beam", "7")])[("beam", "7")]
     assert gespeichert.cover_url == "https://beam.invalid/gross_600x600.jpg"
+
+
+def test_the_candidates_of_an_open_choice_get_their_images(data_dir: Path) -> None:
+    """Ticket 41 haengt die Bildadresse an jeden Kandidaten — vergleichen ist
+    eine Frage ans Auge —, aber geholt hat sie niemand: Cover kommen aus
+    Beobachtungen, und ein Kandidat ist keine. Dass es zu funktionieren schien,
+    lag an Bildern, die beim Bauen der Entwuerfe von Hand im Ordner landeten."""
+    from ebook_watchlist import paths
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.models import LinkOutcome
+    from ebook_watchlist.relations import RelationKind
+    from ebook_watchlist.run import _fetch_candidate_covers
+    from ebook_watchlist.store import Store
+
+    store, profile = Store(paths.db_path()), load_profile()
+    buch = store.find_or_create_book(isbn=None, title="Dark Matter", author="Blake Crouch", now=NOW)
+    store.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+    store.put_book_source(
+        buch.id,
+        "beam",
+        outcome=str(LinkOutcome.UNSURE),
+        url=None,
+        resolved_at=NOW,
+        reason="der gesuchte Titel steckt im gefundenen",
+        candidates=[
+            {"title": "Der Zeitenläufer", "author": "Crouch", "url": "https://x/1",
+             "cover_url": "https://example.invalid/mit.jpg"},
+            {"title": "Ohne Bild", "author": "Crouch", "url": "https://x/2", "cover_url": None},
+        ],
+    )
+
+    client = StubClient()
+    _fetch_candidate_covers(store, profile, client)
+
+    assert client.calls == ["https://example.invalid/mit.jpg"]
+    assert paths.covers_dir().joinpath(file_name(client.calls[0])).exists()
+
+
+def test_an_image_already_on_disk_costs_no_request(data_dir: Path) -> None:
+    from ebook_watchlist import paths
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.covers import CoverStore
+    from ebook_watchlist.models import LinkOutcome
+    from ebook_watchlist.relations import RelationKind
+    from ebook_watchlist.run import _fetch_candidate_covers
+    from ebook_watchlist.store import Store
+
+    store, profile = Store(paths.db_path()), load_profile()
+    url = "https://example.invalid/schon-da.jpg"
+    covers = CoverStore(paths.covers_dir())
+    covers.directory.mkdir(parents=True, exist_ok=True)
+    covers.path(file_name(url)).write_bytes(b"x" * 5000)
+
+    buch = store.find_or_create_book(isbn=None, title="Egal", author="Wer", now=NOW)
+    store.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+    store.put_book_source(
+        buch.id, "beam", outcome=str(LinkOutcome.UNSURE), url=None, resolved_at=NOW,
+        reason="unklar",
+        candidates=[{"title": "Egal", "author": "Wer", "url": "https://x/1", "cover_url": url}],
+    )
+
+    client = StubClient()
+    _fetch_candidate_covers(store, profile, client)
+
+    assert client.calls == []
