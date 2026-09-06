@@ -92,3 +92,24 @@ Reihenbände.
 **Nicht entschieden und ausdrücklich offen:** die Trennung von Kandidatensuche
 und Entscheidung nach Primos Bauweise. Sie bleibt der nächste Schritt, wenn
 dieser nicht reicht.
+
+## Nachtrag (Ticket 45)
+
+Dasselbe gilt für die **Autor:in**. Angewendet wurde der Grundsatz zunächst nur
+auf `id_conflict` und `volume_conflict`; *Dark Matter* von Blake Crouch hat
+gezeigt, dass die Person genauso zählt.
+
+| Kandidat | Titel exakt | enthalten | Autor exakt |
+|---|---|---|---|
+| Dark Matter *(Kim Mannix u. a.)* | ja | – | nein (34) |
+| Dark Matter. Der Zeitenläufer *(Crouch, Blake)* | – | ja | **ja (100)** |
+
+Das richtige Buch war das einzige mit übereinstimmender Autor:in und verlor,
+weil `title_exact` im Sortierschlüssel über `author_exact` steht. Schlimmer
+noch: `_is_tied` verlangt Gleichheit von `title_exact`, also wäre der Leserin
+genau **eine** Karte vorgelegt worden — die falsche. Eine Frage mit einer
+einzigen falschen Antwort ist schlechter als gar keine Frage.
+
+Ein Widerspruch ist, was `author_matches` verneint — dieselbe strenge Regel,
+die schon entscheidet, ob ein Autorentreffer einer ist. Ein fehlendes Autorfeld
+ist keiner: Nichtwissen widerspricht nicht.
