@@ -14,12 +14,12 @@
   -->
   <!--
     Die Farben sind die der Oberfläche, nicht eigene: das Buch traegt das
-    Gruen der Bibliothek (`--color-accent`), das Abzeichen das Bernstein des
-    Shops (`--color-amber`) — dieselbe Zuordnung, die jede Zeile der Liste
+    Gruen der Bibliothek (die Marke `color-accent`), das Abzeichen das Bernstein des
+    Shops (`color-amber`) — dieselbe Zuordnung, die jede Zeile der Liste
     macht. Vorher war das Buch blattgruen und die Marke sandfarben; das war
     huebsch und gehoerte zu nichts.
 
-    Ausgeschrieben als Hex, nicht als `oklch()` oder `var()`: ein Favicon wird
+    Ausgeschrieben als Hex, nicht als oklch() oder var(): ein Favicon wird
     ohne das Stilblatt der Seite gezeichnet, und manche Zeichner (Tab-Leisten,
     Lesezeichen, das Betriebssystem) sind alt. Die Werte sind aus den Marken
     der Oberflaeche umgerechnet und stehen daneben.
