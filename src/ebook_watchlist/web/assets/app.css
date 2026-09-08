@@ -316,8 +316,15 @@
    der Schatten oben: in `base` setzte die Regel zwar Breite und Stil durch,
    die *Farbe* aber blieb `currentColor` — der Ring war dann tintenfarben statt
    petrol und auf einem dunklen Knopf kaum zu sehen. Nachgemessen mit
-   gedrueckter Tabulatortaste, nicht geraten. */
-:focus-visible,
+   gedrueckter Tabulatortaste, nicht geraten.
+
+   `:not(.outline-none)`, weil die Regel sonst zu viel gewinnt: die sechs
+   Eingabefelder tragen `outline-none focus:border-accent` und zeigen ihren
+   Fokus absichtlich am Rahmen. Ohne die Ausnahme bekamen sie beides und
+   standen in zwei ineinandergeschachtelten Ringen — nachgemessen, nicht
+   befuerchtet. Wer `outline-none` schreibt, hat einen eigenen Fokusstil und
+   soll ihn behalten. */
+:focus-visible:not(.outline-none),
 .wahl:has(:focus-visible) .feld {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;

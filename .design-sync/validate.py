@@ -71,14 +71,22 @@ def snippet_classes(text: str) -> set[str]:
 
 
 def read(path: Path) -> str:
-    """A missing bundle is a missing step, not a broken checker."""
+    """A missing bundle is a missing step, not a broken checker.
+
+    Only what `build.py` writes can be rebuilt. `conventions.md` is a source
+    file, and sending someone to `build.py` for it would send them in a
+    circle: the build runs, does not create it, and the next attempt fails
+    the same way.
+    """
     try:
         return path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        raise SystemExit(
-            f"{path} is not there. Build the bundle first:\n"
-            f"    python .design-sync/build.py"
-        ) from None
+        advice = (
+            "    python .design-sync/build.py"
+            if OUT in path.parents
+            else "    it is a source file -- restore it from git"
+        )
+        raise SystemExit(f"{path} is not there.\n{advice}") from None
 
 
 def parses(css: str) -> bool:

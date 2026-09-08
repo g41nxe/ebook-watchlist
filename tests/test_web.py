@@ -256,6 +256,14 @@ def test_a_moment_is_written_the_same_way_everywhere(
     body = client.get("/").text
 
     assert "seit " in body
-    zeitpunkte = re.findall(r"\d{2}\.\d{2}\. \d{2}:\d{2}(?::\d{2})?", body)
-    assert zeitpunkte, "kein Zeitpunkt auf der Seite gefunden"
-    assert not [z for z in zeitpunkte if z.count(":") > 1], f"Sekunden in {zeitpunkte}"
+
+    # Das Jahr gehoert ausdruecklich ins Muster, obwohl es verschwinden soll:
+    # ohne es faende der Ausdruck genau die Schreibweise nicht, gegen die
+    # dieser Test steht, und bliebe gruen, wenn sie zurueckkaeme. Nachgestellt.
+    momente = re.findall(r"\d{2}\.\d{2}\.\d{0,4} \d{2}:\d{2}(?::\d{2})?", body)
+    assert momente, "kein Zeitpunkt auf der Seite gefunden"
+
+    mit_sekunden = [m for m in momente if m.count(":") > 1]
+    mit_jahr = [m for m in momente if re.match(r"\d{2}\.\d{2}\.\d{4}", m)]
+    assert not mit_sekunden, f"Sekunden in {mit_sekunden}"
+    assert not mit_jahr, f"Jahr in einem Zeitpunkt: {mit_jahr}"
