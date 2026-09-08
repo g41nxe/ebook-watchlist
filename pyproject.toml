@@ -3,6 +3,8 @@ name = "ebook-watchlist"
 version = "0.1.0"
 description = "Watches library availability and shop prices for a personal ebook watchlist"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "pyyaml>=6.0",
     "sqlalchemy>=2.0",
