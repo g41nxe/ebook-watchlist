@@ -1,18 +1,23 @@
 """Checks that the bundle says nothing untrue.
 
-    uv run --with tinycss2 python .design-sync/validate.py
+    python .design-sync/build.py                                # first
+    uv run --with tinycss2 python .design-sync/validate.py      # then
 
 The conventions header is inlined into a design agent's prompt, and the agent
 cannot tell a real class name from an invented one -- it will simply write what
 it was told and ship silently unstyled markup. So every name the header
 enumerates is checked against the compiled stylesheet here, and so is the one
 claim the header makes about something *not* existing.
+
+It reads what `build.py` wrote, so that has to have run. Without it -- and
+without `tinycss2`, which is not a dependency of the project -- this used to
+end in a traceback, which reads like a broken checker rather than a missing
+step. Both cases now say what to do instead.
 """
 
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
 #: A literal backslash, built rather than written: this file is generated
@@ -65,18 +70,45 @@ def snippet_classes(text: str) -> set[str]:
     return found
 
 
-def main() -> int:
-    css = (OUT / "styles.css").read_text(encoding="utf-8")
-    tokens = (OUT / "tokens" / "tokens.css").read_text(encoding="utf-8")
-    header = CONVENTIONS.read_text(encoding="utf-8")
+def read(path: Path) -> str:
+    """A missing bundle is a missing step, not a broken checker."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise SystemExit(
+            f"{path} is not there. Build the bundle first:\n"
+            f"    python .design-sync/build.py"
+        ) from None
 
-    import tinycss2
+
+def parses(css: str) -> bool:
+    """Does the compiled sheet read as CSS at all?
+
+    `tinycss2` is not a dependency of the project, and one question does not
+    justify one (ADR 12). Without it this check steps aside and says so; the
+    name checks below are the substance and need nothing extra.
+    """
+    try:
+        import tinycss2
+    except ModuleNotFoundError:
+        print("[parse]  skipped -- no tinycss2. For the full run:")
+        print("         uv run --with tinycss2 python .design-sync/validate.py")
+        return True
 
     rules = tinycss2.parse_stylesheet(css, skip_whitespace=True, skip_comments=True)
-    errors = [r for r in rules if r.type == "error"]
+    errors = [rule for rule in rules if rule.type == "error"]
     print(f"[parse]  {len(rules)} top-level rules, {len(errors)} errors")
     for error in errors[:5]:
         print("        ", error)
+    return not errors
+
+
+def main() -> int:
+    css = read(OUT / "styles.css")
+    tokens = read(OUT / "tokens" / "tokens.css")
+    header = read(CONVENTIONS)
+
+    readable = parses(css)
 
     checked: list[str] = [f"{p}-{r}" for r in ROLES for p in PREFIXES]
     checked += CLASSES + PROSE + sorted(snippet_classes(header))
@@ -102,7 +134,7 @@ def main() -> int:
     media = "@media (prefers-color-scheme: dark)" in css
     print(f"[theme]  light={light} dark={dark} media-query={media}")
 
-    ok = not (errors or missing or strays) and light and dark and media
+    ok = readable and not (missing or strays) and light and dark and media
     print("OK" if ok else "FAILED")
     return 0 if ok else 1
 

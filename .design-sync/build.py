@@ -152,7 +152,9 @@ def main() -> int:
     for name in sorted(light):
         if not name.startswith("--color-"):
             continue
-        body.append(f"| `{name}` | `{light[name].strip()}` | `{dark.get(name, light[name]).strip()}` |")
+        hell = light[name].strip()
+        dunkel = dark.get(name, light[name]).strip()
+        body.append(f"| `{name}` | `{hell}` | `{dunkel}` |")
     body += [
         "", "## How this was built", "",
         "`python .design-sync/build.py` compiles",
