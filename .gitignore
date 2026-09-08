@@ -25,3 +25,6 @@ src/ebook_watchlist/web/static/
 
 # Worktrees paralleler Agenten
 .claude/worktrees/
+
+# Bauergebnis des Design-Sync (ADR 20: nichts Gebautes ins Repo).
+ds-bundle/

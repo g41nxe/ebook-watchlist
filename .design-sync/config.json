@@ -1,0 +1,9 @@
+{
+  "shape": "css-only",
+  "readmeHeader": ".design-sync/conventions.md",
+  "build": "python .design-sync/build.py",
+  "validate": "uv run --with tinycss2 python .design-sync/validate.py",
+  "localDir": "./ds-bundle",
+  "projectId": "b0b26814-59e3-4cdc-9f94-75aa6475ed5e",
+  "projectName": "Der Buchfink"
+}
