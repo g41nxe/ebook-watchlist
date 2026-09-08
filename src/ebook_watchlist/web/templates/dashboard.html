@@ -31,8 +31,13 @@
       {% elif source.ok %}text-accent
       {% elif source.ok is none %}text-soft
       {% else %}text-danger{% endif %}">{{ source.state }}</span>
-    <span class="font-medium">{{ source.display }}</span>
-    <span class="text-sm text-soft">zuletzt geprüft {{ source.seen }}</span>
+    {# Feste Breite, damit "zuletzt geprueft" bei jeder Quelle an derselben
+       Stelle beginnt; vorher richtete es sich nach der Laenge des Namens und
+       sprang zwischen "Shop" und "Bibliothek" um 35 px. Auf dem Telefon
+       nimmt der Zeitpunkt eine eigene Zeile, statt bei der einen Quelle
+       umzubrechen und bei der anderen nicht. #}
+    <span class="w-28 shrink-0 font-medium">{{ source.display }}</span>
+    <span class="w-full text-sm text-soft sm:w-auto">zuletzt geprüft {{ source.seen }}</span>
     {% if source.note %}
     <span class="rounded bg-danger/10 px-1.5 py-0.5 text-xs text-danger">{{ source.note }}</span>
     {% endif %}
@@ -56,8 +61,10 @@
   {% for digest in digests %}
   <li class="flex items-baseline gap-4 py-2.5">
     <span class="w-32 shrink-0 text-sm tabular-nums text-soft">{{ digest.label }}</span>
+    {# Der Dateiname war der Linktext, und "Digest" ist das Codewort — die
+       Leserin liest "Tagesbericht" (ADR 22). Das Datum steht daneben. #}
     <a class="text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent"
-       href="/digest/{{ digest.name }}">{{ digest.name }}</a>
+       href="/digest/{{ digest.name }}">Tagesbericht</a>
   </li>
   {% endfor %}
 </ul>

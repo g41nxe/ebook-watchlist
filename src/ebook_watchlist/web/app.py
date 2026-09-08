@@ -86,11 +86,24 @@ _SELECTED = Form(default=[])
 @dataclass(frozen=True, slots=True)
 class DigestFile:
     name: str
-    written_at: datetime
 
     @property
     def label(self) -> str:
-        return self.written_at.strftime("%d.%m.%Y %H:%M")
+        """Der Tag, den der Bericht meint — aus dem Namen, nicht aus der
+        Dateizeit.
+
+        Beide standen bisher nebeneinander auf der Uebersicht: links wann die
+        Datei geschrieben wurde, rechts als Linktext ihr Name, und darin das
+        Datum des Berichts. Zwei aehnlich aussehende Daten, von denen nur eines
+        jemanden interessiert. Die Dateizeit ist jetzt weg.
+        """
+        stempel = self.name[len("digest-") : -len(".html")]
+        try:
+            if len(stempel) > len("2026-09-08"):
+                return f"{datetime.strptime(stempel, '%Y-%m-%d-%H%M'):%d.%m.%Y %H:%M}"
+            return f"{datetime.strptime(stempel, '%Y-%m-%d'):%d.%m.%Y}"
+        except ValueError:  # pragma: no cover - DIGEST_NAME laesst nichts anderes durch
+            return self.name
 
 
 def digest_files(limit: int = 30) -> list[DigestFile]:
@@ -98,7 +111,7 @@ def digest_files(limit: int = 30) -> list[DigestFile]:
     if not directory.exists():
         return []
     found = [
-        DigestFile(path.name, datetime.fromtimestamp(path.stat().st_mtime))
+        DigestFile(path.name)
         for path in directory.glob("digest-*.html")
         if DIGEST_NAME.match(path.name)
     ]

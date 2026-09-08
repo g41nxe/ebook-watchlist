@@ -69,6 +69,32 @@
     background-color: var(--color-paper);
     color: var(--color-ink);
   }
+
+  /* Ueberfahren aenderte Farben sprunghaft: im ganzen Projekt standen fuenf
+     `transition`-Klassen, und die uebrigen Zustaende sprangen. Nur Farben,
+     keine Groessen — was sich bewegt, soll nicht auch noch wandern. */
+  a,
+  button,
+  summary,
+  label,
+  input,
+  .kachel-klickbar {
+    transition:
+      color 0.15s,
+      background-color 0.15s,
+      border-color 0.15s,
+      outline-color 0.15s;
+  }
+  /* Wer das nicht sehen will, bekommt es nicht. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
   /* Ein Abzeichen auf dem Cover ist ein eigener Gegenstand, kein Aufdruck:
      Ring in der Seitenfarbe, kraeftiger Schatten, dickerer Strich im Symbol.
      Ohne das verschwimmt es auf einem bunten Cover. */
@@ -276,6 +302,25 @@
     --tw-shadow: 0 1px 2px var(--tw-shadow-color, oklch(0 0 0 / 0.5)),
                  0 10px 30px -14px var(--tw-shadow-color, oklch(0 0 0 / 0.8));
   }
+}
+
+/* Ein Fokusring fuer alles, was Fokus bekommen kann. Vorher gab es genau eine
+   Regel dafuer und sechs Eingabefelder mit `focus:border-accent`; Knoepfe,
+   Pillen, Navigation und Kaestchen bekamen den Standardring des Browsers, und
+   das versteckte Radio in `.wahl` gar keinen.
+
+   `:focus-visible`, nicht `:focus`: ein Mausklick auf einen Knopf soll keinen
+   Ring hinterlassen, die Tabulatortaste schon.
+
+   Und wieder ausserhalb jeder Ebene, aus demselben Grund wie der Rahmen und
+   der Schatten oben: in `base` setzte die Regel zwar Breite und Stil durch,
+   die *Farbe* aber blieb `currentColor` — der Ring war dann tintenfarben statt
+   petrol und auf einem dunklen Knopf kaum zu sehen. Nachgemessen mit
+   gedrueckter Tabulatortaste, nicht geraten. */
+:focus-visible,
+.wahl:has(:focus-visible) .feld {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* Ein Aufklapper, dessen Zeile im offenen Zustand etwas anderes sagt. Die

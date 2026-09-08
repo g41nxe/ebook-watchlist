@@ -176,7 +176,9 @@
    Text mit einer Zeilenbegrenzung. #}
 <details class="klappentext mt-6">
   <summary class="list-none">
-    <p class="text-sm leading-relaxed">{{ page.blurb }}</p>
+    {# `max-w-prose`: ueber die vollen 720 px liefen rund 95 Zeichen je Zeile,
+       und ab etwa 75 verliert das Auge den Zeilenanfang. #}
+    <p class="max-w-prose text-sm leading-relaxed">{{ page.blurb }}</p>
     <span class="mehr mt-1 inline-block cursor-pointer text-xs text-accent underline
                  decoration-accent/30 underline-offset-2 hover:decoration-accent"></span>
   </summary>

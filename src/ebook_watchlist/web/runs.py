@@ -117,9 +117,15 @@ class RunState:
 
     @property
     def started_label(self) -> str | None:
+        """Dasselbe Format wie in der Lauf-Liste und bei den Quellen.
+
+        Vorher standen auf einer Seite drei: hier mit Jahr und Sekunden, in
+        der Liste ohne beides, bei den Tagesberichten wieder anders. Sekunden
+        beantworten keine Frage, die jemand an einen taeglichen Lauf hat.
+        """
         if self.run is None:
             return None
-        return self.run.started_at.strftime("%d.%m.%Y %H:%M:%S")
+        return self.run.started_at.strftime("%d.%m. %H:%M")
 
 
 def _log_path() -> Path:

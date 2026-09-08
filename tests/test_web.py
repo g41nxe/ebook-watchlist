@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -178,3 +179,83 @@ def test_a_broken_configuration_is_a_page_not_a_traceback_on_post(
 
     assert response.status_code == 500
     assert "profile.yaml" in response.text
+
+
+# --- was die Gestaltung behauptet, und was pruefbar davon ist ---------------
+#
+# Abstaende und Hoehen prueft hier niemand: dafuer braeuchte es einen Browser,
+# und was er messen wuerde, aendert sich mit jedem Entwurf. Pruefbar ist, was
+# eine Aussage ist — welche Woerter dastehen und welches Element sich als das
+# aktuelle ausgibt.
+
+
+@pytest.mark.parametrize(
+    ("pfad", "name"),
+    [("/", "Übersicht"), ("/watchlist", "Watchlist"), ("/vorschlaege", "Vorschläge"),
+     ("/profil", "Profil")],
+)
+def test_the_navigation_marks_the_page_you_are_on(
+    client: TestClient, pfad: str, name: str
+) -> None:
+    """Vier gleich aussehende Links sagten auch auf der offenen Seite nichts."""
+    body = client.get(pfad).text
+
+    assert body.count('aria-current="page"') == 1
+    marker = body.index('aria-current="page"')
+    assert name in body[marker : marker + 400]
+
+
+def test_a_digest_is_offered_as_a_report_not_as_a_file_name(
+    client: TestClient, data_dir: Path
+) -> None:
+    """`Digest` ist das Codewort, "Tagesbericht" das Wort dafuer (ADR 22).
+
+    Der Dateiname bleibt in der Adresse — er ist der Schluessel —, aber er ist
+    nicht mehr das, was jemand anzuklicken bekommt.
+    """
+    digests = paths.digests_dir()
+    digests.mkdir(parents=True, exist_ok=True)
+    (digests / "digest-2026-09-07.html").write_text("<p>x</p>", encoding="utf-8")
+
+    body = client.get("/").text
+
+    assert ">Tagesbericht</a>" in body
+    assert ">digest-2026-09-07.html</a>" not in body
+    assert 'href="/digest/digest-2026-09-07.html"' in body
+
+
+def test_a_digest_is_dated_by_the_day_it_reports_on(
+    client: TestClient, data_dir: Path
+) -> None:
+    """Danebengestanden hatte die Dateizeit.
+
+    Zwei Berichte verschiedener Tage, am selben Abend geschrieben, trugen
+    damit dieselbe Zahl — zu unterscheiden waren sie nur am Dateinamen.
+    """
+    digests = paths.digests_dir()
+    digests.mkdir(parents=True, exist_ok=True)
+    for name in ("digest-2026-09-07.html", "digest-2026-09-08.html"):
+        (digests / name).write_text("<p>x</p>", encoding="utf-8")
+
+    body = client.get("/").text
+
+    assert "07.09.2026" in body
+    assert "08.09.2026" in body
+
+
+def test_a_moment_is_written_the_same_way_everywhere(
+    client: TestClient, data_dir: Path
+) -> None:
+    """Ein Format fuer Zeitpunkte, ohne Sekunden.
+
+    Die Uebersicht zeigte drei: den Laufbeginn mit Jahr und Sekunden, die
+    Lauf-Liste ohne beides, die Quellen wieder anders.
+    """
+    run_main([])
+
+    body = client.get("/").text
+
+    assert "seit " in body
+    zeitpunkte = re.findall(r"\d{2}\.\d{2}\. \d{2}:\d{2}(?::\d{2})?", body)
+    assert zeitpunkte, "kein Zeitpunkt auf der Seite gefunden"
+    assert not [z for z in zeitpunkte if z.count(":") > 1], f"Sekunden in {zeitpunkte}"
