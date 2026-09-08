@@ -142,10 +142,17 @@
         {% endif %}
       </span>
 
-      <span class="ml-15 flex w-full items-center justify-between gap-3 sm:ml-0 sm:w-auto">
+      {# `justify-between` erst ab `sm`: auf dem Telefon nimmt der Block die
+         ganze Breite, und auseinandergezogen standen zwischen Betrag und
+         Symbol 143 Pixel Nichts. Beieinander lesen sie sich als *ein* Wert. #}
+      <span class="ml-15 flex w-full items-center gap-3
+                   sm:ml-0 sm:w-auto sm:justify-between">
         {# Dieselben zwei Zeilen wie auf der Watchlist, damit die Beträge über
-           beide Seiten hinweg auf derselben Höhe stehen. #}
-        <span class="flex w-24 shrink-0 flex-col items-end leading-tight">
+           beide Seiten hinweg auf derselben Höhe stehen — ab `sm`. Auf dem
+           Telefon gibt es nichts, wogegen auszurichten wäre, und die feste
+           Spalte kostete dort nur Platz. #}
+        <span class="flex shrink-0 items-baseline gap-2 leading-tight
+                     sm:w-24 sm:flex-col sm:items-end sm:gap-0">
           <span class="h-4 text-xs text-soft"></span>
           {% if item.price %}
           <span class="text-lg font-semibold tabular-nums

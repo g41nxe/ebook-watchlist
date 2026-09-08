@@ -388,8 +388,12 @@
 </ul>
 {% endif %}
 
+{# Der Wrapper durfte schon scrollen, die Tabelle wollte nur nicht: mit
+   `w-full` allein schrumpfte sie auf die Breite des Telefons, und dort zerfiel
+   "4,99 €" in zwei Zeilen und die Kopfzelle "Dort anders genannt" in drei.
+   Eine Mindestbreite laesst sie stattdessen scrollen. #}
 <div class="overflow-x-auto">
-<table class="w-full border-collapse text-sm">
+<table class="w-full min-w-xl border-collapse text-sm whitespace-nowrap">
   <thead>
     <tr class="border-b border-rule text-left text-soft">
       <th class="py-1.5 pr-3 font-semibold">Wann</th>
@@ -412,7 +416,8 @@
       {# Nur, wenn die Quelle anders benennt — sonst wiederholte die Spalte
          in jeder Zeile denselben Titel, und der eine Fall, auf den es
          ankommt, ginge darin unter (ADR 9). #}
-      <td class="py-2 {{ 'text-danger' if sighting.other_title else 'text-soft' }}">
+      <td class="py-2 whitespace-normal
+                 {{ 'text-danger' if sighting.other_title else 'text-soft' }}">
         {{ sighting.other_title or "—" }}</td>
     </tr>
     {% endfor %}

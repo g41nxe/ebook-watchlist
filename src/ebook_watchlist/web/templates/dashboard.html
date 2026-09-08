@@ -74,7 +74,7 @@
 {# Fehlermeldungen werden lang; auf einem Telefon muss die Tabelle scrollen
    duerfen, statt die Seite breit zu ziehen. #}
 <div class="overflow-x-auto">
-<table class="w-full border-collapse text-sm">
+<table class="w-full min-w-xl border-collapse text-sm whitespace-nowrap">
   <thead>
     <tr class="border-b border-rule text-left text-soft">
       <th class="py-1.5 pr-3 font-semibold">Start</th>
@@ -100,7 +100,7 @@
         {% elif state == 'läuft' %}text-soft
         {% else %}text-danger{% endif %}">{{ state }}</td>
       <td class="py-2 pr-3 tabular-nums">{{ run.delta_count if run.delta_count else "—" }}</td>
-      <td class="max-w-sm py-2 text-soft">{{ run.error or "" }}</td>
+      <td class="max-w-sm py-2 whitespace-normal text-soft">{{ run.error or "" }}</td>
     </tr>
   {% endfor %}
   </tbody>
