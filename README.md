@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/bilder/hero.png" alt="Die Vorschlagsseite: Funde mit Cover, Sternen und einer Zeile, warum sie in Frage kommen" width="900">
+  <img src="docs/bilder/hero.jpg" alt="Ein Buchfink zeigt drei Schritte: lesen, ohne zu suchen; kaufen, wenn es sich lohnt; Neues finden, das zu dir passt" width="900">
 </p>
 
 # Buchfink
@@ -263,10 +263,11 @@ als ADR unter [docs/adr/](docs/adr) festgehalten; die teuersten Fehler dieses
 Projekts waren plausibel klingende Annahmen, die niemand gemessen hatte
 ([docs/offene-punkte.md](docs/offene-punkte.md), Abschnitt 3).
 
-Das Titelbild dieser Datei wird aus der laufenden Oberfläche aufgenommen:
+Der Screenshot der Buchseite oben wird aus der laufenden Oberfläche
+aufgenommen:
 
 ```bash
-uv run python scripts/make_hero.py
+uv run python scripts/make_screenshots.py buchseite
 ```
 
 ## Dokumentation

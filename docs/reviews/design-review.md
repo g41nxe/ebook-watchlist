@@ -71,7 +71,7 @@ war nicht die Höhe, sondern 143 px Leerraum zwischen Betrag und Symbol.
 | Sieben Schriftgrößen | **Behoben in `2f02582`** — 12/14/16/18/24, alles Tailwind-Stufen. Grundtext von 15 auf 16 px. |
 | Zeilenlänge auf dem Desktop | **Behoben in `3ca6e27`** — `max-w-prose` für den Klappentext. |
 | Zwei Schriften für gleichwertige Werte in den Kacheln | **Offen.** Preis in Serif-Gold, „ausleihbar" in Sans-Petrol. Kein Defekt, eine Frage des Geschmacks. |
-| README-Titelbild veraltet | **Offen, gehört dir.** `make_hero.py` fotografiert die laufende Oberfläche mit **echten** Daten; ein Titelbild mit erfundenen Büchern wäre schlechter als ein veraltetes. |
+| README-Screenshot veraltet | **Offen, gehört dir.** `make_screenshots.py` fotografiert die laufende Oberfläche mit **echten** Daten; ein Titelbild mit erfundenen Büchern wäre schlechter als ein veraltetes. |
 
 ## Nebenher gefunden
 

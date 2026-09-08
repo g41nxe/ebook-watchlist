@@ -1,14 +1,14 @@
-"""Nimmt die Bilder der README auf.
+"""Nimmt die Screenshots der README auf.
 
-    uv run python scripts/make_hero.py            # das Titelbild
-    uv run python scripts/make_hero.py buchseite  # die Buchseite
+    uv run python scripts/make_screenshots.py vorschlaege
+    uv run python scripts/make_screenshots.py buchseite
 
 Voraussetzung: die Oberfläche läuft (``uv run python -m ebook_watchlist.web``).
 
-Gebaut statt erzeugt: die Szene ist ``scripts/hero.html``, aufgenommen wird
-sie mit dem Chrome, der ohnehin auf dem Rechner liegt. Kein Playwright, kein
-Browser-Download — eine neue Abhängigkeit für ein einziges Bild wäre teurer
-als der Nutzen.
+Gebaut statt erzeugt: jede Szene ist eine eigene HTML-Datei unter
+``scripts/``, aufgenommen wird sie mit dem Chrome, der ohnehin auf dem
+Rechner liegt. Kein Playwright, kein Browser-Download — eine neue
+Abhängigkeit für ein paar Bilder wäre teurer als der Nutzen.
 
 Das Bild zeigt die **echte** Oberfläche mit den echten Daten. Es ist damit
 immer so aktuell wie der letzte Aufruf dieses Skripts, und ändert sich die
@@ -29,7 +29,7 @@ WURZEL = Path(__file__).resolve().parent.parent
 #: Eine Szene je Bild, weil jede Seite eine andere Hoehe braucht; das
 #: Fensterbild drumherum ist dasselbe.
 SZENEN = {
-    "hero": ("hero.html", "hero.png", "/vorschlaege", 1600, 900),
+    "vorschlaege": ("vorschlaege.html", "vorschlaege.png", "/vorschlaege", 1600, 900),
     "buchseite": ("buchseite.html", "buchseite.png", "/book/47", 1600, 1160),
 }
 
@@ -65,7 +65,7 @@ def oberflaeche_laeuft(seite: str) -> bool:
 
 
 def main(argumente: list[str] | None = None) -> int:
-    name = (argumente or sys.argv[1:] or ["hero"])[0]
+    name = (argumente or sys.argv[1:] or ["buchseite"])[0]
     if name not in SZENEN:
         print(f"unbekannte Szene {name!r} — bekannt: {', '.join(SZENEN)}", file=sys.stderr)
         return 2
