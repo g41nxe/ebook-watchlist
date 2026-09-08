@@ -42,7 +42,13 @@
 </svg>
 
 <header class="sticky top-0 z-20 border-b border-rule bg-card/85 backdrop-blur">
-  <div class="mx-auto flex max-w-3xl items-center gap-3 px-6 py-3">
+  {# Auf dem Telefon bricht die Navigation in eine eigene Reihe. Vorher stand
+     alles in einer Zeile ohne Umbruch, und die schmalste Breite, in die das
+     passte, war 451 px: ein Telefon mit 375 px zoomte deshalb *jede* Seite
+     heraus, statt sie zu zeigen. Die vier Links brauchen zusammen rund 306 px
+     und haben in einer eigenen Reihe 327 px zur Verfuegung. #}
+  <div class="mx-auto flex max-w-3xl flex-wrap items-center gap-x-3 gap-y-1
+              px-6 py-2 sm:py-3">
     {# Der Namensgeber, und hier nicht dieselbe Datei wie im Tab.
        Urspruenglich war es eine: ein Zeichen, das die Anwendung meint, sollte
        nicht zweimal gezeichnet sein. Der Vogel traegt die 40 px der Kopfzeile,
@@ -59,15 +65,27 @@
          nie etwas unterschieden. `error.html` setzt den Block trotzdem um:
          wenn die Einrichtung klemmt, ist das die wichtigere Auskunft. #}
       {% block subtitle %}
-      <div class="mt-0.5 text-[11px] tracking-[0.05em] text-soft uppercase">
+      {# Auf dem Telefon Zierrat, und sie braeche dort in vier Zeilen um.
+         `error.html` setzt den Block um und bleibt sichtbar: eine klemmende
+         Einrichtung ist keine Zierde. #}
+      <div class="mt-0.5 hidden text-xs tracking-[0.05em] text-soft uppercase sm:block">
         Weniger Suchen. Mehr Lesen.</div>
       {% endblock %}
     </div>
-    <nav class="ml-auto flex gap-1 text-sm">
-      <a href="/" class="rounded px-2.5 py-1 text-soft hover:bg-hair hover:text-ink">Übersicht</a>
-      <a href="/watchlist" class="rounded px-2.5 py-1 text-soft hover:bg-hair hover:text-ink">Watchlist</a>
-      <a href="/vorschlaege" class="rounded px-2.5 py-1 text-soft hover:bg-hair hover:text-ink">Vorschläge</a>
-      <a href="/profil" class="rounded px-2.5 py-1 text-soft hover:bg-hair hover:text-ink">Profil</a>
+    {# Volle Breite auf dem Telefon, damit die Reihe umbricht statt zu
+       ueberlaufen; ab `sm` sitzt sie wieder rechts in derselben Zeile. #}
+    <nav class="flex w-full flex-wrap gap-1 text-sm sm:ml-auto sm:w-auto">
+      {% set pfad = request.url.path %}
+      {% for ziel, name in (("/", "Übersicht"), ("/watchlist", "Watchlist"),
+                            ("/vorschlaege", "Vorschläge"), ("/profil", "Profil")) %}
+      {# Wo man steht, stand bisher nirgends — vier gleich aussehende Links.
+         `aria-current` sagt es der Vorlesehilfe, die Farbe dem Auge. #}
+      {% set aktiv = pfad == ziel %}
+      <a href="{{ ziel }}"{% if aktiv %} aria-current="page"{% endif %}
+         class="tun inline-flex h-7 items-center rounded px-2.5
+                hover:bg-hair hover:text-ink
+                {{ 'bg-hair text-ink' if aktiv else 'text-soft' }}">{{ name }}</a>
+      {% endfor %}
     </nav>
   </div>
 </header>
