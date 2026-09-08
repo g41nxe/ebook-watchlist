@@ -32,9 +32,16 @@
 }
 
 /* Dunkelmodus ueber die Medienabfrage, wie bisher (ADR 20). Nur die Rollen
-   tauschen; keine Farbe ist ausschliesslich hier definiert. */
+   tauschen; keine Farbe ist ausschliesslich hier definiert.
+
+   `:root`, nicht `@theme`: Tailwind v4 kennt kein `@theme` innerhalb einer
+   Medienabfrage. Es zieht die Deklarationen in den einen `:root`-Block hoch
+   und wirft die Bedingung weg — der dunkle Block ueberschrieb damit den hellen,
+   und die Anwendung lief in jeder Einstellung dunkel, ohne dass irgendwo eine
+   Medienabfrage uebrig blieb. Die Hilfsklassen loesen ohnehin ueber
+   `var(--color-paper)` auf, also genuegt es, die Eigenschaften zu ueberschreiben. */
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root {
     --color-paper: oklch(0.17 0.008 285);
     --color-card: oklch(0.21 0.008 285);
     --color-ink: oklch(0.92 0.006 85);
@@ -255,6 +262,20 @@
 }
 .kachel-klickbar:hover .kachelbild {
   opacity: 0.18;
+}
+
+/* Der Schatten laesst sich nicht ueber eine Eigenschaft tauschen: Tailwind
+   loest `--shadow-*` beim Bauen auf und schreibt den Wert fest in
+   `.shadow-sheet`; `--shadow-sheet` selbst steht am Ende gar nicht im
+   Stylesheet. Der dunkle Wert wird deshalb ausgeschrieben — ausserhalb jeder
+   Ebene, wie der Rahmen oben, sonst verliert er gegen `utilities`. Die Form
+   mit `var(--tw-shadow-color, ...)` ist die, die Tailwind selbst erzeugt,
+   damit `shadow-<farbe>` weiter funktioniert. */
+@media (prefers-color-scheme: dark) {
+  .shadow-sheet {
+    --tw-shadow: 0 1px 2px var(--tw-shadow-color, oklch(0 0 0 / 0.5)),
+                 0 10px 30px -14px var(--tw-shadow-color, oklch(0 0 0 / 0.8));
+  }
 }
 
 /* Ein Aufklapper, dessen Zeile im offenen Zustand etwas anderes sagt. Die
