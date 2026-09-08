@@ -2,6 +2,7 @@
 
     uv run python scripts/make_screenshots.py vorschlaege
     uv run python scripts/make_screenshots.py buchseite
+    uv run python scripts/make_screenshots.py watchlist
 
 Voraussetzung: die Oberfläche läuft (``uv run python -m ebook_watchlist.web``).
 
@@ -31,6 +32,7 @@ WURZEL = Path(__file__).resolve().parent.parent
 SZENEN = {
     "vorschlaege": ("vorschlaege.html", "vorschlaege.png", "/vorschlaege", 1600, 900),
     "buchseite": ("buchseite.html", "buchseite.png", "/book/47", 1600, 1160),
+    "watchlist": ("watchlist.html", "watchlist.png", "/watchlist", 1600, 900),
 }
 
 #: Die Klammern in "ProgramFiles(x86)" sind kein gueltiger Formatname —
