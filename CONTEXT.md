@@ -40,13 +40,28 @@ is available, otherwise title and author through the matcher.
 ### Book Relation
 *deutsch: Buchbeziehung*
 
-What a Profile has to do with a Book: `watching`, `owned`, `liked`, `disliked`,
-`dismissed`. Several hold at once — a book can be owned *and* have been watched.
-Relations are deactivated rather than deleted, so "watched until you bought it"
-stays visible.
+What a Profile has to do with a Book. Several hold at once — a book can be
+owned *and* have been watched. Relations are deactivated rather than deleted,
+so "watched until you bought it" stays visible.
+
+| kind | deutsch | what it says |
+| --- | --- | --- |
+| `watching` | in Beobachtung | on the Watchlist, reported at every price |
+| `owned` | im Besitz | the reader has it |
+| `liked` | Mag ich | read, and it was good |
+| `disliked` | Kein Interesse | read, and it was not |
+| `dismissed` | Ausgeschlossen | never offer this book again |
+
+`disliked` and `dismissed` are different statements, and neither implies the
+other. `disliked` is a verdict *after reading* and says something about taste.
+`dismissed` is an instruction about the Suggestion pile and says nothing about
+whether the book is any good — a book can be dismissed unread.
 
 ### Interest
-*deutsch: Interesse*
+*deutsch: Entdeckungskanal*
+
+Not *Interesse*: that word belongs to the reader's `disliked` relation, which
+the interface calls "Kein Interesse".
 
 Where the tool should look for new books: a Reference Author or a Genre
 Category, unified into one concept because both answer the same question and

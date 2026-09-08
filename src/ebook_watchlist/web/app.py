@@ -268,6 +268,7 @@ def create_app() -> FastAPI:
                 "message": message,
                 "offene_wahl": offen,
                 "nur_unklar": nur_unklar,
+                "abschluss": watchlist.ABSCHLUSS,
             },
         )
 
@@ -376,6 +377,7 @@ def create_app() -> FastAPI:
                 "check": rechecker.state(book_id),
                 "now": datetime.now(),
                 "profile": profile,
+                "abschluss": watchlist.ABSCHLUSS,
             },
         )
 
