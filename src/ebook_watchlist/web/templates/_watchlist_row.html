@@ -25,7 +25,7 @@
            >{{ entry.title }}</a>
         {% if entry.is_bundle %}
         <span class="ml-1 align-middle rounded bg-amber/15 px-1.5 py-0.5
-                     text-[11px] font-medium text-amber"
+                     text-xs font-medium text-amber"
               title="Mehrere Bände in einer Ausgabe">Sammelausgabe</span>
         {% endif %}</p>
       <p class="truncate text-sm text-soft">
@@ -155,19 +155,19 @@
         <form method="post" action="/watchlist/{{ entry.book_id }}/umbenennen"
               class="flex flex-wrap items-end gap-2">
           <label class="flex flex-col gap-1">
-            <span class="text-[11px] font-medium text-soft">Titel</span>
+            <span class="text-xs font-medium text-soft">Titel</span>
             <input name="title" required autocomplete="off" value="{{ entry.title }}"
-                   class="w-64 rounded border border-rule bg-card px-2 py-1.5 text-sm
+                   class="w-64 rounded border border-rule bg-card h-9 px-2 text-sm
                           text-ink outline-none focus:border-accent">
           </label>
           <label class="flex flex-col gap-1">
-            <span class="text-[11px] font-medium text-soft">Autor:in</span>
+            <span class="text-xs font-medium text-soft">Autor:in</span>
             <input name="author" autocomplete="off" value="{{ entry.author or '' }}"
-                   class="w-52 rounded border border-rule bg-card px-2 py-1.5 text-sm
+                   class="w-52 rounded border border-rule bg-card h-9 px-2 text-sm
                           text-ink outline-none focus:border-accent">
           </label>
           <button type="submit"
-                  class="tun rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm
+                  class="tun rounded border border-accent bg-accent/10 tun inline-flex h-9 items-center justify-center px-3 text-sm
                          font-medium text-accent hover:bg-accent/25">Aktualisieren</button>
         </form>
         <form method="post" action="/watchlist/{{ entry.book_id }}/fehlt" class="mt-2">
@@ -225,7 +225,7 @@
               {% endif %}
               <span class="haken">&#10003;</span>
             </span>
-            <span class="beschriftung mt-1 block text-[11px] leading-tight">
+            <span class="beschriftung mt-1 block text-xs leading-tight">
               {{ kandidat.title }}
               {% if kandidat.is_bundle %}
               <span class="mt-0.5 block text-amber">
@@ -239,10 +239,10 @@
 
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <button type="submit" name="was" value="bestaetigen"
-                  class="tun rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm
+                  class="tun rounded border border-accent bg-accent/10 tun inline-flex h-9 items-center justify-center px-3 text-sm
                          font-medium text-accent hover:bg-accent/25">Bestätigen</button>
           <button type="submit" name="was" value="keiner" formnovalidate
-                  class="tun rounded border border-rule bg-card px-3 py-1.5 text-sm text-soft
+                  class="tun rounded border border-rule bg-card tun inline-flex h-9 items-center justify-center px-3 text-sm text-soft
                          hover:border-danger hover:bg-danger/10 hover:text-danger"
                   title="Keine dieser Ausgaben ist es — dieselben werden nicht noch
                          einmal vorgelegt, eine neue schon">Nichts passt</button>

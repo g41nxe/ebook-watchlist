@@ -15,13 +15,13 @@
   <label class="flex flex-col gap-1">
     <span class="text-xs font-medium text-soft">Titel</span>
     <input name="title" required autocomplete="off"
-           class="w-52 rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink
+           class="w-52 rounded border border-rule bg-paper h-9 px-2 text-sm text-ink
                   outline-none focus:border-accent">
   </label>
   <label class="flex flex-col gap-1">
     <span class="text-xs font-medium text-soft">Autor:in</span>
     <input name="author" autocomplete="off"
-           class="w-52 rounded border border-rule bg-paper px-2 py-1.5 text-sm text-ink
+           class="w-52 rounded border border-rule bg-paper h-9 px-2 text-sm text-ink
                   outline-none focus:border-accent">
   </label>
   {# Knopf und Hinweis in einer eigenen Gruppe: das Formular richtet seine
@@ -29,7 +29,7 @@
      Hinweis auf der Schriftlinie des Knopfes statt auf seiner Mitte. #}
   <div class="flex items-center gap-3">
     <button type="submit"
-            class="rounded border border-accent bg-accent/10 px-3 py-1.5 text-sm font-medium
+            class="rounded border border-accent bg-accent/10 tun inline-flex h-9 items-center justify-center px-3 text-sm font-medium
                    text-accent hover:bg-accent/20">Anlegen</button>
     <span class="text-xs text-soft">wird sofort gesucht</span>
   </div>
@@ -47,7 +47,7 @@
     {%- if offene_wahl == 1 %} Zuordnung braucht{% else %} Zuordnungen brauchen{% endif %}
     deine Entscheidung</span>
   <a href="{{ '/watchlist' if nur_unklar else '/watchlist?nur=unklar' }}"
-     class="ml-auto rounded border border-rule bg-card px-2.5 py-1 text-xs font-medium
+     class="ml-auto tun inline-flex h-7 items-center rounded border border-rule bg-card px-2.5 text-xs font-medium
             hover:border-accent hover:text-accent">
     {{ 'alle zeigen' if nur_unklar else 'nur diese zeigen' }}</a>
 </div>

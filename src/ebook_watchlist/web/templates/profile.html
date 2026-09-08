@@ -85,14 +85,14 @@
 {% endif %}
 <ul class="flex flex-wrap gap-2">
   {% for interest in view.authors %}
-  <li class="rounded-full border px-3 py-1 text-sm
+  <li class="tun inline-flex h-7 items-center rounded-full border px-3 text-sm
              {{ 'border-rule text-soft line-through' if not interest.active
                 else 'border-accent/40 text-accent' }}">
     {{ interest.value }}
     {% if interest.weekly %}
     {# core wird jeden Lauf gefegt, extended einmal die Woche — der lange
        Ausläufer, bei dem ein verpasster Tag nichts kostet (ADR 11). #}
-    <span class="ml-1 text-[11px] text-soft">wöchentlich</span>
+    <span class="ml-1 text-xs text-soft">wöchentlich</span>
     {% endif %}
   </li>
   {% endfor %}
@@ -106,7 +106,7 @@
 {% endif %}
 <ul class="flex flex-wrap gap-2">
   {% for interest in view.themen %}
-  <li class="rounded-full border px-3 py-1 text-sm
+  <li class="tun inline-flex h-7 items-center rounded-full border px-3 text-sm
              {{ 'border-rule text-soft line-through' if not interest.active
                 else 'border-amber/40 text-amber' }}"
       title="{{ interest.value }}">{{ interest.label }}</li>
