@@ -55,11 +55,16 @@
        aber nicht die 16 des Tabs — dort zerfaellt er zu einem Kruemel, waehrend
        das gezeichnete Zeichen als Rechteck mit Abzeichen lesbar bleibt.
        Zwei Groessen, zwei Zeichen; wer eines aendert, muss ans andere
-       denken. #}
-    <img src="{{ url_for('static', path='buchfink.png') }}?v={{ asset_version }}"
-         alt="" width="40" height="40" class="h-10 w-10 shrink-0">
+       denken.
+
+       Zeichen und Name fuehren auf die Startseite. Ein eigener Punkt "Start"
+       waere der fuenfte in der Reihe unten — und die bricht damit auf 375 px
+       um, siehe die Rechnung dort (Issue #5). #}
+    <a href="/" title="Zur Startseite" class="shrink-0">
+      <img src="{{ url_for('static', path='buchfink.png') }}?v={{ asset_version }}"
+           alt="" width="40" height="40" class="h-10 w-10"></a>
     <div>
-      <div class="font-semibold tracking-tight">Buchfink</div>
+      <div class="font-semibold tracking-tight"><a href="/">Buchfink</a></div>
       {# Die Zeile der Anwendung, auf jeder Seite dieselbe. Vorher stand hier
          der Profilname — der ist auf jeder Seite ebenfalls derselbe und hat
          nie etwas unterschieden. `error.html` setzt den Block trotzdem um:
@@ -76,7 +81,7 @@
        ueberlaufen; ab `sm` sitzt sie wieder rechts in derselben Zeile. #}
     <nav class="flex w-full flex-wrap gap-1 text-sm sm:ml-auto sm:w-auto">
       {% set pfad = request.url.path %}
-      {% for ziel, name in (("/", "Übersicht"), ("/watchlist", "Watchlist"),
+      {% for ziel, name in (("/uebersicht", "Übersicht"), ("/watchlist", "Watchlist"),
                             ("/vorschlaege", "Vorschläge"), ("/profil", "Profil")) %}
       {# Wo man steht, stand bisher nirgends — vier gleich aussehende Links.
          `aria-current` sagt es der Vorlesehilfe, die Farbe dem Auge. #}

@@ -229,7 +229,7 @@ def create_app() -> FastAPI:
             status_code=500,
         )
 
-    @app.get("/", response_class=HTMLResponse)
+    @app.get("/uebersicht", response_class=HTMLResponse)
     def dashboard(request: Request) -> HTMLResponse:
         try:
             profile = load_profile()

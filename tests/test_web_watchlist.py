@@ -40,7 +40,7 @@ def test_the_watched_books_are_listed(client: TestClient) -> None:
 
 def test_the_page_is_reachable_from_the_dashboard(client: TestClient) -> None:
     """Eine Seite ohne Weg dorthin ist keine Seite."""
-    assert '/watchlist' in client.get("/").text
+    assert '/watchlist' in client.get("/uebersicht").text
 
 
 # --- aufnehmen --------------------------------------------------------------
