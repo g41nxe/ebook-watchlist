@@ -33,17 +33,22 @@
 </div>
 
 {% else %}
-<h1 class="font-serif text-2xl font-semibold tracking-tight">Heute</h1>
+<h1 class="mb-4 font-serif text-2xl font-semibold tracking-tight">Heute</h1>
 {# Eine Statuszeile, keine Kacheln: nur Werte mit Vergleich oder Zustand.
    "Schnäppchen: 2" zählte die Liste darunter. Alt und fehlgeschlagen stehen
    ausgeschrieben da — eine Farbe allein wäre für jemanden mit
-   Farbsehschwäche keine Information. #}
+   Farbsehschwäche keine Information.
+
+   Der Rahmen um die Zeile ist keine KPI-Kachel — es stehen keine Zahlen in
+   Kaestchen, sondern ein Satz mit zwei Wegen (Tagesbericht, Lauf-Knopf).
+   Ohne ihn hing die Zeile zwischen Ueberschrift und Spalten ohne Kante. #}
 {# Die Statuszeile hat Wege, nicht nur Auskunft: "N Änderungen" führt in den
    letzten Tagesbericht, und rechts steht der Lauf-Knopf — dort, wo "vor 1 Tag"
    in Bernstein mahnt. Es ist derselbe Lauf wie auf der Übersicht: das
    Fragment, das POST /run zurückgibt, landet unter der Zeile und fragt von
    selbst nach, bis der Lauf zu Ende ist; dann lädt die Seite neu (ADR 3). #}
-<div class="mt-1 mb-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+<div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border
+            border-hair bg-card px-5 py-3">
 <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-soft">
   <svg class="i"><use href="#ic-clock"/></svg>
   {# Zahl und Wort auf einer Zeile: ein Umbruch dazwischen macht aus
