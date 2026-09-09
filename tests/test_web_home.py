@@ -139,6 +139,59 @@ def test_a_failed_last_run_is_named_not_counted(client: TestClient, db: Store) -
     assert "0 Änderungen" not in body
 
 
+def test_the_change_count_leads_to_the_latest_report(client: TestClient, db: Store) -> None:
+    """Die Statuszeile ist nicht nur Auskunft: "3 Änderungen" ist der Weg zu
+    dem, was der Lauf gefunden hat."""
+    finished_run(db, finished_at=datetime.now(), deltas=3)
+    digests = paths.digests_dir()
+    digests.mkdir(parents=True, exist_ok=True)
+    (digests / "digest-2026-09-06.html").write_text("<p>alt</p>", encoding="utf-8")
+    (digests / "digest-2026-09-07.html").write_text("<p>neu</p>", encoding="utf-8")
+
+    body = client.get("/").text
+
+    marker = body.index("3 Änderungen")
+    assert 'href="/digest/digest-2026-09-07.html"' in body[marker - 200 : marker]
+    assert "digest-2026-09-06" not in body
+
+
+def test_without_a_report_the_change_count_is_plain_text(client: TestClient, db: Store) -> None:
+    finished_run(db, finished_at=datetime.now(), deltas=0)
+
+    body = client.get("/").text
+
+    assert "0 Änderungen" in body
+    assert "/digest/" not in body
+
+
+def test_the_start_page_offers_to_run_now(client: TestClient, db: Store) -> None:
+    """Wo "vor 1 Tag" in Bernstein steht, gehört die Handbewegung daneben —
+    derselbe Lauf-Knopf wie auf der Übersicht, nicht ein Link dorthin."""
+    finished_run(db, finished_at=datetime.now() - timedelta(days=1, hours=2))
+
+    body = client.get("/").text
+
+    assert "Jetzt prüfen" in body
+    assert 'hx-post="/run"' in body
+
+
+def test_while_a_run_is_going_the_start_page_shows_it_instead_of_the_button(
+    client: TestClient, db: Store
+) -> None:
+    """Kein zweiter Lauf: der Knopf ist weg, solange einer läuft — dieselbe
+    Regel wie auf der Übersicht, dasselbe Panel."""
+    import os
+
+    finished_run(db, finished_at=datetime.now() - timedelta(days=1))
+    db.start_run("test", "cron", datetime.now(), pid=os.getpid())
+
+    body = client.get("/").text
+
+    assert 'id="run-panel"' in body
+    assert "läuft" in body.lower()
+    assert 'hx-post="/run"' not in body
+
+
 # --- jetzt zu haben ---------------------------------------------------------
 
 

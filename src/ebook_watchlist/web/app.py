@@ -245,6 +245,10 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "view": home.build(store, profile, now=datetime.now()),
                 "undo": home.undo_for(store, rueckgaengig, art) if rueckgaengig else None,
+                # Der juengste Tagesbericht ist der Weg hinter "N Aenderungen";
+                # der Lauf-Knopf ist derselbe wie auf der Uebersicht.
+                "digest": next(iter(digest_files(limit=1)), None),
+                "run_state": launcher.state(store, profile.slug),
                 "actions": triage.ACTIONS,
                 "icons": home.ICONS,
                 "arguments": home.ARGUMENTS,
