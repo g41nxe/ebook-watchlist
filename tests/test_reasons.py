@@ -67,6 +67,13 @@ def test_a_theme_without_a_category_does_not_pretend_to_know_one() -> None:
 
 
 def test_the_short_form_fits_a_label() -> None:
+    """Die Pille nennt das Thema selbst, ohne das Wort "Thema" davor — die
+    Farbe (Bernstein) sagt in ihrem Kontext schon, dass es eines ist."""
     assert short_why(observation(match_reason=MatchReason.WATCHLIST)) == "Watchlist"
     assert short_why(observation(match_reason=MatchReason.PROFILE_AUTHOR)) == "Autor:in"
-    assert short_why(observation(category="a/b/psychothriller")) == "Thema Psychothriller"
+    assert short_why(observation(category="a/b/psychothriller")) == "Psychothriller"
+
+
+def test_the_short_form_falls_back_to_thema_without_a_readable_name() -> None:
+    """Ohne Kategorie bleibt "Thema" die einzig ehrliche Auskunft."""
+    assert short_why(observation(category=None)) == "Thema"
