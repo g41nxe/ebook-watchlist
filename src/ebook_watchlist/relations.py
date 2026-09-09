@@ -53,6 +53,26 @@ RELATION_LABELS: dict[RelationKind, str] = {
 }
 
 
+#: Was auf dem **Knopf** steht, der ein Buch in eine Beziehung bringt — eine
+#: Liste fuer Stapel, Startseite und Watchlist-Menue (Issue #5, ADR 29).
+#:
+#: Zwei Listen mit klarer Zustaendigkeit, nicht vier Fassungen einer. Der
+#: Zustandsname oben antwortet auf "was ist dieses Buch fuer mich?" und steht,
+#: wo Buecher beschrieben werden — Buchseite, Profil — wie ein Regalschild.
+#: Der Knopf antwortet auf "was tust du damit?" und traegt ein Taetigkeitswort.
+#: "Hab ich" verstoesst absichtlich gegen die Regel oben: die galt fuer
+#: Regalschilder; auf einem Knopf ist der Ich-Satz die Antwort, nicht der Name.
+#: Kein Wort wandert auf die andere Seite — das prueft test_relations.py.
+#:
+#: `liked` und `disliked` sind kein Ausgang einer Entscheidung im Stapel und
+#: bekommen deshalb hier kein Wort.
+ACTION_LABELS: dict[RelationKind, str] = {
+    RelationKind.DISMISSED: "Verwerfen",
+    RelationKind.OWNED: "Hab ich",
+    RelationKind.WATCHING: "Beobachten",
+}
+
+
 def label_of(kind: RelationKind | str) -> str:
     """Wie diese Beziehung heisst. Unbekanntes bleibt, wie es ist."""
     try:
@@ -64,6 +84,11 @@ def label_of(kind: RelationKind | str) -> str:
 def labelled(*kinds: RelationKind) -> tuple[tuple[str, str], ...]:
     """``(schluessel, name)`` in der angegebenen Reihenfolge."""
     return tuple((str(kind), RELATION_LABELS[kind]) for kind in kinds)
+
+
+def labelled_actions(*kinds: RelationKind) -> tuple[tuple[str, str], ...]:
+    """``(schluessel, knopfwort)`` in der angegebenen Reihenfolge."""
+    return tuple((str(kind), ACTION_LABELS[kind]) for kind in kinds)
 
 
 class InterestKey(StrEnum):

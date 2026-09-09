@@ -1,0 +1,55 @@
+# 29. Ein Zustand hat einen Namen, eine Handlung ein Wort
+
+Eine Buchbeziehung trägt zwei Wörter: den Zustandsnamen („im Besitz"), wo ein
+Buch beschrieben wird, und das Knopfwort („Hab ich"), wo entschieden wird. Zwei
+Listen, je eine Zuständigkeit, kein Wort auf der anderen Seite.
+
+## Kontext
+
+`RELATION_LABELS` entstand, weil `owned` an vier Stellen vier Namen trug —
+„besitze ich", „besessen", „Habe ich", „im Besitz". Die Lösung war *eine*
+Liste für alle Ansichten, mit zwei Regeln darüber: Substantive statt
+Ich-Sätze, und keine zwei Namen, die sich nur durch ein „nicht" unterscheiden.
+Der Design-Review vom 08.09. hat auf dieser Grundlage „Verwerfen" aus dem
+Hinweistext des Stapels entfernt, weil der Knopf daneben „Ausgeschlossen" hieß.
+
+Mit der Startseite (Issue #5) bekam dieselbe Handlung einen zweiten Knopf, und
+die Frage stellte sich neu: Was steht auf einem Knopf? „Ausgeschlossen" ist die
+Antwort auf *„was ist dieses Buch für mich?"* — ein Regalschild, wie Goodreads
+und StoryGraph ihre Regale beschriften. Ein Knopf beantwortet eine andere Frage:
+*„was tust du damit?"* Darauf antwortet niemand mit einem Regalschild.
+
+Die Nutzerrecherche (docs/research/startseite-tracking-werkzeuge.md) legt nahe,
+dass Knöpfe für Ein-Klick-Entscheidungen ein sichtbares Wort brauchen — und
+dass dieses Wort die Handlung nennen soll.
+
+## Entscheidung
+
+**Zwei Listen in `relations.py`.** `RELATION_LABELS` bleibt, was es war: der
+Zustandsname, gelesen von Buchseite und Profil. Daneben `ACTION_LABELS` mit
+einem Wort je Entscheidung — Verwerfen, Hab ich, Beobachten — gelesen von
+Stapel, Startseite und dem Watchlist-Menü. `liked` und `disliked` sind kein
+Ausgang einer Entscheidung im Stapel und haben kein Knopfwort.
+
+**„Hab ich" verstößt absichtlich gegen „keine Ich-Sätze".** Die Regel galt
+für Regalschilder und gilt dort weiter. Auf einem Knopf ist der Ich-Satz die
+natürliche Antwort auf die Frage, die der Knopf stellt.
+
+**Kein Wort wandert.** Ein Zustandsname steht nie auf einem Knopf, ein
+Knopfwort beschreibt nie ein Buch. Das prüft `test_relations.py` in beide
+Richtungen: welche Ansicht aus welcher Liste liest, und dass die beiden
+Listen kein Wort teilen.
+
+Verworfen: **eine Liste mit Tätigkeitswörtern für alles.** „Beobachten" als
+Regalschild auf der Buchseite liest sich wie eine Aufforderung, nicht wie ein
+Zustand. Und: **zwei Wörter je Stelle nach Gefühl.** Genau das war der
+Ausgangszustand, den `RELATION_LABELS` beendet hat.
+
+## Folgen
+
+- Die Vorschlagsseite und das Watchlist-Menü sagen dasselbe wie die Startseite.
+  Der Hinweistext des Stapels nennt wieder „Verwerfen" — diesmal zu Recht.
+- Das Glossar in `CONTEXT.md` trägt die Spalte „on the button".
+- Wer eine vierte Ansicht mit Entscheidungsknöpfen baut, liest aus
+  `ACTION_LABELS`; wer einen Zustand zeigt, aus `RELATION_LABELS`. Eine dritte
+  Liste gibt es nicht.

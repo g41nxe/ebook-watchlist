@@ -14,7 +14,7 @@ from ..config import Profile
 from ..deals import is_strong_deal
 from ..matching.bundles import looks_like_bundle
 from ..models import Availability, LinkOutcome, Observation
-from ..relations import RelationKind, labelled
+from ..relations import RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
 
@@ -25,7 +25,9 @@ RESTRICTIONS = ("library", "shop")
 #: Womit ein Eintrag die Watchlist verlässt. Dieselben zwei Arten, nach denen
 #: :func:`entries` filtert — und die Namen aus der einen Tabelle statt aus der
 #: Vorlage, in der sie bis hierher zum zweiten Mal standen.
-ABSCHLUSS: tuple[tuple[str, str], ...] = labelled(RelationKind.OWNED, RelationKind.DISMISSED)
+ABSCHLUSS: tuple[tuple[str, str], ...] = labelled_actions(
+    RelationKind.OWNED, RelationKind.DISMISSED
+)
 
 
 def _details(row) -> dict:

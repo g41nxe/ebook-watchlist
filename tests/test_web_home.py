@@ -206,6 +206,24 @@ def test_open_suggestions_are_offered_with_the_three_decisions(
         assert f'value="{kind}"' in body
 
 
+def test_a_decision_is_a_verb_on_the_button_and_the_same_verb_on_the_pile(
+    client: TestClient, db: Store
+) -> None:
+    """Der Knopf sagt, was du *tust*; der Zustandsname ("im Besitz") bleibt der
+    Buchseite. Und ein Wort ist ein Wort: Startseite und Stapel sagen dasselbe
+    (ADR 22) — genau die Drift, die 7cc1931 schon einmal eingefangen hat."""
+    finished_run(db, finished_at=datetime.now())
+    found(db, item_id="7", title="Der Kannibalenhügel")
+
+    start = client.get("/").text
+    stapel = client.get("/vorschlaege").text
+
+    for wort in ("Verwerfen", "Hab ich", "Beobachten"):
+        assert wort in start, wort
+        assert wort in stapel, wort
+    assert "Ausgeschlossen" not in start
+
+
 def test_at_most_two_suggestions_are_shown_and_the_rest_is_counted(
     client: TestClient, db: Store
 ) -> None:
