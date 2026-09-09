@@ -795,11 +795,15 @@ class Store:
             return preise
 
     def decided_items(self, profile_slug: str) -> set[tuple[str, str]]:
-        """``(Quelle, Item-Id)``, zu denen es schon ein Buch mit Beziehung gibt.
+        """``(Quelle, Item-Id)``, zu denen es schon ein Buch mit **aktiver**
+        Beziehung gibt.
 
         Ueber ``book_source``, weil dort steht, unter welcher Nummer eine
         Quelle ein Buch fuehrt. Das ist der Weg, auf dem eine Entscheidung
         *buchweit* wirkt statt nur fuer eine Produktnummer (ADR 18).
+
+        Nur aktive: eine zurueckgenommene Entscheidung ist keine, und der Fund
+        gehoert wieder in den Stapel — dieselbe Lesart wie ``dismissed_keys``.
         """
         with self.session() as session:
             stmt = (
@@ -807,6 +811,7 @@ class Store:
                 .join(BookRelationRow, BookRelationRow.book_id == BookSourceRow.book_id)
                 .where(
                     BookRelationRow.profile_slug == profile_slug,
+                    BookRelationRow.active.is_(True),
                     BookSourceRow.source_item_id.is_not(None),
                 )
             )
@@ -851,7 +856,8 @@ class Store:
         return items, isbns
 
     def books_with_relations(self, profile_slug: str) -> dict[str, int]:
-        """ISBN -> Buch-Id, aber nur fuer Buecher, zu denen etwas gesagt wurde.
+        """ISBN -> Buch-Id, aber nur fuer Buecher, zu denen etwas gesagt wurde
+        — und noch gilt.
 
         So verschwindet ein Fund auch dann aus dem Stapel, wenn eine *andere*
         Quelle dasselbe Buch unter einer anderen Nummer fuehrt — die ISBN ist
@@ -863,6 +869,7 @@ class Store:
                 .join(BookRelationRow, BookRelationRow.book_id == BookRow.id)
                 .where(
                     BookRelationRow.profile_slug == profile_slug,
+                    BookRelationRow.active.is_(True),
                     BookRow.isbn.is_not(None),
                 )
             )

@@ -121,6 +121,56 @@ def build(store: Store, profile: Profile, *, now: datetime) -> HomeView:
     )
 
 
+#: Was geschehen ist, in der Rückgängig-Zeile — ein Satz, kein Knopfwort.
+DONE: dict[str, str] = {
+    "dismissed": "verworfen",
+    "owned": "als vorhanden vermerkt",
+    "watching": "in Beobachtung genommen",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Undo:
+    """Die gerade getroffene Entscheidung, so wie die Zeile sie anbietet."""
+
+    key: str
+    kind: str
+    title: str
+
+    @property
+    def done(self) -> str:
+        return DONE[self.kind]
+
+
+def _book_of(store: Store, key: str) -> int | None:
+    source, _, item_id = key.partition(":")
+    if not source or not item_id:
+        return None
+    return store.book_by_source_item(source, item_id)
+
+
+def undo_for(store: Store, key: str, kind: str) -> Undo | None:
+    """Was die Seite zurückzunehmen anbietet — nichts, wenn die Adresse
+    etwas nennt, das es nicht gibt."""
+    if kind not in DONE:
+        return None
+    book_id = _book_of(store, key)
+    book = store.book(book_id) if book_id is not None else None
+    return Undo(key, kind, book.title) if book is not None else None
+
+
+def undo(store: Store, profile: Profile, key: str, kind: str, *, now: datetime) -> bool:
+    """Die Beziehung stilllegen, nicht löschen (ADR 18). Der Fund steht danach
+    wieder im Stapel, weil nur aktive Beziehungen als Entscheidung zählen."""
+    if kind not in DONE:
+        return False
+    book_id = _book_of(store, key)
+    if book_id is None:
+        return False
+    store.deactivate_relation(profile.slug, book_id, kind, now=now)
+    return True
+
+
 def _status(store: Store, profile_slug: str, now: datetime) -> Status | None:
     # Der jüngste *abgeschlossene* Rundgang. Ein Lauf, der gerade läuft oder
     # abgeschossen wurde, hat kein Ende — über den spricht die Übersicht.

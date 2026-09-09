@@ -53,6 +53,21 @@
   <span>{{ view.suggestions_total }} {{ 'Vorschlag' if view.suggestions_total == 1 else 'Vorschläge' }} offen</span>
 </p>
 
+{% if undo %}
+{# Rückgängig statt Nachfrage: die Handlung ist umkehrbar, ADR 18 löscht
+   nichts — also kein Dialog, sondern der Weg zurück an Ort und Stelle. #}
+<div class="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-rule
+            bg-card px-4 py-2 text-sm">
+  <span>„{{ undo.title }}" {{ undo.done }}.</span>
+  <form method="post" action="/vorschlaege/zuruecknehmen">
+    <input type="hidden" name="key" value="{{ undo.key }}">
+    <input type="hidden" name="kind" value="{{ undo.kind }}">
+    <input type="hidden" name="zurueck" value="/">
+    <button type="submit" class="tun text-accent underline underline-offset-2">Rückgängig</button>
+  </form>
+</div>
+{% endif %}
+
 {# Natürliche Höhe: fünf gegen zwei Einträge gleich hoch zu ziehen erzeugt
    nur Leerraum. Die Zahl steht vorn — sie ist der Anker beim Überfliegen. #}
 <div class="flex flex-wrap items-start gap-x-8 gap-y-10">
@@ -69,22 +84,20 @@
             <a href="/book/{{ entry.book_id }}"
                class="hover:underline underline-offset-2">{{ entry.title }}</a></p>
           <p class="truncate text-sm text-soft">{{ entry.author or "unbekannt" }}</p>
-          {# Beide Quellen nach einer Regel: gefunden = Symbol und Name als
-             Link, sonst gedämpft mit Namen. Keine stumme Ikone daneben. #}
-          <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {# Die Quellen wie in der Watchlist-Zeile: Symbole, gefunden farbig
+             und verlinkt, sonst stumpf — dieselbe Sprache auf beiden Seiten. #}
+          <div class="mt-1 flex flex-wrap items-center gap-2 text-base">
             {% for state in entry.sources %}
             {% set library = state.category == "library" %}
             {% set symbol = "ic-lib" if library else "ic-shop" %}
             {% if state.url and state.outcome in ("linked", "confirmed") %}
             <a href="{{ state.url }}" target="_blank" rel="noopener"
-               title="{{ state.display }} öffnen"
-               class="tun inline-flex h-7 items-center gap-1 hover:underline underline-offset-2
-                      {{ 'text-accent' if library else 'text-amber' }}">
-              <svg class="i"><use href="#{{ symbol }}"/></svg>{{ state.display }}</a>
+               title="{{ state.display }}: gefunden"
+               class="{{ 'text-accent' if library else 'text-amber' }} hover:opacity-70">
+              <svg class="i"><use href="#{{ symbol }}"/></svg></a>
             {% else %}
-            <span title="{{ state.display }}: {{ state.label }}"
-                  class="inline-flex h-7 items-center gap-1 text-soft/60">
-              <svg class="i"><use href="#{{ symbol }}"/></svg>{{ state.display }}</span>
+            <span title="{{ state.display }}: {{ state.label }}" class="text-rule">
+              <svg class="i"><use href="#{{ symbol }}"/></svg></span>
             {% endif %}
             {% endfor %}
           </div>
@@ -103,8 +116,8 @@
     <p class="py-3 text-sm text-soft italic">Gerade kein Schnäppchen und nichts ausleihbar.</p>
     {% endif %}
     <a href="/watchlist"
-       class="mt-3 inline-flex items-center gap-1.5 text-sm text-accent underline
-              decoration-accent/30 underline-offset-2 hover:decoration-accent">
+       class="tun mt-3 inline-flex h-9 items-center gap-1.5 rounded border border-rule px-3
+              text-sm font-medium text-ink hover:border-accent hover:text-accent">
       Ganze Watchlist <span class="text-soft">({{ view.watchlist_total }})</span></a>
   </section>
 
@@ -113,31 +126,41 @@
       {{ view.suggestions|length }} von {{ view.suggestions_total }} zu entscheiden</h2>
     <ul class="divide-y divide-hair">
     {% for item in view.suggestions %}
-      <li class="flex flex-wrap items-start gap-x-3 gap-y-2 py-3">
-        {{ cover(item.title, item.cover_file, false, item.deal) }}
-        <div class="min-w-0 flex-1">
+      {# Ein Raster, drei Spalten: Cover, Text, Preis. Pitch und Knöpfe
+         beginnen unter dem Titel — nicht erst unter dem Cover, das machte
+         zwischen Autor und Pitch eine Lücke — und laufen bis unter den
+         Preis: neben der Preisspalte blieben dem Satz 26 Zeichen je Zeile. #}
+      <li class="grid grid-cols-[auto_1fr_auto] gap-x-3 py-3">
+        <div class="row-span-3">{{ cover(item.title, item.cover_file, false, item.deal) }}</div>
+        <div class="min-w-0">
           <p class="truncate font-serif text-base font-semibold tracking-tight">
             {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener"
                class="hover:underline underline-offset-2">{{ item.title }}</a>
             {% else %}{{ item.title }}{% endif %}</p>
-          <p class="truncate text-sm text-soft">{{ item.author or "unbekannt" }}
-            {%- if item.thema %} · <span class="text-amber">{{ item.thema }}</span>{% endif %}</p>
+          {# Der Anlass als Pille wie im Stapel: Thema in Bernstein,
+             Autor:in in Petrol — und nicht mehr am Ende einer abgeschnittenen
+             Zeile, wo ihn niemand sah. #}
+          <p class="mt-0.5 flex items-center gap-x-2 text-sm text-soft">
+            <span class="min-w-0 truncate">{{ item.author or "unbekannt" }}</span>
+            <span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium
+                         {{ 'bg-accent/15 text-accent' if item.reason == 'profile_author'
+                            else 'bg-amber/15 text-amber' }}">{{ item.why_short }}</span>
+          </p>
         </div>
-        <div class="flex w-16 shrink-0 flex-col items-end leading-tight">
+        <div class="flex w-16 flex-col items-end leading-tight">
           <span class="h-4 text-xs text-soft">{% if item.stars %}{{ item.stars|sterne }} ★{% endif %}</span>
           <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if item.deal }}">
             {{ item.price or "" }}</span>
         </div>
-        {# Der Pitch unter der Zeile über die volle Breite, an der Kante der
-           aufklappbaren Blöcke der Watchlist. Neben der Preisspalte blieben
-           ihm 26 Zeichen je Zeile. #}
-        {% if item.pitch %}<p class="w-full pl-15 text-sm">{{ item.pitch }}</p>
-        {% elif item.blurb %}<p class="w-full pl-15 text-sm text-soft">{{ item.blurb }}</p>{% endif %}
+        {% if item.pitch %}<p class="col-span-2 col-start-2 mt-1 text-sm">{{ item.pitch }}</p>
+        {% elif item.blurb %}<p class="col-span-2 col-start-2 mt-1 text-sm text-soft">{{ item.blurb }}</p>{% endif %}
         {# Ein Klick, keine Nachfrage — die Beziehung lässt sich stilllegen
            (ADR 18). Icon und Wort: ein Symbol allein versteht niemand beim
-           ersten Mal, und auf dem Telefon gibt es keinen Tooltip. #}
+           ersten Mal, und auf dem Telefon gibt es keinen Tooltip. Eine
+           Reihe, kein Umbruch: drei kurze Wörter passen in die 271 px, die
+           auf einem Telefon neben dem Cover bleiben. #}
         <form method="post" action="/vorschlaege/entscheiden"
-              class="flex w-full flex-wrap gap-1.5 pl-15">
+              class="col-span-2 col-start-2 mt-2 flex gap-1.5">
           <input type="hidden" name="keys" value="{{ item.key }}">
           <input type="hidden" name="zurueck" value="/">
           {% for kind, label in actions %}
@@ -158,8 +181,8 @@
       ist ein gutes Ergebnis.</p>
     {% endif %}
     <a href="/vorschlaege"
-       class="mt-3 inline-flex items-center gap-1.5 text-sm text-accent underline
-              decoration-accent/30 underline-offset-2 hover:decoration-accent">
+       class="tun mt-3 inline-flex h-9 items-center gap-1.5 rounded border border-rule px-3
+              text-sm font-medium text-ink hover:border-accent hover:text-accent">
       Alle Vorschläge <span class="text-soft">({{ view.suggestions_total }})</span></a>
   </section>
 </div>

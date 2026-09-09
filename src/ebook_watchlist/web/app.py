@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -230,9 +231,10 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/", response_class=HTMLResponse)
-    def start_page(request: Request) -> HTMLResponse:
+    def start_page(request: Request, rueckgaengig: str = "", art: str = "") -> HTMLResponse:
         """Was heute zählt — nicht der Zustand des Werkzeugs, der steht auf
-        der Übersicht (Issue #5)."""
+        der Übersicht (Issue #5). ``rueckgaengig`` und ``art`` nennen die
+        gerade getroffene Entscheidung, die die Seite zurückzunehmen anbietet."""
         profile = load_profile()
         store = _store_for(paths.db_path())
         return TEMPLATES.TemplateResponse(
@@ -242,6 +244,7 @@ def create_app() -> FastAPI:
                 "profile": profile,
                 "asset_version": asset_version(),
                 "view": home.build(store, profile, now=datetime.now()),
+                "undo": home.undo_for(store, rueckgaengig, art) if rueckgaengig else None,
                 "actions": triage.ACTIONS,
                 "icons": home.ICONS,
                 "arguments": home.ARGUMENTS,
@@ -691,13 +694,21 @@ def create_app() -> FastAPI:
 
     @app.post("/vorschlaege/entscheiden")
     def triage_decide(
-        kind: str = Form(...), keys: list[str] = _SELECTED, anlass: str = Form("")
+        kind: str = Form(...),
+        keys: list[str] = _SELECTED,
+        anlass: str = Form(""),
+        zurueck: str = Form("/vorschlaege"),
     ) -> RedirectResponse:
         """Eine Entscheidung auf die Auswahl anwenden.
 
         Alle drei schreiben eine Beziehung auf Buchebene — "verworfen" ist
         keine Loeschung, sondern eine Aussage ueber das Buch, und sie gilt
         dadurch bei *jeder* Quelle statt nur fuer eine Produktnummer (ADR 18).
+
+        Zurueck dorthin, wo entschieden wurde: von der Startseite aus auf die
+        Startseite, mit dem Angebot, es rueckgaengig zu machen — ein Klick
+        ohne Nachfrage braucht einen Weg zurueck (ADR 30). Ein Formularfeld
+        ist kein Ziel; alles ausser "/" fuehrt in den Stapel.
         """
         triage.decide(
             _store_for(paths.db_path()),
@@ -706,8 +717,25 @@ def create_app() -> FastAPI:
             kind,
             now=datetime.now(),
         )
+        if zurueck == "/":
+            if len(keys) == 1:
+                return RedirectResponse(
+                    "/?" + urlencode({"rueckgaengig": keys[0], "art": kind}), status_code=303
+                )
+            return RedirectResponse("/", status_code=303)
         target = f"/vorschlaege?anlass={anlass}" if anlass else "/vorschlaege"
         return RedirectResponse(target, status_code=303)
+
+    @app.post("/vorschlaege/zuruecknehmen")
+    def triage_undo(
+        key: str = Form(...), kind: str = Form(...), zurueck: str = Form("/")
+    ) -> RedirectResponse:
+        """Eine Entscheidung zuruecknehmen: die Beziehung wird stillgelegt,
+        nicht geloescht (ADR 18) — und der Fund steht wieder im Stapel."""
+        home.undo(
+            _store_for(paths.db_path()), load_profile(), key, kind, now=datetime.now()
+        )
+        return RedirectResponse("/" if zurueck == "/" else "/vorschlaege", status_code=303)
 
     # --- Profiluebersicht (Ticket 09) ---------------------------------------
 

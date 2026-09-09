@@ -224,6 +224,85 @@ def test_a_decision_is_a_verb_on_the_button_and_the_same_verb_on_the_pile(
     assert "Ausgeschlossen" not in start
 
 
+def test_deciding_from_the_start_page_returns_to_the_start_page(
+    data_dir: Path, db: Store
+) -> None:
+    """Wer auf der Startseite entscheidet, will die Startseite wiedersehen —
+    nicht den Stapel, auf dem er nie war."""
+    finished_run(db, finished_at=datetime.now())
+    found(db, item_id="7", title="Der Kannibalenhügel")
+    client = TestClient(create_app(), raise_server_exceptions=False, follow_redirects=False)
+
+    response = client.post(
+        "/vorschlaege/entscheiden",
+        data={"kind": "owned", "keys": ["beam:7"], "zurueck": "/"},
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/")
+    assert not response.headers["location"].startswith("/vorschlaege")
+
+
+def test_a_foreign_return_address_leads_back_to_the_pile(data_dir: Path, db: Store) -> None:
+    """Ein Formularfeld ist kein Ziel — sonst leitet ein untergeschobenes Feld
+    auf eine fremde Adresse (dasselbe Muster wie `_zurueck` der Watchlist)."""
+    found(db, item_id="7")
+    client = TestClient(create_app(), raise_server_exceptions=False, follow_redirects=False)
+
+    response = client.post(
+        "/vorschlaege/entscheiden",
+        data={"kind": "dismissed", "keys": ["beam:7"], "zurueck": "https://boese.invalid/"},
+    )
+
+    assert response.headers["location"] == "/vorschlaege"
+
+
+# --- rueckgaengig -----------------------------------------------------------
+
+
+def test_after_a_decision_the_start_page_offers_to_take_it_back(
+    data_dir: Path, db: Store
+) -> None:
+    """Ein Klick, keine Nachfrage — dafür ein Weg zurück an Ort und Stelle.
+    ADR 18 löscht nichts, also ist jede der drei Handlungen umkehrbar."""
+    finished_run(db, finished_at=datetime.now())
+    found(db, item_id="7", title="Der Kannibalenhügel")
+    client = TestClient(create_app(), raise_server_exceptions=False, follow_redirects=True)
+
+    body = client.post(
+        "/vorschlaege/entscheiden",
+        data={"kind": "dismissed", "keys": ["beam:7"], "zurueck": "/"},
+    ).text
+
+    assert "Rückgängig" in body
+    assert "Der Kannibalenhügel" in body
+    assert 'action="/vorschlaege/zuruecknehmen"' in body
+    assert "0 von 0 zu entscheiden" in body
+
+
+def test_taking_a_decision_back_puts_the_find_back_on_the_pile(
+    data_dir: Path, db: Store
+) -> None:
+    finished_run(db, finished_at=datetime.now())
+    found(db, item_id="7", title="Der Kannibalenhügel")
+    client = TestClient(create_app(), raise_server_exceptions=False, follow_redirects=True)
+    client.post(
+        "/vorschlaege/entscheiden", data={"kind": "owned", "keys": ["beam:7"], "zurueck": "/"}
+    )
+
+    body = client.post(
+        "/vorschlaege/zuruecknehmen", data={"key": "beam:7", "kind": "owned", "zurueck": "/"}
+    ).text
+
+    assert "1 von 1 zu entscheiden" in body
+    assert "Der Kannibalenhügel" in body
+    assert "Rückgängig" not in body
+    book = next(b for b in db.books() if b.title == "Der Kannibalenhügel")
+    assert not any(
+        row.active for row in db.relations_of("test", book.id) if row.kind == "owned"
+    )
+
+
 def test_at_most_two_suggestions_are_shown_and_the_rest_is_counted(
     client: TestClient, db: Store
 ) -> None:
