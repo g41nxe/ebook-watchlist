@@ -194,15 +194,18 @@
             {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener"
                class="hover:underline underline-offset-2">{{ item.title }}</a>
             {% else %}{{ item.title }}{% endif %}</p>
-          {# Derselbe Stil wie auf /vorschlaege: die Pille vor dem Autor, in
-             einer flex-wrap-Zeile — bei Platzmangel bricht sie um, statt mit
-             dem Autorennamen zu kollidieren (triage.html). #}
-          <p class="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-soft">
-            <span class="rounded px-1.5 py-0.5 text-xs font-medium
+          {# Zwei eigene Zeilen statt einer flex-wrap-Zeile: bei "Autor:in
+             Nesbø, Jo" passte beides in eine Zeile, bei "Horror & Mystery
+             Heinz Siegfried Pestner" brach nur der Autor in eine dritte um
+             — in der schmalen Spalte hier (anders als auf /vorschlaege mit
+             mehr Platz) je nach Textlaenge uneinheitlich. Jetzt immer zwei
+             Zeilen, gleich hoch, unabhaengig vom Text. #}
+          <p class="mt-0.5">
+            <span class="inline-block rounded px-1.5 py-0.5 text-xs font-medium
                          {{ 'bg-accent/15 text-accent' if item.reason == 'profile_author'
                             else 'bg-amber/15 text-amber' }}">{{ item.why_short }}</span>
-            <span class="min-w-0 truncate">{{ item.author or "unbekannt" }}</span>
           </p>
+          <p class="mt-1 truncate text-sm text-soft">{{ item.author or "unbekannt" }}</p>
         </div>
         <div class="flex w-16 flex-col items-end leading-tight">
           <span class="h-4 text-xs text-soft">{% if item.stars %}{{ item.stars|sterne }} ★{% endif %}</span>
