@@ -194,14 +194,14 @@
             {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener"
                class="hover:underline underline-offset-2">{{ item.title }}</a>
             {% else %}{{ item.title }}{% endif %}</p>
-          {# Der Anlass als Pille wie im Stapel: Thema in Bernstein,
-             Autor:in in Petrol — und nicht mehr am Ende einer abgeschnittenen
-             Zeile, wo ihn niemand sah. #}
-          <p class="mt-0.5 flex items-center gap-x-2 text-sm text-soft">
-            <span class="min-w-0 truncate">{{ item.author or "unbekannt" }}</span>
-            <span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium
+          {# Derselbe Stil wie auf /vorschlaege: die Pille vor dem Autor, in
+             einer flex-wrap-Zeile — bei Platzmangel bricht sie um, statt mit
+             dem Autorennamen zu kollidieren (triage.html). #}
+          <p class="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-soft">
+            <span class="rounded px-1.5 py-0.5 text-xs font-medium
                          {{ 'bg-accent/15 text-accent' if item.reason == 'profile_author'
                             else 'bg-amber/15 text-amber' }}">{{ item.why_short }}</span>
+            <span class="min-w-0 truncate">{{ item.author or "unbekannt" }}</span>
           </p>
         </div>
         <div class="flex w-16 flex-col items-end leading-tight">
