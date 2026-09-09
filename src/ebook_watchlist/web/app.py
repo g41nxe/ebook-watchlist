@@ -29,7 +29,7 @@ from ..models import LinkOutcome
 from ..relations import RelationKind
 from ..sources import registry
 from ..store import RunRow, Store
-from . import assignments, book, profile_page, triage, watchlist
+from . import assignments, book, home, profile_page, triage, watchlist
 from .recheck import Rechecker
 from .runs import RunLauncher, journal_status
 
@@ -227,6 +227,25 @@ def create_app() -> FastAPI:
             "error.html",
             {"message": str(exc), "asset_version": asset_version()},
             status_code=500,
+        )
+
+    @app.get("/", response_class=HTMLResponse)
+    def start_page(request: Request) -> HTMLResponse:
+        """Was heute zählt — nicht der Zustand des Werkzeugs, der steht auf
+        der Übersicht (Issue #5)."""
+        profile = load_profile()
+        store = _store_for(paths.db_path())
+        return TEMPLATES.TemplateResponse(
+            request,
+            "home.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "view": home.build(store, profile, now=datetime.now()),
+                "actions": triage.ACTIONS,
+                "icons": home.ICONS,
+                "arguments": home.ARGUMENTS,
+            },
         )
 
     @app.get("/uebersicht", response_class=HTMLResponse)

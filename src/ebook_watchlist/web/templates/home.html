@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "_cover.html" import cover %}
+
+{% block content %}
+{% if view.first_run %}
+{# Der Leerzustand erklärt, was hier stehen wird, und zeigt einen Weg. Die
+   drei Verkaufsargumente stehen nur hier: Rückkehrer blenden sie aus, und
+   die oberste Bildschirmhälfte gehört ihren Daten (design-review 09.09.,
+   startseite-tracking-werkzeuge.md). #}
+<h1 class="mb-4 font-serif text-2xl font-semibold tracking-tight">Weniger Suchen. Mehr Lesen.</h1>
+<div class="rounded-lg border border-hair bg-card px-5 py-6">
+  <h2 class="font-serif text-xl font-semibold">Noch kein Lauf</h2>
+  <p class="mt-1 max-w-prose text-soft">Trag deine Titel in die Watchlist ein und lass Buchfink
+     einmal laufen. Der erste Lauf sät Beobachtungen und schweigt; ab dem zweiten steht hier,
+     was sich geändert hat.</p>
+  <div class="mt-4 flex flex-wrap items-center gap-4">
+    <a href="/watchlist"
+       class="tun inline-flex h-9 items-center justify-center rounded border border-accent
+              bg-accent/10 px-3 text-sm font-medium text-accent hover:bg-accent/25">Zur Watchlist</a>
+    <a href="/uebersicht" class="text-sm text-accent underline decoration-accent/30
+       underline-offset-2 hover:decoration-accent">Zur Übersicht</a>
+  </div>
+</div>
+<div class="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-6">
+  {% for symbol, titel, satz in arguments %}
+  <div class="min-w-52 flex-1 text-center">
+    <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-hair
+                 text-2xl text-accent"><svg class="i"><use href="#{{ symbol }}"/></svg></span>
+    <div class="mt-2 font-medium">{{ titel }}</div>
+    <div class="text-sm text-soft">{{ satz }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<h1 class="font-serif text-2xl font-semibold tracking-tight">Heute</h1>
+{# Eine Statuszeile, keine Kacheln: nur Werte mit Vergleich oder Zustand.
+   "Schnäppchen: 2" zählte die Liste darunter. Alt und fehlgeschlagen stehen
+   ausgeschrieben da — eine Farbe allein wäre für jemanden mit
+   Farbsehschwäche keine Information. #}
+<p class="mt-1 mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-soft">
+  <svg class="i"><use href="#ic-clock"/></svg>
+  {# Zahl und Wort auf einer Zeile: ein Umbruch dazwischen macht aus
+     "vor 2 Tagen" zwei Stücke, die niemand als eines liest oder findet. #}
+  <span class="{{ 'font-medium text-amber' if view.status.stale }}">zuletzt geprüft {{ view.status.when }}{% if view.status.stale %} — vor {{ view.status.age_days }} {{ 'Tag' if view.status.age_days == 1 else 'Tagen' }}{% endif %}</span>
+  <span aria-hidden="true">·</span>
+  {% if view.status.failed %}
+  <span class="font-medium text-danger">letzter Lauf fehlgeschlagen</span>
+  {% else %}
+  <span>{{ view.status.delta_count }} {{ 'Änderung' if view.status.delta_count == 1 else 'Änderungen' }}</span>
+  {% endif %}
+  <span aria-hidden="true">·</span>
+  <span>{{ view.suggestions_total }} {{ 'Vorschlag' if view.suggestions_total == 1 else 'Vorschläge' }} offen</span>
+</p>
+
+{# Natürliche Höhe: fünf gegen zwei Einträge gleich hoch zu ziehen erzeugt
+   nur Leerraum. Die Zahl steht vorn — sie ist der Anker beim Überfliegen. #}
+<div class="flex flex-wrap items-start gap-x-8 gap-y-10">
+
+  <section class="min-w-52 flex-1">
+    <h2 class="mb-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
+      {{ view.offers_total }} jetzt zu haben</h2>
+    <ul class="divide-y divide-hair">
+    {% for entry in view.offers %}
+      <li class="flex items-start gap-3 py-3">
+        {{ cover(entry.title, entry.cover_file, entry.borrowable, entry.deal) }}
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-serif text-base font-semibold tracking-tight">
+            <a href="/book/{{ entry.book_id }}"
+               class="hover:underline underline-offset-2">{{ entry.title }}</a></p>
+          <p class="truncate text-sm text-soft">{{ entry.author or "unbekannt" }}</p>
+          {# Beide Quellen nach einer Regel: gefunden = Symbol und Name als
+             Link, sonst gedämpft mit Namen. Keine stumme Ikone daneben. #}
+          <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            {% for state in entry.sources %}
+            {% set library = state.category == "library" %}
+            {% set symbol = "ic-lib" if library else "ic-shop" %}
+            {% if state.url and state.outcome in ("linked", "confirmed") %}
+            <a href="{{ state.url }}" target="_blank" rel="noopener"
+               title="{{ state.display }} öffnen"
+               class="tun inline-flex h-7 items-center gap-1 hover:underline underline-offset-2
+                      {{ 'text-accent' if library else 'text-amber' }}">
+              <svg class="i"><use href="#{{ symbol }}"/></svg>{{ state.display }}</a>
+            {% else %}
+            <span title="{{ state.display }}: {{ state.label }}"
+                  class="inline-flex h-7 items-center gap-1 text-soft/60">
+              <svg class="i"><use href="#{{ symbol }}"/></svg>{{ state.display }}</span>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        <div class="flex w-24 shrink-0 flex-col items-end leading-tight">
+          <span class="h-4 text-xs {{ 'text-accent' if entry.borrowable else 'text-soft' }}">
+            {{ entry.availability or "" }}</span>
+          {# Schnäppchen färbt den Betrag, kein Hintergrund — wie in der Watchlist. #}
+          <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if entry.deal }}">
+            {{ entry.price or "—" }}</span>
+        </div>
+      </li>
+    {% endfor %}
+    </ul>
+    {% if not view.offers %}
+    <p class="py-3 text-sm text-soft italic">Gerade kein Schnäppchen und nichts ausleihbar.</p>
+    {% endif %}
+    <a href="/watchlist"
+       class="mt-3 inline-flex items-center gap-1.5 text-sm text-accent underline
+              decoration-accent/30 underline-offset-2 hover:decoration-accent">
+      Ganze Watchlist <span class="text-soft">({{ view.watchlist_total }})</span></a>
+  </section>
+
+  <section class="min-w-52 flex-1">
+    <h2 class="mb-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
+      {{ view.suggestions|length }} von {{ view.suggestions_total }} zu entscheiden</h2>
+    <ul class="divide-y divide-hair">
+    {% for item in view.suggestions %}
+      <li class="flex flex-wrap items-start gap-x-3 gap-y-2 py-3">
+        {{ cover(item.title, item.cover_file, false, item.deal) }}
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-serif text-base font-semibold tracking-tight">
+            {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener"
+               class="hover:underline underline-offset-2">{{ item.title }}</a>
+            {% else %}{{ item.title }}{% endif %}</p>
+          <p class="truncate text-sm text-soft">{{ item.author or "unbekannt" }}
+            {%- if item.thema %} · <span class="text-amber">{{ item.thema }}</span>{% endif %}</p>
+        </div>
+        <div class="flex w-16 shrink-0 flex-col items-end leading-tight">
+          <span class="h-4 text-xs text-soft">{% if item.stars %}{{ item.stars|sterne }} ★{% endif %}</span>
+          <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if item.deal }}">
+            {{ item.price or "" }}</span>
+        </div>
+        {# Der Pitch unter der Zeile über die volle Breite, an der Kante der
+           aufklappbaren Blöcke der Watchlist. Neben der Preisspalte blieben
+           ihm 26 Zeichen je Zeile. #}
+        {% if item.pitch %}<p class="w-full pl-15 text-sm">{{ item.pitch }}</p>
+        {% elif item.blurb %}<p class="w-full pl-15 text-sm text-soft">{{ item.blurb }}</p>{% endif %}
+        {# Ein Klick, keine Nachfrage — die Beziehung lässt sich stilllegen
+           (ADR 18). Icon und Wort: ein Symbol allein versteht niemand beim
+           ersten Mal, und auf dem Telefon gibt es keinen Tooltip. #}
+        <form method="post" action="/vorschlaege/entscheiden"
+              class="flex w-full flex-wrap gap-1.5 pl-15">
+          <input type="hidden" name="keys" value="{{ item.key }}">
+          <input type="hidden" name="zurueck" value="/">
+          {% for kind, label in actions %}
+          <button type="submit" name="kind" value="{{ kind }}"
+                  class="tun inline-flex h-7 items-center gap-1 rounded border px-2 text-xs
+                         font-medium transition
+                         {{ 'border-rule text-soft hover:border-danger hover:text-danger'
+                            if kind == 'dismissed'
+                            else 'border-rule text-ink hover:border-accent hover:text-accent' }}">
+            <svg class="i"><use href="#{{ icons[kind] }}"/></svg>{{ label }}</button>
+          {% endfor %}
+        </form>
+      </li>
+    {% endfor %}
+    </ul>
+    {% if not view.suggestions %}
+    <p class="py-3 text-sm text-soft italic">Kein offener Vorschlag — ein leerer Stapel
+      ist ein gutes Ergebnis.</p>
+    {% endif %}
+    <a href="/vorschlaege"
+       class="mt-3 inline-flex items-center gap-1.5 text-sm text-accent underline
+              decoration-accent/30 underline-offset-2 hover:decoration-accent">
+      Alle Vorschläge <span class="text-soft">({{ view.suggestions_total }})</span></a>
+  </section>
+</div>
+{% endif %}
+{% endblock %}
