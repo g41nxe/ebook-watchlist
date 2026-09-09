@@ -53,7 +53,7 @@ class Library:
 #: Zwei Zeichen, nicht eins: der Buchfink traegt die Kopfzeile bei 40 px, das
 #: gezeichnete Zeichen den Browser-Tab bei 16 — dort zerfaellt der Vogel zu
 #: einem Kruemel, waehrend Rechteck und Abzeichen noch unterscheidbar sind.
-ICONS = ("favicon.svg", "buchfink.png")
+ICONS = ("favicon.svg", "buchfink.png", "buchfink-tag.png")
 
 LIBRARIES = (
     Library(
