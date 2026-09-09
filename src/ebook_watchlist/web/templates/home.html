@@ -73,8 +73,15 @@
 <div class="flex flex-wrap items-start gap-x-8 gap-y-10">
 
   <section class="min-w-52 flex-1">
-    <h2 class="mb-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-      {{ view.offers_total }} jetzt zu haben</h2>
+    {# Der Weg zur ganzen Liste steht in der Ueberschriftenzeile, nicht unter
+       der Liste: dort sieht man ihn, bevor man scrollt. #}
+    <div class="mb-2 flex items-center justify-between gap-3 border-b border-rule pb-2">
+      <h2 class="text-sm font-semibold text-soft">{{ view.offers_total }} jetzt zu haben</h2>
+      <a href="/watchlist"
+         class="tun inline-flex h-7 shrink-0 items-center gap-1 rounded border border-accent
+                bg-accent/10 px-2 text-xs font-medium text-accent hover:bg-accent/25">
+        Ganze Watchlist <span class="text-accent/70">({{ view.watchlist_total }})</span></a>
+    </div>
     <ul class="divide-y divide-hair">
     {% for entry in view.offers %}
       <li class="flex items-start gap-3 py-3">
@@ -115,15 +122,17 @@
     {% if not view.offers %}
     <p class="py-3 text-sm text-soft italic">Gerade kein Schnäppchen und nichts ausleihbar.</p>
     {% endif %}
-    <a href="/watchlist"
-       class="tun mt-3 inline-flex h-9 items-center gap-1.5 rounded border border-rule px-3
-              text-sm font-medium text-ink hover:border-accent hover:text-accent">
-      Ganze Watchlist <span class="text-soft">({{ view.watchlist_total }})</span></a>
   </section>
 
   <section class="min-w-52 flex-1">
-    <h2 class="mb-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-      {{ view.suggestions|length }} von {{ view.suggestions_total }} zu entscheiden</h2>
+    <div class="mb-2 flex items-center justify-between gap-3 border-b border-rule pb-2">
+      <h2 class="text-sm font-semibold text-soft">
+        {{ view.suggestions|length }} von {{ view.suggestions_total }} zu entscheiden</h2>
+      <a href="/vorschlaege"
+         class="tun inline-flex h-7 shrink-0 items-center gap-1 rounded border border-accent
+                bg-accent/10 px-2 text-xs font-medium text-accent hover:bg-accent/25">
+        Alle Vorschläge <span class="text-accent/70">({{ view.suggestions_total }})</span></a>
+    </div>
     <ul class="divide-y divide-hair">
     {% for item in view.suggestions %}
       {# Ein Raster, drei Spalten: Cover, Text, Preis. Pitch und Knöpfe
@@ -180,10 +189,6 @@
     <p class="py-3 text-sm text-soft italic">Kein offener Vorschlag — ein leerer Stapel
       ist ein gutes Ergebnis.</p>
     {% endif %}
-    <a href="/vorschlaege"
-       class="tun mt-3 inline-flex h-9 items-center gap-1.5 rounded border border-rule px-3
-              text-sm font-medium text-ink hover:border-accent hover:text-accent">
-      Alle Vorschläge <span class="text-soft">({{ view.suggestions_total }})</span></a>
   </section>
 </div>
 {% endif %}
