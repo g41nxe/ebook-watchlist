@@ -203,12 +203,14 @@
   {% for kind, label in actions %}
   {# Ohne Alpine bleibt der Knopf klickbar und tut wie bisher nichts, wenn
      nichts angehakt ist — das ist der heutige Zustand, nicht schlechter. #}
+  {# Dieselbe Farblogik wie auf der Startseite: bernstein fuer "Hab ich"
+     (meist gekauft), gruen fuer "Beobachten" (Bibliothek/Watchlist). #}
   <button type="submit" name="kind" value="{{ kind }}" :disabled="chosen === 0"
           class="rounded border tun inline-flex h-9 items-center justify-center px-3 text-sm font-medium transition
                  disabled:opacity-40
-                 {{ 'border-rule text-soft hover:border-danger hover:text-danger'
-                    if kind == 'dismissed'
-                    else 'border-rule text-ink hover:border-accent hover:text-accent' }}">
+                 {% if kind == 'dismissed' %}border-rule text-soft hover:border-danger hover:text-danger
+                 {% elif kind == 'owned' %}border-rule text-ink hover:border-amber hover:text-amber
+                 {% else %}border-rule text-ink hover:border-accent hover:text-accent{% endif %}">
     {{ label }}
   </button>
   {% endfor %}

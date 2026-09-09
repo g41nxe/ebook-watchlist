@@ -24,12 +24,14 @@ from .watchlist import Entry
 OFFERS = 5
 SUGGESTIONS = 2
 
-#: Ein Zeichen je Entscheidung, aus dem Sprite in ``base.html``. ``ic-play``
-#: heißt in der Watchlist-Zeile "aktivieren" — dasselbe wie hier.
+#: Ein Zeichen je Entscheidung, aus dem Sprite in ``base.html``. Keins davon
+#: ist anderswo schon besetzt: ``ic-play`` heißt in der Watchlist-Zeile
+#: "aktivieren", ``ic-user`` steht im Profil für Autor:innen — beide passten
+#: hier weder farblich noch inhaltlich.
 ICONS: dict[str, str] = {
     "dismissed": "ic-x",
-    "owned": "ic-user",
-    "watching": "ic-play",
+    "owned": "ic-check",
+    "watching": "ic-search",  # weiter danach Ausschau halten
 }
 
 #: Die drei Verkaufsargumente aus der README — nur im Leerzustand. Wer die

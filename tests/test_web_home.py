@@ -259,6 +259,43 @@ def test_open_suggestions_are_offered_with_the_three_decisions(
         assert f'value="{kind}"' in body
 
 
+def test_each_decision_has_its_own_distinct_icon(client: TestClient, db: Store) -> None:
+    """Drei verschiedene Handlungen brauchen drei verschiedene Zeichen —
+    ic-play und ic-user waren beide schon anderswo besetzt (Watchlist-Zeile,
+    Autor:innen-Liste des Profils) und passten inhaltlich nicht."""
+    finished_run(db, finished_at=datetime.now())
+    found(db, item_id="7", title="Der Kannibalenhügel")
+
+    body = client.get("/").text
+    form = body[body.index('action="/vorschlaege/entscheiden"') :]
+    form = form[: form.index("</form>")]
+
+    def icon_of(kind: str) -> str:
+        rest = form[form.index(f'value="{kind}"') :]
+        return re.search(r'use href="#(ic-\w+)"', rest).group(1)
+
+    zeichen = {icon_of(kind) for kind in ("dismissed", "owned", "watching")}
+    assert len(zeichen) == 3, f"nicht drei verschiedene Zeichen: {zeichen}"
+    assert icon_of("watching") == "ic-search"  # weiter danach Ausschau halten
+
+
+def test_the_owned_button_is_coloured_like_a_purchase_not_like_the_library(
+    client: TestClient, db: Store
+) -> None:
+    """"Hab ich" heißt meist: gekauft — dieselbe Farbe wie Schnäppchen und
+    Shop im ganzen Theme, nicht das Bibliotheksgrün von "Beobachten"."""
+    finished_run(db, finished_at=datetime.now())
+    found(db, item_id="7", title="Der Kannibalenhügel")
+
+    body = client.get("/").text
+    form = body[body.index('action="/vorschlaege/entscheiden"') :]
+    start = form.index('value="owned"')
+    knopf = form[start : form.index("</button>", start)]
+
+    assert "hover:text-amber" in knopf
+    assert "hover:text-accent" not in knopf
+
+
 def test_a_decision_is_a_verb_on_the_button_and_the_same_verb_on_the_pile(
     client: TestClient, db: Store
 ) -> None:
