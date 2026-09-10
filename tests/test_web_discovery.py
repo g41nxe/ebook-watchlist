@@ -157,6 +157,45 @@ def test_the_head_names_title_author_and_source_and_nothing_else(
     assert body.index("Viktor Sauer") < body.index("Psychothriller")
 
 
+def test_a_taken_back_decision_leads_to_the_find_again(
+    client: TestClient, db: Store
+) -> None:
+    """Zuruecknehmen legt die Beziehung still, loescht sie aber nicht (ADR 18)
+    — und die Verknuepfung zur Quelle bleibt ebenfalls. Der Fund steht danach
+    wieder im Stapel; sein Titel muss dann auch wieder auf die Fundseite
+    fuehren und nicht auf eine Buchseite, auf der nichts mehr gilt."""
+    fund(db)
+    client.post("/vorschlaege/entscheiden", data={"kind": "watching", "keys": ["beam:7"]})
+    book_id = db.book_by_source_item("beam", "7")
+    client.post(
+        "/vorschlaege/zuruecknehmen",
+        data={"key": "beam:7", "kind": "watching", "zurueck": "/vorschlaege"},
+    )
+
+    antwort = client.get("/discovery/beam/7")
+
+    assert book_id is not None
+    assert antwort.status_code == 200
+    assert "Der Kannibalenhügel" in antwort.text
+
+
+def test_a_decision_with_an_unknown_kind_creates_nothing(
+    client: TestClient, db: Store
+) -> None:
+    """Der Knopf schickt eine der drei Arten; ein handgeschriebenes Formular
+    kann alles schicken. Frueher entstand dabei erst die Buch-Zeile und dann
+    der Fehler — zurueck blieb ein Buch ohne jede Beziehung, das den Fund von
+    seiner eigenen Seite wegleitete."""
+    fund(db)
+
+    antwort = client.post(
+        "/vorschlaege/entscheiden", data={"kind": "gefaellt", "keys": ["beam:7"]}
+    )
+
+    assert antwort.status_code == 400
+    assert db.book_by_source_item("beam", "7") is None
+
+
 def test_the_page_leaves_out_what_a_find_does_not_have(client: TestClient, db: Store) -> None:
     """Kein Buch heißt: keine Beziehungen, keine Notiz, kein "Prüfen bei"."""
     fund(db)

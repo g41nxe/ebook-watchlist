@@ -20,7 +20,10 @@ sm:rounded-full
 {% else %}border-rule text-soft hover:border-accent hover:text-accent{% endif %}
 {%- endset -%}
 {% if url %}
-<a href="{{ url }}"{% if aktiv %} aria-current="page"{% endif %}
+{# `aria-current="true"`, nicht `"page"`: die Pille ist die geltende Wahl,
+   nicht die geoeffnete Seite — die steht schon in der Navigation, und zwei
+   "aktuelle Seiten" auf einer Seite sind fuer eine Vorlesehilfe eine zu viel. #}
+<a href="{{ url }}"{% if aktiv %} aria-current="true"{% endif %}
    class="{{ klasse }}">{{ text }}</a>
 {% else %}
 <button type="submit" class="{{ klasse }}">{{ text }}</button>

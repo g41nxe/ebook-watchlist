@@ -1,7 +1,8 @@
 {# Was die Quellen über dieses Buch gesagt haben, eine Zeile je Sichtung.
 
-   Eine Stelle für Buch- und Fundseite (Issue #9). Gezeigt werden die letzten
-   fünf: der Snapshot ist anhängend (ADR 5) und wird nie kürzer, die Seite muss
+   Eine Stelle für Buch- und Fundseite (Issue #9). Immer mit Inhalt: die
+   Buchseite fragt vorher `has_history`, und einen Fund ohne Beobachtung gibt
+   es nicht — er entsteht ja aus einer. Gezeigt werden die letzten fünf: der Snapshot ist anhängend (ADR 5) und wird nie kürzer, die Seite muss
    es sein — ein Titel, der seit elf Läufen dasselbe kostet, hatte elf Zeilen
    mit elfmal demselben Betrag.
 
@@ -11,11 +12,6 @@
    Eine Mindestbreite lässt sie stattdessen scrollen.
 #}
 {% macro beobachtungen(sichtungen, verborgen=0) %}
-{% if not sichtungen %}
-<p class="py-2 text-sm text-soft italic">
-  Noch nichts gesehen — der nächste Lauf trägt hier ein.
-</p>
-{% else %}
 <div class="overflow-x-auto">
 <table class="w-full min-w-xl border-collapse text-sm whitespace-nowrap">
   <thead>
@@ -52,6 +48,5 @@
 {# Nicht verschwiegen, nur nicht gezeigt: der Snapshot behält jede Sichtung. #}
 <p class="mt-2 text-xs text-soft">
   {{ verborgen }} ältere Sichtung{{ "en" if verborgen > 1 }} nicht gezeigt.</p>
-{% endif %}
 {% endif %}
 {% endmacro %}

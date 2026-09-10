@@ -18,10 +18,6 @@ from . import triage, watchlist
 from .triage import Suggestion
 from .watchlist import Entry
 
-#: Die Zeichen der drei Entscheidungen stehen bei den Entscheidungen selbst
-#: (``triage.ICONS``) — Startseite, Stapel und Fundseite zeigen dieselben.
-ICONS = triage.ICONS
-
 #: Die drei Verkaufsargumente aus der README — nur im Leerzustand. Wer die
 #: Seite täglich öffnet, kennt sie; wer sie zum ersten Mal öffnet, hat sonst
 #: nichts zu sehen. Die Bilder dazu kommen aus Issue #3.

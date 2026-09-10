@@ -25,20 +25,15 @@ from ..models import MatchReason, Observation
 from ..rating import DEFAULT_THRESHOLD
 from ..ratings import BY_MODEL, subject_of
 from ..reasons import short_why, thema_name, why_shown
-from ..relations import RelationKind, labelled_actions
+from ..relations import RELATION_KINDS, RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
-from .symbols import RELATION_ICONS
 
 #: Was mit einem Stapel geschehen kann. Alle drei schreiben eine Beziehung —
 #: "verworfen" ist keine Löschung, sondern eine Aussage über das Buch.
 ACTIONS: tuple[tuple[str, str], ...] = labelled_actions(
     RelationKind.DISMISSED, RelationKind.OWNED, RelationKind.WATCHING
 )
-
-#: Ein Zeichen je Entscheidung, aus einer Stelle: Stapel, Startseite, Fund- und
-#: Buchseite zeigen dieselben (``symbols.RELATION_ICONS``).
-ICONS: dict[str, str] = RELATION_ICONS
 
 #: Wie viele Zeilen eine Seite zeigt. Der Rückstand ist dreistellig, und eine
 #: Seite mit dreihundert Einträgen ist keine Aufgabe, sondern eine Strafe —
@@ -261,6 +256,13 @@ def decide(
     Quelle wird mitgeschrieben, damit derselbe Fund beim nächsten Lauf nicht
     wieder im Stapel steht.
     """
+    # Zuerst die Art, dann irgendetwas anlegen: `put_relation` prueft sie auch,
+    # aber erst nachdem `find_or_create_book` die Zeile geschrieben hat — eine
+    # unbekannte Art hinterliess so ein Buch ohne jede Beziehung, und das
+    # leitete den Fund von seiner eigenen Seite weg.
+    if kind not in RELATION_KINDS:
+        raise ValueError(f"unbekannte Beziehung {kind!r}")
+
     wanted = set(keys)
     if not wanted:
         return 0

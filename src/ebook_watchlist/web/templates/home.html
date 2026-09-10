@@ -69,7 +69,7 @@
   {# Der Zeitpunkt fuehrt auf die Uebersicht: dort stehen die Laeufe, aus
      denen er kommt. Seit sie nicht mehr im Menue steht, ist das ihr Weg —
      ein Zustand der Quellen ist nichts, was man taeglich aufschlaegt. #}
-  <a href="/uebersicht" title="Laeufe, Quellen und Tagesberichte"
+  <a href="/uebersicht" title="Läufe, Quellen und Tagesberichte"
      class="{{ 'font-medium text-amber' if view.status.stale }} underline
             decoration-rule underline-offset-2 hover:decoration-current">zuletzt geprüft {{ view.status.when }}{% if view.status.stale %} — vor {{ view.status.age_days }} {{ 'Tag' if view.status.age_days == 1 else 'Tagen' }}{% endif %}</a>
   <span aria-hidden="true">·</span>

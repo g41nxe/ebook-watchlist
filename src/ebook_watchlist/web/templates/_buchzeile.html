@@ -37,6 +37,19 @@
     auswahl=none,
     umschliessend=false
 ) %}
+{# Ein Steckplatz aus `{% raw %}{% set %}{% endraw %}` ist nie leer: er
+   liefert eine Zeichenkette aus Leerzeichen, und die ist wahr. Ohne diese
+   Zeilen baute die Zeile jede Zone, die eine Seite vorsorglich anlegt —
+   sichtbar an der Kennzahlenspalte, die fuer einen Fund ohne Urteil und ohne
+   Pitch leer blieb und auf dem Telefon trotzdem eine ganze Reihe kostete
+   (`basis-full`). #}
+{% set pille = pille.strip() or none if pille else none %}
+{% set unter_autor = unter_autor.strip() or none if unter_autor else none %}
+{% set kennzahlen = kennzahlen.strip() or none if kennzahlen else none %}
+{% set aktionen = aktionen.strip() or none if aktionen else none %}
+{% set auswahl = auswahl.strip() or none if auswahl else none %}
+{% set preis_inhalt = preis_inhalt.strip() or none if preis_inhalt else none %}
+
 {# `umschliessend`: die Vorschlagsseite macht die ganze Zeile zum Label ihres
    Kästchens — auf dem Telefon ist ein Kästchen von 16 Pixeln kein Ziel.
    Alles Anklickbare darin traegt deshalb `stopPropagation`. #}
@@ -142,11 +155,7 @@
          Zahl: waehrend ein enger Lauf nachsieht, steht der zuletzt bekannte
          gedaempft da, mit einem Zeichen daneben (Ticket 51). Die Spalte bleibt
          dieselbe, damit die Betraege ueber alle Zeilen ausgerichtet sind. #}
-      {# `.strip()`, weil ein leerer Steckplatz aus `{% raw %}{% set %}{% endraw %}`
-         eine Zeichenkette aus Leerzeichen ist und damit wahr — ohne die
-         Pruefung verschwaende der Betrag, sobald eine Seite den Platz
-         vorsorglich anlegt. #}
-      {% if preis_inhalt and preis_inhalt.strip() %}{{ preis_inhalt }}
+      {% if preis_inhalt %}{{ preis_inhalt }}
       {% else %}
       <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if deal }}">
         {{ preis or "—" }}</span>

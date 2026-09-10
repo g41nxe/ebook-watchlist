@@ -16,6 +16,7 @@ verschieden entsteht.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from ..config import Profile
 from ..deals import is_strong_deal
@@ -73,7 +74,7 @@ class Page:
         return self.history[0].availability if self.history else None
 
     @property
-    def last_seen(self):
+    def last_seen(self) -> datetime | None:
         """Wann die Quelle zuletzt gesprochen hat."""
         return self.history[0].when if self.history else None
 

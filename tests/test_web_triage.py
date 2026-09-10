@@ -229,11 +229,15 @@ def test_an_unknown_key_is_ignored_not_fatal(client: TestClient, db: Store) -> N
 
 
 def test_an_unknown_action_is_refused(client: TestClient, db: Store) -> None:
+    """400 statt 500: die Art ist falsch, nicht der Server. Und geprueft wird,
+    bevor irgendetwas entsteht — sonst blieb eine Buch-Zeile ohne Beziehung
+    zurueck."""
     found(db, item_id="7")
     response = client.post(
         "/vorschlaege/entscheiden", data={"kind": "verschlungen", "keys": ["beam:7"]}
     )
-    assert response.status_code == 500
+    assert response.status_code == 400
+    assert db.book_by_source_item("beam", "7") is None
 
 
 def test_the_title_leads_to_the_page_of_the_find(client: TestClient, db: Store) -> None:

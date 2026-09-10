@@ -19,9 +19,12 @@
    `text-sm` messen die drei Knoepfe des Stapels zusammen 346 px und brauchen
    bei 327 px Platz zwei Reihen. Mit `px-2` und `text-xs` sind es 276.
    `aus_wenn` traegt die Alpine-Bedingung, unter der der Knopf ruht — der
-   Stapel schaltet ihn aus, solange nichts angehakt ist. #}
+   Stapel schaltet ihn aus, solange nichts angehakt ist. `|safe`, weil Jinja
+   den Wert sonst als Text maskiert: aus `a && b` wuerde `a &amp;&amp; b`,
+   und Alpine wertet das stumm nicht aus. Der Wert kommt aus der Vorlage,
+   nie von aussen. #}
 <button type="submit"{% if wert %} name="kind" value="{{ wert }}"{% endif %}
-        {%- if aus_wenn %} :disabled="{{ aus_wenn }}"{% endif %}
+        {%- if aus_wenn %} :disabled="{{ aus_wenn|safe }}"{% endif %}
         class="tun inline-flex h-9 items-center justify-center gap-1.5 rounded border
                px-2 text-xs font-medium transition disabled:opacity-40
                sm:px-3 sm:text-sm

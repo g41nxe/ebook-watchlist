@@ -259,7 +259,7 @@ def create_app() -> FastAPI:
                 "digest": next(iter(digest_files(limit=1)), None),
                 "run_state": launcher.state(store, profile.slug),
                 "actions": triage.ACTIONS,
-                "icons": home.ICONS,
+                "icons": symbols.RELATION_ICONS,
                 "arguments": home.ARGUMENTS,
             },
         )
@@ -684,14 +684,24 @@ def create_app() -> FastAPI:
     def discovery_page(request: Request, source: str, item_id: str) -> HTMLResponse:
         """Die Buchseite ohne das, was es vor einer Entscheidung nicht gibt.
 
-        Sobald der Fund eine Buch-Zeile hat, ist die Buchseite die reichere
-        Ansicht — dann fuehrt diese Adresse dorthin, statt eine aermere
-        Fassung desselben Buchs zu zeigen.
+        Sobald der Fund eine Buch-Zeile mit einer *geltenden* Beziehung hat,
+        ist die Buchseite die reichere Ansicht — dann fuehrt diese Adresse
+        dorthin, statt eine aermere Fassung desselben Buchs zu zeigen.
+
+        Auf die Beziehung kommt es an, nicht auf die Zeile: eine
+        zurueckgenommene Entscheidung legt sie stumm und laesst Buch und
+        Verknuepfung stehen (ADR 18). Der Fund steht danach wieder im Stapel,
+        und sein Titel muss dorthin fuehren, wo ueber ihn entschieden wird —
+        nicht auf eine Buchseite, auf der nichts mehr gilt. Die Frage nach der
+        Beziehung bindet die Weiterleitung ausserdem ans Profil; die
+        Nummernsuche allein tut das nicht.
         """
         profile = load_profile()
         store = _store_for(paths.db_path())
         book_id = store.book_by_source_item(source, item_id)
-        if book_id is not None:
+        if book_id is not None and any(
+            row.active for row in store.relations_of(profile.slug, book_id)
+        ):
             return RedirectResponse(f"/book/{book_id}", status_code=303)
         page = discovery.build(store, profile, source, item_id)
         if page is None:
@@ -704,7 +714,7 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "page": page,
                 "actions": triage.ACTIONS,
-                "icons": home.ICONS,
+                "icons": symbols.RELATION_ICONS,
             },
         )
 
@@ -732,7 +742,7 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "pile": pile,
                 "actions": triage.ACTIONS,
-                "icons": triage.ICONS,
+                "icons": symbols.RELATION_ICONS,
                 "anlass": anlass,
             },
         )
@@ -759,13 +769,10 @@ def create_app() -> FastAPI:
         was nicht zu diesen beiden Faellen passt, fuehrt in den Stapel.
         """
         store = _store_for(paths.db_path())
-        triage.decide(
-            store,
-            load_profile(),
-            keys,
-            kind,
-            now=datetime.now(),
-        )
+        try:
+            triage.decide(store, load_profile(), keys, kind, now=datetime.now())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if zurueck == "buch" and len(keys) == 1:
             source, _, item_id = keys[0].partition(":")
             book_id = store.book_by_source_item(source, item_id)
@@ -792,13 +799,16 @@ def create_app() -> FastAPI:
         Die Antwort ist leer: htmx tauscht die Zeile dagegen aus, und damit
         ist sie weg. Die Auswahl der uebrigen Zeilen bleibt unberuehrt.
         """
-        decided = triage.decide(
-            _store_for(paths.db_path()),
-            load_profile(),
-            [f"{source}:{item_id}"],
-            kind,
-            now=datetime.now(),
-        )
+        try:
+            decided = triage.decide(
+                _store_for(paths.db_path()),
+                load_profile(),
+                [f"{source}:{item_id}"],
+                kind,
+                now=datetime.now(),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if not decided:
             raise HTTPException(status_code=404, detail="kein solcher Fund")
         return HTMLResponse("")
