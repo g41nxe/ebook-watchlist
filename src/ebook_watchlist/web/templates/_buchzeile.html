@@ -41,7 +41,11 @@
 {% set tag = "label" if umschliessend else "div" %}
 <{{ tag }} class="flex flex-wrap items-start gap-x-4 gap-y-2 py-3
             {{ 'cursor-pointer hover:bg-card' if umschliessend }}">
-  {{ auswahl if auswahl }}
+  {# Das Kaestchen auf halber Hoehe, wie Preis und Handlungen: oben
+     ausgerichtet klebte es an der Titelzeile und sah wie deren Aufzaehlungs-
+     punkt aus. Der Steckplatz wird dafuer umschlossen, damit jede Seite die
+     Ausrichtung erbt, statt sie einzeln zu setzen. #}
+  {% if auswahl %}<span class="flex shrink-0 self-center">{{ auswahl }}</span>{% endif %}
   {{ cover(titel, cover_file, borrowable, deal) }}
 
   {# Anlass, Titel, Autor — die schmalere der beiden Textspalten.
@@ -53,7 +57,6 @@
      festen Teile ihren Platz zuerst, und die zwei Textspalten teilen sich,
      was uebrig bleibt: 1 zu 1,6 zugunsten des Pitches. #}
   <div class="min-w-40 flex-[1_1_0%]">
-    {% if pille %}<p class="mb-0.5">{{ pille }}</p>{% endif %}
     <p class="font-serif text-base font-semibold tracking-tight">
       {% if titel_url %}
       <a href="{{ titel_url }}" onclick="event.stopPropagation()"
@@ -61,7 +64,15 @@
       {% else %}{{ titel }}{% endif %}
     </p>
     <p class="truncate text-sm text-soft">{{ autor or "unbekannt" }}</p>
-    {% if unter_autor %}<div class="mt-1">{{ unter_autor }}</div>{% endif %}
+    {# Anlass und Quelle in einer Zeile unter dem Autor: die Pille sagt,
+       *warum* das Buch hier steht, das Symbol *wo* es zu holen ist — beides
+       Herkunft, beides klein, beides an derselben Stelle. #}
+    {% if unter_autor or pille %}
+    <div class="mt-1 flex flex-wrap items-center gap-2">
+      {{ unter_autor if unter_autor }}
+      {{ pille if pille }}
+    </div>
+    {% endif %}
   </div>
 
   {# Kennzahlen und Pitch — die breitere Spalte. Sie bekommt den groesseren
@@ -73,7 +84,10 @@
   </div>
   {% endif %}
 
-  <div class="ml-15 flex w-full items-end gap-3 sm:ml-0 sm:w-auto">
+  {# Preis und Handlungen sitzen auf halber Hoehe der Zeile, nicht an ihrem
+     Fuss: die Textspalten sind unterschiedlich hoch, unten ausgerichtet
+     haengt der Betrag mal am Pitch, mal am Autor. #}
+  <div class="ml-15 flex w-full items-center gap-3 sm:ml-0 sm:w-auto sm:self-center">
     {% if preis is not none or oben %}
     <div class="flex shrink-0 items-baseline gap-2 leading-tight
                 sm:w-24 sm:flex-col sm:items-end sm:gap-0">
