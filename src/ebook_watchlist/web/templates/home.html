@@ -3,6 +3,7 @@
 
 {% block content %}
 {% from "_abschnitt.html" import abschnitt %}
+{% from "_hero.html" import hero with context %}
 {% if view.first_run %}
 {# Der Leerzustand erklärt, was hier stehen wird, und zeigt einen Weg. Die
    drei Verkaufsargumente stehen nur hier: Rückkehrer blenden sie aus, und
@@ -17,10 +18,7 @@
    Watchlist auf dem Tisch. `width`/`height` stehen dran, damit die Seite
    beim Laden nicht springt; `aspect-[24/10]` schneidet oben und unten,
    falls ein spaeteres Bild andere Masse hat. #}
-<div class="mb-6 overflow-hidden rounded-lg border border-hair">
-  <img src="{{ url_for('static', path='hero-lesezimmer.jpg') }}?v={{ asset_version }}" alt=""
-       width="1571" height="663" class="aspect-[24/10] w-full object-cover">
-</div>
+<div class="mb-6">{{ hero() }}</div>
 <h1 class="mb-4 text-center font-serif text-2xl font-semibold tracking-tight">Weniger Suchen. Mehr Lesen.</h1>
 <div class="rounded-lg border border-hair bg-card px-5 py-6">
   <h2 class="font-serif text-xl font-semibold">Noch kein Lauf</h2>
@@ -47,6 +45,7 @@
 </div>
 
 {% else %}
+<div class="mb-5">{{ hero() }}</div>
 <h1 class="mb-4 font-serif text-2xl font-semibold tracking-tight">Heute</h1>
 {# Eine Statuszeile, keine Kacheln: nur Werte mit Vergleich oder Zustand.
    "Schnäppchen: 2" zählte die Liste darunter. Alt und fehlgeschlagen stehen
