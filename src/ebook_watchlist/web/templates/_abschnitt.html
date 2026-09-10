@@ -1,17 +1,22 @@
-{# Eine Abschnitts-Überschrift, auf Buch- und Fundseite dieselbe (Issue #9).
+{# Eine Abschnitts-Überschrift, auf allen Seiten dieselbe (Issue #9).
 
    Sie besteht aus drei Dingen: einem Zeichen, einem Wort und einer Linie
-   darunter. Grün ist die Voreinstellung — es ist die Farbe der Anwendung, und
-   ein Abschnitt ist eine Ansage; grau bleibt, was Fremdes berichtet
-   ("Was andere Leser:innen sagen").
+   darunter. Immer grün: das ist die Farbe der Anwendung, und ein Abschnitt
+   ist eine Ansage. Vorher war sie auf drei Seiten grau und auf einer grün,
+   und das las sich wie zwei Ränge, wo es nur einen gibt.
 
-   Wer rechts noch etwas hineinhängen will (einen Stand, einen Knopf), ruft das
-   Element mit `{% raw %}{% call %}{% endraw %}` auf — der Inhalt landet hinter
-   dem Wort und schiebt sich mit `ml-auto` an den rechten Rand.
+   Wer rechts noch etwas hineinhängen will (einen Stand, einen Verweis, einen
+   Knopf), ruft das Element mit `{% raw %}{% call %}{% endraw %}` auf — der
+   Inhalt landet hinter dem Wort und schiebt sich mit `ml-auto` an den rechten
+   Rand.
+
+   `rand` gibt es, weil nicht jeder Abschnitt gleich weit von seinem Vorgänger
+   steht: in einer Spalte der Startseite sind die 32 Pixel der Detailseiten zu
+   viel.
 #}
-{% macro abschnitt(titel, zeichen=none, ton="text-accent") %}
-<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm
-           font-semibold {{ ton }}">
+{% macro abschnitt(titel, zeichen=none, rand="mt-8 mb-3") %}
+<h2 class="{{ rand }} flex items-center gap-2 border-b border-rule pb-2 text-sm
+           font-semibold text-accent">
   {% if zeichen %}<svg class="i"><use href="#{{ zeichen }}"/></svg>{% endif %}
   {{ titel }}{% if caller %}{{ caller() }}{% endif %}
 </h2>

@@ -169,6 +169,11 @@ class Judgement:
         return current is not None and self.profile_version != current
 
 
+#: Wie viele Zeilen die Tabelle "Was beobachtet wurde" zeigt. Der Snapshot ist
+#: anhaengend (ADR 5) und wird nie kuerzer — die Seite muss es sein.
+HISTORY_ROWS = 5
+
+
 @dataclass(frozen=True, slots=True)
 class Page:
     book_id: int
@@ -246,6 +251,22 @@ class Page:
     @property
     def has_history(self) -> bool:
         return bool(self.history)
+
+    @property
+    def recent_history(self) -> tuple[Sighting, ...]:
+        """Die letzten Sichtungen — mehr zeigt die Tabelle nicht.
+
+        Ein Buch, das seit elf Laeufen dasselbe kostet, hatte elf Zeilen mit
+        elfmal demselben Betrag, und alles darunter rutschte aus dem Bild. Was
+        sich geaendert hat, steht ohnehin darueber in der Preisliste; hier geht
+        es um den letzten Stand, nicht um ein Archiv.
+        """
+        return self.history[:HISTORY_ROWS]
+
+    @property
+    def hidden_history(self) -> int:
+        """Wie viele aeltere Sichtungen die Tabelle nicht zeigt."""
+        return max(0, len(self.history) - HISTORY_ROWS)
 
     @property
     def mismatch(self) -> tuple[SourceState, ...]:

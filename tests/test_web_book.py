@@ -186,13 +186,32 @@ def test_unchanged_prices_do_not_fill_the_list(db: Store) -> None:
 
 
 def test_the_full_history_is_still_there(db: Store) -> None:
-    """Zusammengefasst wird nur die Preisliste; die Tabelle zeigt jede Sichtung."""
+    """Zusammengefasst wird nur die Preisliste; gespeichert bleibt jede Sichtung."""
     book = db.books()[0]
     for day in range(3):
         sighting(db, book.id, when=NOW + timedelta(days=day), price=999)
 
     page = view.build(db, load_profile(), book.id)
     assert len(page.history) >= 3
+
+
+def test_the_table_shows_the_last_five_sightings_and_says_so(
+    client: TestClient, db: Store
+) -> None:
+    """Elf Zeilen mit elfmal demselben Betrag sind kein Verlauf, sondern
+    Rauschen — und sie schoben alles darunter aus dem Bild. Was sich geaendert
+    hat, steht ohnehin darueber in der Preisliste."""
+    book = db.books()[0]
+    for day in range(8):
+        sighting(db, book.id, when=NOW + timedelta(days=day), price=900 + day)
+
+    page = view.build(db, load_profile(), book.id)
+    assert len(page.recent_history) == 5
+    assert page.hidden_history == 3
+    # Die neuesten fuenf, nicht die aeltesten.
+    assert page.recent_history[0].price == "9,07 €"
+
+    assert "3 ältere" in client.get(f"/book/{book.id}").text
 
 
 def test_availability_appears_for_a_library(client: TestClient, db: Store) -> None:

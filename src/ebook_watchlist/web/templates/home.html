@@ -2,6 +2,7 @@
 {% from "_cover.html" import cover %}
 
 {% block content %}
+{% from "_abschnitt.html" import abschnitt %}
 {% if view.first_run %}
 {# Der Leerzustand erklärt, was hier stehen wird, und zeigt einen Weg. Die
    drei Verkaufsargumente stehen nur hier: Rückkehrer blenden sie aus, und
@@ -119,17 +120,17 @@
   <section class="min-w-52 flex-1">
     {# Der Weg zur ganzen Liste steht in der Ueberschriftenzeile, nicht unter
        der Liste: dort sieht man ihn, bevor man scrollt. #}
-    <div class="mb-2 flex items-center justify-between gap-3 border-b border-rule pb-2">
-      <h2 class="text-sm font-semibold text-soft">{{ view.offers_total }} jetzt zu haben</h2>
+    {% call abschnitt(view.offers_total ~ " jetzt zu haben", "ic-tag", rand="mb-2") %}
       {# Nicht bernstein/gruen gefuellt wie "Jetzt pruefen": drei gleich
          farbige Knoepfe dicht beieinander lasen sich wie eine verwirrte
          Wiederholung, egal wie sie zueinander ausgerichtet waren. Ruhig bis
          zum Hover — derselbe Stil wie der "Beobachten"-Knopf im Stapel. #}
       <a href="/watchlist"
-         class="tun inline-flex h-7 shrink-0 items-center gap-1 rounded border border-rule
-                px-2 text-xs font-medium text-ink hover:border-accent hover:text-accent">
+         class="tun ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded
+                border border-rule px-2 text-xs font-medium text-ink
+                hover:border-accent hover:text-accent">
         Ganze Watchlist <span class="text-soft">({{ view.watchlist_total }})</span></a>
-    </div>
+    {% endcall %}
     <ul class="divide-y divide-hair">
     {% for entry in view.offers %}
       <li class="flex items-start gap-3 py-3">
@@ -173,14 +174,14 @@
   </section>
 
   <section class="min-w-52 flex-1">
-    <div class="mb-2 flex items-center justify-between gap-3 border-b border-rule pb-2">
-      <h2 class="text-sm font-semibold text-soft">
-        {{ view.suggestions|length }} von {{ view.suggestions_total }} zu entscheiden</h2>
+    {% call abschnitt(view.suggestions|length ~ " von " ~ view.suggestions_total
+                      ~ " zu entscheiden", "ic-binoculars", rand="mb-2") %}
       <a href="/vorschlaege"
-         class="tun inline-flex h-7 shrink-0 items-center gap-1 rounded border border-rule
-                px-2 text-xs font-medium text-ink hover:border-accent hover:text-accent">
+         class="tun ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded
+                border border-rule px-2 text-xs font-medium text-ink
+                hover:border-accent hover:text-accent">
         Alle Vorschläge <span class="text-soft">({{ view.suggestions_total }})</span></a>
-    </div>
+    {% endcall %}
     <ul class="divide-y divide-hair">
     {% for item in view.suggestions %}
       {# Ein Raster, drei Spalten: Cover, Text, Preis. Pitch und Knöpfe

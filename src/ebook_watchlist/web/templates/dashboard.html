@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% from "_abschnitt.html" import abschnitt %}
 <h1 class="mb-4 font-serif text-2xl font-semibold tracking-tight">Übersicht</h1>
 
 {% include "_run_panel.html" %}
@@ -17,9 +18,7 @@
 </div>
 {% endif %}
 
-<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  <svg class="i"><use href="#ic-plug"/></svg>Quellen
-</h2>
+{{ abschnitt("Quellen", "ic-plug") }}
 {% if sources %}
 <ul class="divide-y divide-hair">
   {% for source in sources %}
@@ -53,9 +52,7 @@
 </p>
 {% endif %}
 
-<h2 class="mt-10 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  <svg class="i"><use href="#ic-doc"/></svg>Tagesberichte
-</h2>
+{{ abschnitt("Tagesberichte", "ic-doc", rand="mt-10 mb-3") }}
 {% if digests %}
 <ul class="divide-y divide-hair">
   {% for digest in digests %}
@@ -74,9 +71,7 @@
 </p>
 {% endif %}
 
-<h2 class="mt-10 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  <svg class="i"><use href="#ic-clock"/></svg>Läufe
-</h2>
+{{ abschnitt("Läufe", "ic-clock", rand="mt-10 mb-3") }}
 {% if runs %}
 {# Fehlermeldungen werden lang; auf einem Telefon muss die Tabelle scrollen
    duerfen, statt die Seite breit zu ziehen. #}

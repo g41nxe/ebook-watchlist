@@ -172,11 +172,6 @@
 </div>
 {% endif %}
 
-{% if page.blurb %}
-{{ abschnitt("Klappentext", "ic-doc") }}
-{{ klappentext(page.blurb) }}
-{% endif %}
-
 {% if page.watching %}
 {# Bis hierher gab es das Umbenennen nur auf der Watchlist, und dort nur,
    wenn keine Quelle den Titel fand (ADR 27) — es ist aber eine Eigenschaft
@@ -220,6 +215,11 @@
       Ein geänderter Titel wirft die Zuordnungen weg und wird sofort neu gesucht.</p>
   </form>
 </details>
+{% endif %}
+
+{% if page.blurb %}
+{{ abschnitt("Klappentext", "ic-doc") }}
+{{ klappentext(page.blurb) }}
 {% endif %}
 
 {{ abschnitt("Wie gut das passt", "ic-star") }}
@@ -304,9 +304,7 @@
 {% endif %}
 
 {% if fremd %}
-{# Grau, nicht gruen: hier berichtet Fremdes, und das ist keine Ansage der
-   Anwendung. #}
-{{ abschnitt("Was andere Leser:innen sagen", "ic-lib", ton="text-soft") }}
+{{ abschnitt("Was andere Leser:innen sagen", "ic-lib") }}
 <p class="mb-3 max-w-xl text-xs text-soft">
   Ein Durchschnitt aus fremden Stimmen — keine Aussage darüber, ob das Buch zu
   dir passt. Dafür stehen die Sterne oben.
@@ -393,7 +391,7 @@
     </tr>
   </thead>
   <tbody class="divide-y divide-hair">
-    {% for sighting in page.history %}
+    {% for sighting in page.recent_history %}
     <tr class="align-top">
       <td class="py-2 pr-3 tabular-nums whitespace-nowrap text-soft">
         {{ sighting.when.strftime("%d.%m. %H:%M") if sighting.when else "" }}</td>
@@ -413,6 +411,13 @@
   </tbody>
 </table>
 </div>
+{% if page.hidden_history %}
+{# Nicht verschwiegen, nur nicht gezeigt: der Snapshot behaelt jede Sichtung
+   (ADR 5), die Seite zeigt den letzten Stand. #}
+<p class="mt-2 text-xs text-soft">
+  {{ page.hidden_history }} ältere Sichtung{{ "en" if page.hidden_history > 1 }}
+  nicht gezeigt.</p>
+{% endif %}
 {% endif %}
 {{ abschnitt("Was du dazu sagst", "ic-tag") }}
 <div class="flex flex-wrap gap-2">
@@ -463,9 +468,7 @@
 {# Seit die Kacheln im Kopf stehen, sagt dieser Abschnitt den Preis nicht
    noch einmal — was bleibt, ist der Zustand der Zuordnung. Das ist
    Werkzeug und keine Auskunft, also steht es klein und am Ende. #}
-<h2 class="mt-9 mb-3 text-xs font-medium tracking-wide text-accent uppercase">
-  Zuordnung
-</h2>
+{{ abschnitt("Zuordnung", "ic-plug", rand="mt-9 mb-3") }}
 {% if not page.sources %}
 <p class="py-2 text-sm text-soft italic">Noch keine Quelle hat nachgesehen.</p>
 {% endif %}
