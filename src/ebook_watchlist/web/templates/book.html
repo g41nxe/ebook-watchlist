@@ -192,8 +192,13 @@
    sehen bewusst verschieden aus: eine 4 von ihr ist eine Tatsache, eine 4 vom
    Modell ein Vorschlag (ADR 17). Ein gemeinsamer Durchschnitt waere genau die
    Vermischung, die das verhindern soll. #}
+{# Ohne Sterne heisst die Zeile "Noch nicht bewertet" und sonst nichts:
+   vorher stand daneben noch "Meine Bewertung" und, kursiv dahinter, ein
+   zweites Mal "noch nicht bewertet" — drei Beschriftungen fuer eine leere
+   Angabe. Die Sterne bleiben, sie sind der einzige Weg, eine zu machen. #}
 <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-  <span class="w-28 shrink-0 text-sm text-soft">Meine Bewertung</span>
+  <span class="w-28 shrink-0 text-sm text-soft">
+    {{ "Meine Bewertung" if page.my_stars is not none else "Noch nicht bewertet" }}</span>
   <span class="flex items-center gap-0.5">
     {% for value in range(1, 6) %}
     {% set on = page.my_stars is not none and value <= page.my_stars %}
@@ -224,8 +229,6 @@
     <button type="submit" class="text-xs text-soft underline underline-offset-2
                                  hover:text-ink">zurücknehmen</button>
   </form>
-  {% else %}
-  <span class="text-xs text-soft italic">noch nicht bewertet</span>
   {% endif %}
 </div>
 

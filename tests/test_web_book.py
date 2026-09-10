@@ -302,7 +302,7 @@ def test_a_book_without_a_judgement_shows_nothing_rather_than_zero_stars(
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "noch nicht bewertet" in body
+    assert "Noch nicht bewertet" in body
     assert "zurücknehmen" not in body
 
 
@@ -323,7 +323,7 @@ def test_taking_them_back_writes_no_zero(client: TestClient, db: Store) -> None:
     client.post(f"/book/{book.id}/sterne", data={"stars": ""})
 
     assert db.rating(book_subject(book.id), 1, origin=BY_READER) is None
-    assert "noch nicht bewertet" in client.get(f"/book/{book.id}").text
+    assert "Noch nicht bewertet" in client.get(f"/book/{book.id}").text
 
 
 def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> None:
@@ -337,7 +337,7 @@ def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> 
 
     assert "im Gespräch bewertet" in body
     assert "Reihe und Stimme." in body
-    assert "noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
+    assert "Noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
 
 
 def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: Store) -> None:
@@ -460,7 +460,7 @@ def test_the_gates_verdict_on_a_discovery_without_an_isbn_is_found_too(
 
     assert "Übereinstimmung mit Leseprofil" in body
     assert "Achse D: isoliert." in body
-    assert "noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
+    assert "Noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
 
 
 def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:
