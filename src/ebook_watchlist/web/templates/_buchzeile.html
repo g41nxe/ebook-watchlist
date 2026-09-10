@@ -33,7 +33,6 @@
     preis=none,
     preis_inhalt=none,
     aktionen=none,
-    aktionen_gestapelt=false,
     auswahl=none,
     umschliessend=false
 ) %}
@@ -110,13 +109,11 @@
      die letzte Reihe. Rechtsbuendig, nicht eingerueckt: eingerueckt stand der
      Betrag unter dem Cover und die Zeichen mitten im Text — mit dem rechten
      Rand als Kante liegen sie ueber allen Zeilen hinweg an derselben Stelle. #}
-  {# Ab `sm` steht der Betrag ueber den Handlungen. Auf dem Telefon haengt es
-     daran, wie viel dort steht: drei Zeichen verdienen eine eigene Zeile
-     (`aktionen_gestapelt`), ein einzelnes Menue nicht — die Watchlist gab
-     sonst drei rechtsbuendige Zeilen fuer einen Betrag und drei Punkte aus. #}
+  {# Ab `sm` steht der Betrag ueber den Handlungen; auf dem Telefon daneben.
+     Untereinander gab die Zeile dort drei rechtsbuendige Reihen aus, zwei
+     davon fuer je eine Sache. #}
   <div class="flex w-full items-center justify-end gap-3
-              sm:w-auto sm:flex-col sm:items-end sm:gap-2.5 sm:self-center
-              {{ 'flex-col items-end gap-2.5' if aktionen_gestapelt }}">
+              sm:w-auto sm:flex-col sm:items-end sm:gap-2.5 sm:self-center">
     {% if preis is not none or oben %}
     {# Der Betrag steht mittig ueber der Reihe der Zeichen, nicht rechts
        ausgerichtet: die Reihe ist 92 Pixel breit, die Preisspalte 96 — rechts
