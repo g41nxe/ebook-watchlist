@@ -1,9 +1,11 @@
 {% extends "base.html" %}
-{% from "_cover.html" import cover %}
 
 {% block content %}
 {% from "_abschnitt.html" import abschnitt %}
 {% from "_hero.html" import hero with context %}
+{% from "_buchzeile.html" import zeile %}
+{% from "_quellensymbole.html" import quellensymbole %}
+{% from "_entscheidungen.html" import entscheidungen %}
 {% if view.first_run %}
 {# Der Leerzustand erklärt, was hier stehen wird, und zeigt einen Weg. Die
    drei Verkaufsargumente stehen nur hier: Rückkehrer blenden sie aus, und
@@ -123,137 +125,127 @@
 </div>
 {% endif %}
 
-{# Natürliche Höhe: fünf gegen zwei Einträge gleich hoch zu ziehen erzeugt
-   nur Leerraum. Die Zahl steht vorn — sie ist der Anker beim Überfliegen. #}
-<div class="flex flex-wrap items-start gap-x-8 gap-y-10">
+{# Untereinander, nicht nebeneinander: die geteilte Buchzeile (Issue #9)
+   fordert 352 Pixel Mindestbreite — Cover 64, Titelspalte 160, Preisspalte 96
+   und zwei Abstaende —, zwei Spalten geben je 344. Gestapelt bekommt sie die
+   vollen 720, und die Startseite zeigt Buecher genauso wie Watchlist und
+   Stapel. Natuerliche Hoehe: gleich hoch gezogen erzeugten die beiden
+   Abschnitte nur Leerraum. #}
+<section class="mb-10">
+  {# Der Weg zur ganzen Liste steht in der Ueberschriftenzeile, nicht unter
+     der Liste: dort sieht man ihn, bevor man scrollt. #}
+  {% call abschnitt(view.offers_total ~ " jetzt zu haben", "ic-tag", rand="mb-2") %}
+    {# Nicht bernstein/gruen gefuellt wie "Jetzt pruefen": drei gleich farbige
+       Knoepfe dicht beieinander lasen sich wie eine verwirrte Wiederholung,
+       egal wie sie zueinander ausgerichtet waren. Ruhig bis zum Hover —
+       derselbe Stil wie der "Beobachten"-Knopf im Stapel. #}
+    <a href="/watchlist"
+       class="tun ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded
+              border border-rule px-2 text-xs font-medium text-ink
+              hover:border-accent hover:text-accent">
+      Ganze Watchlist <span class="text-soft">({{ view.watchlist_total }})</span></a>
+  {% endcall %}
+  <ul class="divide-y divide-hair">
+  {% for entry in view.offers %}
+    <li>
+      {% set unter_autor %}
+      {{ quellensymbole(entry.sources) }}
+      {% endset %}
+      {{ zeile(
+           entry.title,
+           titel_url="/book/" ~ entry.book_id,
+           autor=entry.author,
+           cover_file=entry.cover_file,
+           borrowable=entry.borrowable,
+           deal=entry.deal,
+           unter_autor=unter_autor,
+           oben=entry.availability,
+           oben_farbe="text-accent" if entry.borrowable else "text-soft",
+           preis=entry.price) }}
+    </li>
+  {% endfor %}
+  </ul>
+  {% if not view.offers %}
+  <p class="py-3 text-sm text-soft italic">Gerade kein Schnäppchen und nichts ausleihbar.</p>
+  {% endif %}
+</section>
 
-  <section class="min-w-52 flex-1">
-    {# Der Weg zur ganzen Liste steht in der Ueberschriftenzeile, nicht unter
-       der Liste: dort sieht man ihn, bevor man scrollt. #}
-    {% call abschnitt(view.offers_total ~ " jetzt zu haben", "ic-tag", rand="mb-2") %}
-      {# Nicht bernstein/gruen gefuellt wie "Jetzt pruefen": drei gleich
-         farbige Knoepfe dicht beieinander lasen sich wie eine verwirrte
-         Wiederholung, egal wie sie zueinander ausgerichtet waren. Ruhig bis
-         zum Hover — derselbe Stil wie der "Beobachten"-Knopf im Stapel. #}
-      <a href="/watchlist"
-         class="tun ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded
-                border border-rule px-2 text-xs font-medium text-ink
-                hover:border-accent hover:text-accent">
-        Ganze Watchlist <span class="text-soft">({{ view.watchlist_total }})</span></a>
-    {% endcall %}
-    <ul class="divide-y divide-hair">
-    {% for entry in view.offers %}
-      <li class="flex items-start gap-3 py-3">
-        {{ cover(entry.title, entry.cover_file, entry.borrowable, entry.deal) }}
-        <div class="min-w-0 flex-1">
-          <p class="truncate font-serif text-base font-semibold tracking-tight">
-            <a href="/book/{{ entry.book_id }}"
-               class="hover:underline underline-offset-2">{{ entry.title }}</a></p>
-          <p class="truncate text-sm text-soft">{{ entry.author or "unbekannt" }}</p>
-          {# Die Quellen wie in der Watchlist-Zeile: Symbole, gefunden farbig
-             und verlinkt, sonst stumpf — dieselbe Sprache auf beiden Seiten. #}
-          <div class="mt-1 flex flex-wrap items-center gap-2 text-base">
-            {% for state in entry.sources %}
-            {% set library = state.category == "library" %}
-            {% set symbol = "ic-lib" if library else "ic-shop" %}
-            {% if state.url and state.outcome in ("linked", "confirmed") %}
-            <a href="{{ state.url }}" target="_blank" rel="noopener"
-               title="{{ state.display }}: gefunden"
-               class="{{ 'text-accent' if library else 'text-amber' }} hover:opacity-70">
-              <svg class="i"><use href="#{{ symbol }}"/></svg></a>
-            {% else %}
-            <span title="{{ state.display }}: {{ state.label }}" class="text-rule">
-              <svg class="i"><use href="#{{ symbol }}"/></svg></span>
-            {% endif %}
-            {% endfor %}
-          </div>
-        </div>
-        <div class="flex w-24 shrink-0 flex-col items-end leading-tight">
-          <span class="h-4 text-xs {{ 'text-accent' if entry.borrowable else 'text-soft' }}">
-            {{ entry.availability or "" }}</span>
-          {# Schnäppchen färbt den Betrag, kein Hintergrund — wie in der Watchlist. #}
-          <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if entry.deal }}">
-            {{ entry.price or "—" }}</span>
-        </div>
-      </li>
-    {% endfor %}
-    </ul>
-    {% if not view.offers %}
-    <p class="py-3 text-sm text-soft italic">Gerade kein Schnäppchen und nichts ausleihbar.</p>
-    {% endif %}
-  </section>
+<section>
+  {% call abschnitt(view.suggestions|length ~ " von " ~ view.suggestions_total
+                    ~ " zu entscheiden", "ic-binoculars", rand="mb-2") %}
+    <a href="/vorschlaege"
+       class="tun ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded
+              border border-rule px-2 text-xs font-medium text-ink
+              hover:border-accent hover:text-accent">
+      Alle Vorschläge <span class="text-soft">({{ view.suggestions_total }})</span></a>
+  {% endcall %}
+  <ul class="divide-y divide-hair">
+  {% for item in view.suggestions %}
+    <li>
+      {% set pille %}
+      <span class="rounded px-1.5 py-0.5 text-xs font-medium
+                   {{ 'bg-accent/15 text-accent' if item.reason == 'profile_author'
+                      else 'bg-amber/15 text-amber' }}">{{ item.why_short }}</span>
+      {% endset %}
 
-  <section class="min-w-52 flex-1">
-    {% call abschnitt(view.suggestions|length ~ " von " ~ view.suggestions_total
-                      ~ " zu entscheiden", "ic-binoculars", rand="mb-2") %}
-      <a href="/vorschlaege"
-         class="tun ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded
-                border border-rule px-2 text-xs font-medium text-ink
-                hover:border-accent hover:text-accent">
-        Alle Vorschläge <span class="text-soft">({{ view.suggestions_total }})</span></a>
-    {% endcall %}
-    <ul class="divide-y divide-hair">
-    {% for item in view.suggestions %}
-      {# Ein Raster, drei Spalten: Cover, Text, Preis. Pitch und Knöpfe
-         beginnen unter dem Titel — nicht erst unter dem Cover, das machte
-         zwischen Autor und Pitch eine Lücke — und laufen bis unter den
-         Preis: neben der Preisspalte blieben dem Satz 26 Zeichen je Zeile. #}
-      <li class="grid grid-cols-[auto_1fr_auto] gap-x-3 py-3">
-        <div class="row-span-3">{{ cover(item.title, item.cover_file, false, item.deal) }}</div>
-        <div class="min-w-0">
-          <p class="truncate font-serif text-base font-semibold tracking-tight">
-            {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener"
-               class="hover:underline underline-offset-2">{{ item.title }}</a>
-            {% else %}{{ item.title }}{% endif %}</p>
-          {# Zwei eigene Zeilen statt einer flex-wrap-Zeile: bei "Autor:in
-             Nesbø, Jo" passte beides in eine Zeile, bei "Horror & Mystery
-             Heinz Siegfried Pestner" brach nur der Autor in eine dritte um
-             — in der schmalen Spalte hier (anders als auf /vorschlaege mit
-             mehr Platz) je nach Textlaenge uneinheitlich. Jetzt immer zwei
-             Zeilen, gleich hoch, unabhaengig vom Text. #}
-          <p class="mt-0.5">
-            <span class="inline-block rounded px-1.5 py-0.5 text-xs font-medium
-                         {{ 'bg-accent/15 text-accent' if item.reason == 'profile_author'
-                            else 'bg-amber/15 text-amber' }}">{{ item.why_short }}</span>
-          </p>
-          <p class="mt-1 truncate text-sm text-soft">{{ item.author or "unbekannt" }}</p>
-        </div>
-        <div class="flex w-16 flex-col items-end leading-tight">
-          <span class="h-4 text-xs text-soft">{% if item.stars %}{{ item.stars|sterne }} ★{% endif %}</span>
-          <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if item.deal }}">
-            {{ item.price or "" }}</span>
-        </div>
-        {% if item.pitch %}<p class="col-span-2 col-start-2 mt-1 text-sm">{{ item.pitch }}</p>
-        {% elif item.blurb %}<p class="col-span-2 col-start-2 mt-1 text-sm text-soft">{{ item.blurb }}</p>{% endif %}
-        {# Ein Klick, keine Nachfrage — die Beziehung lässt sich stilllegen
-           (ADR 18). Icon und Wort: ein Symbol allein versteht niemand beim
-           ersten Mal, und auf dem Telefon gibt es keinen Tooltip. Eine
-           Reihe, kein Umbruch: drei kurze Wörter passen in die 271 px, die
-           auf einem Telefon neben dem Cover bleiben. #}
-        <form method="post" action="/vorschlaege/entscheiden"
-              class="col-span-2 col-start-2 mt-2 flex gap-1.5">
-          <input type="hidden" name="keys" value="{{ item.key }}">
-          <input type="hidden" name="zurueck" value="/">
-          {# Die Hover-Farbe folgt dem Theme: gruen ist Bibliothek/Beobachten,
-             bernstein ist Shop/Kauf — "Hab ich" heisst meist gekauft. #}
-          {% for kind, label in actions %}
-          <button type="submit" name="kind" value="{{ kind }}"
-                  class="tun inline-flex h-7 items-center gap-1 rounded border px-2 text-xs
-                         font-medium transition
-                         {% if kind == 'dismissed' %}border-rule text-soft hover:border-danger hover:text-danger
-                         {% elif kind == 'owned' %}border-rule text-ink hover:border-amber hover:text-amber
-                         {% else %}border-rule text-ink hover:border-accent hover:text-accent{% endif %}">
-            <svg class="i"><use href="#{{ icons[kind] }}"/></svg>{{ label }}</button>
-          {% endfor %}
-        </form>
-      </li>
-    {% endfor %}
-    </ul>
-    {% if not view.suggestions %}
-    <p class="py-3 text-sm text-soft italic">Kein offener Vorschlag — ein leerer Stapel
-      ist ein gutes Ergebnis.</p>
-    {% endif %}
-  </section>
-</div>
+      {% set unter_autor %}
+      {% if item.url %}
+      <a href="{{ item.url }}" target="_blank" rel="noopener"
+         title="{{ item.source_label }}: dort ansehen"
+         class="{{ 'text-accent' if item.source_category == 'library' else 'text-amber' }}
+                hover:opacity-70">
+        <svg class="i"><use href="#ic-{{ 'lib' if item.source_category == 'library'
+                                         else 'shop' }}"/></svg></a>
+      {% endif %}
+      {% endset %}
+
+      {% set kennzahlen %}
+      {# Die Sterne des Tors, wie im Stapel. Ohne Urteil steht hier nichts. #}
+      {% if item.stars is not none %}
+      <span class="flex items-center gap-0.5 text-gold"
+            title="{{ item.stars | sterne }} von 5 — Urteil des Werkzeugs">
+        {% for value in range(1, 6) %}
+        <svg class="i" {% if value <= item.stars %}style="fill:currentColor"{% endif %}>
+          <use href="#ic-star"/></svg>
+        {% endfor %}
+      </span>
+      {% endif %}
+      {% endset %}
+
+      {% set aktionen %}
+      {# Ein Klick, keine Nachfrage — die Beziehung laesst sich stilllegen
+         (ADR 18), und die Zeile darueber bietet genau das an. Dieselben drei
+         Zeichen wie im Stapel, nur als gewoehnliche Absende-Knoepfe: das
+         Formular schickt `zurueck=/`, damit die Seite danach das
+         Zuruecknehmen anbieten kann. #}
+      <form method="post" action="/vorschlaege/entscheiden">
+        <input type="hidden" name="keys" value="{{ item.key }}">
+        <input type="hidden" name="zurueck" value="/">
+        {{ entscheidungen(item.source, item.source_item_id, actions, icons,
+                          absenden=true) }}
+      </form>
+      {% endset %}
+
+      {{ zeile(
+           item.title,
+           titel_url="/discovery/" ~ item.source ~ "/" ~ item.source_item_id,
+           autor=item.author,
+           cover_file=item.cover_file,
+           deal=item.deal,
+           pille=pille,
+           unter_autor=unter_autor,
+           kennzahlen=kennzahlen,
+           pitch=item.pitch or item.blurb,
+           preis=item.price,
+           aktionen=aktionen,
+           aktionen_unter_preis=true) }}
+    </li>
+  {% endfor %}
+  </ul>
+  {% if not view.suggestions %}
+  <p class="py-3 text-sm text-soft italic">Kein offener Vorschlag — ein leerer Stapel
+    ist ein gutes Ergebnis.</p>
+  {% endif %}
+</section>
 {% endif %}
 {% endblock %}

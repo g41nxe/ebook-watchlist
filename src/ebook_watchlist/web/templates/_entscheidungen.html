@@ -9,23 +9,30 @@
    Tastaturfokus — als eigene Blase, nicht als `title`: der native Hinweis
    kommt erst nach einer Sekunde und auf dem Telefon gar nicht.
 
-   `type="button"`, sonst schickt der Knopf ein umschließendes Formular ab.
-   `stopPropagation`, weil die Zeile im Stapel das Label eines Kästchens ist.
-   htmx statt Absenden, weil die Stapelseite *ein* Formular ist und ein
-   Absende-Knopf darin die angehakte Auswahl schickte statt seiner Zeile.
+   Zwei Bauarten, ein Aussehen. Im Stapel entscheidet htmx: die Seite ist
+   *ein* Formular, ein Absende-Knopf darin schickte die angehakte Auswahl
+   statt seiner Zeile — also `type="button"` und `hx-post`, und
+   `stopPropagation`, weil die Zeile dort das Label eines Kästchens ist.
+   Auf der Startseite steht jede Zeile in ihrem eigenen Formular, das
+   `zurueck=/` mitschickt; dort sind es gewöhnliche Absende-Knöpfe, damit die
+   Seite danach die Zeile zum Zurücknehmen zeigen kann (ADR 30). `absenden`
+   schaltet um.
 #}
-{% macro entscheidungen(source, item_id, actions, icons, ziel="closest li") %}
+{% macro entscheidungen(source, item_id, actions, icons, ziel="closest li",
+                        absenden=false) %}
 {# Eine Reihe unter dem Preis, nicht eine Spalte neben ihm: so kostet die
    Handlungszone nur die Breite des Preises (96 px statt 136), und die 40
    gehen an Titel und Pitch. #}
 <span class="flex items-center gap-1">
   {% for kind, label in actions %}
   <span class="group relative flex">
-    <button type="button" aria-label="{{ label }}"
+    <button aria-label="{{ label }}"
+            {% if absenden %}type="submit" name="kind" value="{{ kind }}"
+            {% else %}type="button"
             onclick="event.stopPropagation()"
             hx-post="/vorschlaege/{{ source }}/{{ item_id }}/entscheiden"
             hx-vals='{"kind": "{{ kind }}"}'
-            hx-target="{{ ziel }}" hx-swap="outerHTML"
+            hx-target="{{ ziel }}" hx-swap="outerHTML"{% endif %}
             class="tun inline-flex h-7 w-7 items-center justify-center rounded border
                    transition
                    {% if kind == 'dismissed' %}border-rule text-soft hover:border-danger hover:text-danger
