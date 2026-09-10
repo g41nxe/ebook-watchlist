@@ -335,7 +335,7 @@ def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> 
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "geschätzt im Gespräch" in body
+    assert "deine Bewertung" in body
     assert "Reihe und Stimme." in body
     assert "Noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
 

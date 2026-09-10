@@ -57,11 +57,13 @@ LABELS: dict[str, str] = {
     # Auskunft — die groessere ist, *was* gemessen wurde. Und "geschaetzt",
     # weil das Tor aus einem Klappentext schliesst und nicht aus dem Buch.
     BY_MODEL: "geschätzte Übereinstimmung",
-    # Dieselbe Schaetzung, nur im Gespraech entstanden statt im Lauf: die
-    # dreizehn Urteile aus ``owned.yaml``. Nicht "von mir" — die Datei haelt
-    # ausdruecklich fest, dass die Leserin diese Sterne *nicht* selbst
-    # vergeben hat, und eine 4 von ihr ist etwas anderes (ADR 17).
-    BY_CONVERSATION: "geschätzt im Gespräch",
+    # Dieselbe Beschriftung wie bei den eigenen Sternen: die dreizehn Urteile
+    # aus ``owned.yaml`` sind im Gespraech der Leserin ueber ihre eigenen
+    # Buecher entstanden, und fuer sie ist das ihre Bewertung. Getrennt
+    # bleiben die beiden trotzdem, denn sie verhalten sich verschieden: ein
+    # Urteil aus dem Gespraech faellt gegen eine Profilversion und veraltet
+    # mit ihr (PROFILE_BOUND), die selbst vergebenen Sterne nie.
+    BY_CONVERSATION: "deine Bewertung",
     BY_READER: "deine Bewertung",
     BY_LIBRARY_READERS: "Leser:innen der Bibliothek",
 }
