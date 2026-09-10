@@ -109,8 +109,6 @@ Pi: [docs/betrieb.md](docs/betrieb.md).
 
 - [docs/offene-punkte.md](docs/offene-punkte.md) — was fehlt, und welche
   Behauptungen sich unterwegs als falsch erwiesen haben
-- [docs/namensfindung.md](docs/namensfindung.md) — wie das Werkzeug zu seinem
-  Namen kam
 - [docs/research/](docs/research) — Recherche zu den Schnittstellen von VÖBB
   und beam-shop, zu Metadatenquellen und deren Rechtslage
 
