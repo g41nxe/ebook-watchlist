@@ -689,7 +689,7 @@ class Store:
             return [_to_observation(row) for row in session.scalars(stmt)]
 
     def latest_discoveries(
-        self, profile_slug: str, limit: int = 500
+        self, profile_slug: str, limit: int | None = None
     ) -> list[Observation]:
         """Die zuletzt gesehene Fassung jeder Entdeckung.
 
@@ -697,6 +697,14 @@ class Store:
         Lauf. Fuer die Triage zaehlt nur der letzte Stand — dieselbe
         max-id-je-Element-Unterabfrage wie ueberall sonst, damit die Kosten an
         der Zahl der Funde haengen und nicht an der Laenge der Geschichte.
+
+        Ohne Grenze, und das ist der Punkt: hier standen 500, der Bestand bei
+        397, und jeder Lauf legt zu. Zu langsam waere die Seite davon nicht
+        geworden, sondern unvollstaendig — die aeltesten Funde waeren aus dem
+        Stapel, aus der Zaehlung "N offen" und aus dem Bilderholen gefallen,
+        ohne dass irgendwo etwas davon steht. Die Zahl der Entdeckungen
+        waechst langsam (410 in drei Monaten) und die Abfrage kostet bei 400
+        Zeilen 7 ms; wer sie doch einmal deckeln will, sagt es beim Aufruf.
         """
         latest_ids = (
             select(func.max(ObservationRow.id))
@@ -713,8 +721,9 @@ class Store:
                 select(ObservationRow)
                 .where(ObservationRow.id.in_(latest_ids))
                 .order_by(ObservationRow.id.desc())
-                .limit(limit)
             )
+            if limit is not None:
+                stmt = stmt.limit(limit)
             return [_to_observation(row) for row in session.scalars(stmt)]
 
     def latest_prices_by_title(self, profile_slug: str, source: str) -> dict[str, int]:

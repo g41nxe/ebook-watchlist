@@ -109,6 +109,33 @@ def test_a_find_nobody_ever_saw_has_no_history(tmp_path: Path) -> None:
     assert store.observations_for_item("p", "beam", "nope") == []
 
 
+def test_every_discovery_comes_back_not_the_newest_five_hundred(tmp_path: Path) -> None:
+    """Die Abfrage hatte eine stille Grenze von 500. Der echte Bestand stand
+    bei 397, und jeder Lauf legt zu — daran waere der Stapel nicht langsam
+    geworden, sondern unvollstaendig: die aeltesten Funde waeren aus der
+    Liste, aus der Zaehlung "N offen" und aus dem Bilderholen gefallen, ohne
+    dass irgendwo etwas davon steht."""
+    store = Store(tmp_path / "snapshots.db")
+    run_id = store.start_run("p", "cli", NOW)
+    store.append(
+        run_id,
+        "p",
+        [
+            Observation(
+                source="beam",
+                source_item_id=str(nummer),
+                title=f"Fund {nummer}",
+                match_reason=MatchReason.GENRE_CATEGORY,
+                price_cents=399,
+            )
+            for nummer in range(600)
+        ],
+        NOW,
+    )
+
+    assert len(store.latest_discoveries("p")) == 600
+
+
 def test_last_finished_run_ignores_the_current_one(tmp_path: Path) -> None:
     store = Store(tmp_path / "snapshots.db")
     first = store.start_run("p", "cli", NOW)
