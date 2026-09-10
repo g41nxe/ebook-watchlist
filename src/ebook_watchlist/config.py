@@ -40,6 +40,13 @@ class Profile:
     rating_batch_size: int = 20
     #: Welches Modell urteilt. ``None`` heißt: das voreingestellte kleine.
     rating_model: str | None = None
+    #: Wie viele Zeilen die Startseite je Spalte zeigt. Fünf Angebote und drei
+    #: Entscheidungen: StoryGraph und BookWyrm ziehen bei fünf dieselbe Linie,
+    #: und ein Stapel von drei Entscheidungen bleibt eine Aufgabe statt einer
+    #: Liste. Einstellbar, weil das vom Bildschirm abhängt und nicht vom
+    #: Werkzeug — der Rest hängt am Verweis darunter (Issue #5).
+    home_offers: int = 5
+    home_suggestions: int = 3
     #: Swept every Run.
     reference_authors: list[str] = field(default_factory=list)
     #: Swept once a week — the long tail, where a missed day costs nothing.
@@ -199,6 +206,8 @@ def load_profile(path: Path | None = None) -> Profile:
         dnb_budget=_positive_int(data, "dnb_budget", 50, what),
         rating_batch_size=_positive_int(data, "rating_batch_size", 20, what),
         rating_model=str(data["rating_model"]) if data.get("rating_model") else None,
+        home_offers=_positive_int(data, "home_offers", 5, what),
+        home_suggestions=_positive_int(data, "home_suggestions", 3, what),
         reference_authors=core_authors,
         extended_authors=extended_authors,
         extended_sweep_weekday=weekday,

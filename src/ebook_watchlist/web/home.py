@@ -18,12 +18,6 @@ from . import triage, watchlist
 from .triage import Suggestion
 from .watchlist import Entry
 
-#: Fünf Angebote und zwei Vorschläge. StoryGraph und BookWyrm ziehen bei fünf
-#: dieselbe Linie; zwei Entscheidungen halten den Knopfblock lesbar. Der Rest
-#: hängt am Link darunter, nicht an einer längeren Liste.
-OFFERS = 5
-SUGGESTIONS = 2
-
 #: Die Zeichen der drei Entscheidungen stehen bei den Entscheidungen selbst
 #: (``triage.ICONS``) — Startseite, Stapel und Fundseite zeigen dieselben.
 ICONS = triage.ICONS
@@ -106,10 +100,13 @@ def build(store: Store, profile: Profile, *, now: datetime) -> HomeView:
             entry.title.casefold(),
         )
     )
-    pile = triage.pending(store, profile, limit=SUGGESTIONS)
+    # Wie viele Zeilen je Spalte stehen, sagt das Profil (``home_offers``,
+    # ``home_suggestions``): das haengt am Bildschirm der Leserin und nicht am
+    # Werkzeug. Der Rest haengt am Verweis darunter.
+    pile = triage.pending(store, profile, limit=profile.home_suggestions)
     return HomeView(
         status=_status(store, profile.slug, now),
-        offers=tuple(offers[:OFFERS]),
+        offers=tuple(offers[:profile.home_offers]),
         offers_total=len(offers),
         watchlist_total=len(entries),
         suggestions=pile.items,

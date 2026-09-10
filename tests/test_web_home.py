@@ -407,17 +407,42 @@ def test_taking_a_decision_back_puts_the_find_back_on_the_pile(
     )
 
 
-def test_at_most_two_suggestions_are_shown_and_the_rest_is_counted(
+def test_the_columns_show_what_the_profile_says_and_count_the_rest(
     client: TestClient, db: Store
 ) -> None:
-    finished_run(db, finished_at=datetime.now())
-    for number in range(4):
+    """Wie viele Zeilen je Spalte stehen, haengt am Bildschirm der Leserin und
+    nicht am Werkzeug — drei Vorschlaege sind die Voreinstellung, nicht das
+    Gesetz. Was nicht gezeigt wird, ist gezaehlt: der Verweis darunter traegt
+    die Zahl."""
+    # Der abgeschlossene Lauf zuletzt: jeder Fund legt selbst einen an, und
+    # ``recent_runs`` sieht nur fuenf zurueck — davor faellt der abgeschlossene
+    # aus dem Fenster, und die Seite zeigt den Leerzustand.
+    for number in range(5):
         found(db, item_id=str(number), title=f"Fund {number}")
+    finished_run(db, finished_at=datetime.now())
 
     body = client.get("/").text
 
-    assert "2 von 4 zu entscheiden" in body
-    assert body.count('action="/vorschlaege/entscheiden"') == 2
+    assert "3 von 5 zu entscheiden" in body
+    assert body.count('action="/vorschlaege/entscheiden"') == 3
+
+
+def test_another_profile_shows_another_number(data_dir: Path, db: Store) -> None:
+    """Zwei Zahlen im Profil, keine Konstante im Code."""
+    from dataclasses import replace
+
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.web import home as view
+
+    for number in range(5):
+        found(db, item_id=str(number), title=f"Fund {number}")
+    finished_run(db, finished_at=datetime.now())
+
+    knapp = replace(load_profile(), home_suggestions=1)
+    seite = view.build(db, knapp, now=datetime.now())
+
+    assert len(seite.suggestions) == 1
+    assert seite.suggestions_total == 5
 
 
 # --- Der Umzug --------------------------------------------------------------
