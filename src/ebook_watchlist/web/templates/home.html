@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% from "_abschnitt.html" import abschnitt %}
+{% from "_hero.html" import hero with context %}
+{% from "_buchzeile.html" import zeile %}
+{% from "_quellensymbole.html" import quellensymbole %}
+{% from "_entscheidungen.html" import entscheidungen %}
+{% if view.first_run %}
+{# Der Leerzustand erklärt, was hier stehen wird, und zeigt einen Weg. Die
+   drei Verkaufsargumente stehen nur hier: Rückkehrer blenden sie aus, und
+   die oberste Bildschirmhälfte gehört ihren Daten (design-review 09.09.,
+   startseite-tracking-werkzeuge.md). #}
+{# Das einzige Bild der Startseite, und nur hier: ein Willkommensgruss vor
+   dem ersten Lauf. Rueckkehrer mit echten Daten sehen es nie wieder — die
+   oberste Bildschirmhaelfte gehoert dann ihnen, nicht Buchfink (ADR 30).
+
+   Das Lesezimmer statt des runden Abzeichens: es zeigt in einem Bild, wovon
+   die drei Argumente darunter reden — ein Regal, ein Sessel, und die
+   Watchlist auf dem Tisch. `width`/`height` stehen dran, damit die Seite
+   beim Laden nicht springt; `aspect-[24/10]` schneidet oben und unten,
+   falls ein spaeteres Bild andere Masse hat. #}
+<div class="mb-6">{{ hero() }}</div>
+<h1 class="mb-4 text-center font-serif text-2xl font-semibold tracking-tight">Weniger Suchen. Mehr Lesen.</h1>
+<div class="rounded-lg border border-hair bg-card px-5 py-6">
+  <h2 class="font-serif text-xl font-semibold">Noch kein Lauf</h2>
+  <p class="mt-1 max-w-prose text-soft">Trag deine Titel in die Watchlist ein und lass Buchfink
+     einmal laufen. Der erste Lauf sät Beobachtungen und schweigt; ab dem zweiten steht hier,
+     was sich geändert hat.</p>
+  <div class="mt-4 flex flex-wrap items-center gap-4">
+    <a href="/watchlist"
+       class="tun inline-flex h-9 items-center justify-center rounded border border-accent
+              bg-accent/10 px-3 text-sm font-medium text-accent hover:bg-accent/25">Zur Watchlist</a>
+    <a href="/uebersicht" class="text-sm text-accent underline decoration-accent/30
+       underline-offset-2 hover:decoration-accent">Zur Übersicht</a>
+  </div>
+</div>
+<div class="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-6">
+  {% for symbol, titel, satz in arguments %}
+  <div class="min-w-52 flex-1 text-center">
+    <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-hair
+                 text-2xl text-accent"><svg class="i"><use href="#{{ symbol }}"/></svg></span>
+    <div class="mt-2 font-medium">{{ titel }}</div>
+    <div class="text-sm text-soft">{{ satz }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="mb-5">{{ hero() }}</div>
+<h1 class="mb-4 font-serif text-2xl font-semibold tracking-tight">Heute</h1>
+{# Eine Statuszeile, keine Kacheln: nur Werte mit Vergleich oder Zustand.
+   "Schnäppchen: 2" zählte die Liste darunter. Alt und fehlgeschlagen stehen
+   ausgeschrieben da — eine Farbe allein wäre für jemanden mit
+   Farbsehschwäche keine Information.
+
+   Der Rahmen um die Zeile ist keine KPI-Kachel — es stehen keine Zahlen in
+   Kaestchen, sondern ein Satz mit zwei Wegen (Tagesbericht, Lauf-Knopf).
+   Ohne ihn hing die Zeile zwischen Ueberschrift und Spalten ohne Kante. #}
+{# Die Statuszeile hat Wege, nicht nur Auskunft: "N Änderungen" führt in den
+   letzten Tagesbericht, und rechts steht der Lauf-Knopf — dort, wo "vor 1 Tag"
+   in Bernstein mahnt. Es ist derselbe Lauf wie auf der Übersicht: das
+   Fragment, das POST /run zurückgibt, landet unter der Zeile und fragt von
+   selbst nach, bis der Lauf zu Ende ist; dann lädt die Seite neu (ADR 3). #}
+<div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border
+            border-hair bg-card px-5 py-3">
+<p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-soft">
+  <svg class="i"><use href="#ic-clock"/></svg>
+  {# Zahl und Wort auf einer Zeile: ein Umbruch dazwischen macht aus
+     "vor 2 Tagen" zwei Stücke, die niemand als eines liest oder findet. #}
+  {# Der Zeitpunkt fuehrt auf die Uebersicht: dort stehen die Laeufe, aus
+     denen er kommt. Seit sie nicht mehr im Menue steht, ist das ihr Weg —
+     ein Zustand der Quellen ist nichts, was man taeglich aufschlaegt. #}
+  <a href="/uebersicht" title="Läufe, Quellen und Tagesberichte"
+     class="{{ 'font-medium text-amber' if view.status.stale }} underline
+            decoration-rule underline-offset-2 hover:decoration-current">zuletzt geprüft {{ view.status.when }}{% if view.status.stale %} — vor {{ view.status.age_days }} {{ 'Tag' if view.status.age_days == 1 else 'Tagen' }}{% endif %}</a>
+  <span aria-hidden="true">·</span>
+  {% if view.status.failed %}
+  <span class="font-medium text-danger">letzter Lauf fehlgeschlagen</span>
+  {% elif digest %}
+  <a href="/digest/{{ digest.name }}"
+     class="text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent"
+     title="Tagesbericht vom {{ digest.label }}">{{ view.status.delta_count }} {{ 'Änderung' if view.status.delta_count == 1 else 'Änderungen' }}</a>
+  {% else %}
+  <span>{{ view.status.delta_count }} {{ 'Änderung' if view.status.delta_count == 1 else 'Änderungen' }}</span>
+  {% endif %}
+  <span aria-hidden="true">·</span>
+  <span>{{ view.suggestions_total }} {{ 'Vorschlag' if view.suggestions_total == 1 else 'Vorschläge' }} offen</span>
+</p>
+{% if not run_state.busy %}
+{# Kein zweiter Lauf: der Knopf ist weg, solange einer läuft — wie auf der
+   Übersicht. Während eines gerade angestoßenen Laufs bleibt er bis zum
+   Neuladen stehen; ein zweiter Klick prallt am Panel ab ("Läuft schon").
+
+   Nicht rechtsbuendig (kein ml-auto): das ruecke ihn auf dieselbe
+   Kanten-Hoehe wie "Alle Vorschlaege" eine Zeile darunter, nur 21 px
+   daneben — zwei rechtsbuendige Knoepfe, die fast, aber nicht ganz
+   fluchten, sahen kaputter aus als gar keine Ausrichtung. Im Fluss nach
+   dem Text ist der Knopf eindeutig Teil des Satzes, nicht der Spalten. #}
+<form hx-post="/run" hx-target="#lauf" hx-swap="innerHTML"
+      hx-disabled-elt="find button">
+  <button type="submit"
+          class="tun inline-flex h-7 items-center gap-1 rounded border border-accent bg-accent/10
+                 px-2 text-xs font-medium text-accent hover:bg-accent/25">
+    <svg class="i"><use href="#ic-refresh"/></svg>Jetzt prüfen</button>
+</form>
+{% endif %}
+</div>
+<div id="lauf">
+  {% if run_state.busy or run_state.trouble %}{% include "_run_panel.html" %}{% endif %}
+</div>
+
+{% if undo %}
+{# Rückgängig statt Nachfrage: die Handlung ist umkehrbar, ADR 18 löscht
+   nichts — also kein Dialog, sondern der Weg zurück an Ort und Stelle. #}
+<div class="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-rule
+            bg-card px-4 py-2 text-sm">
+  <span>„{{ undo.title }}" {{ undo.done }}.</span>
+  <form method="post" action="/vorschlaege/zuruecknehmen">
+    <input type="hidden" name="key" value="{{ undo.key }}">
+    <input type="hidden" name="kind" value="{{ undo.kind }}">
+    <input type="hidden" name="zurueck" value="/">
+    <button type="submit" class="tun text-accent underline underline-offset-2">Rückgängig</button>
+  </form>
+</div>
+{% endif %}
+
+{# Untereinander, nicht nebeneinander: die geteilte Buchzeile (Issue #9)
+   fordert 352 Pixel Mindestbreite — Cover 64, Titelspalte 160, Preisspalte 96
+   und zwei Abstaende —, zwei Spalten geben je 344. Gestapelt bekommt sie die
+   vollen 720, und die Startseite zeigt Buecher genauso wie Watchlist und
+   Stapel. Natuerliche Hoehe: gleich hoch gezogen erzeugten die beiden
+   Abschnitte nur Leerraum. #}
+<section class="mb-10">
+  {# Der Weg zur ganzen Liste steht in der Ueberschriftenzeile, nicht unter
+     der Liste: dort sieht man ihn, bevor man scrollt. #}
+  {% call abschnitt(view.offers_total ~ " jetzt zu haben", "ic-tag", rand="mb-2") %}
+    {# Nicht bernstein/gruen gefuellt wie "Jetzt pruefen": drei gleich farbige
+       Knoepfe dicht beieinander lasen sich wie eine verwirrte Wiederholung,
+       egal wie sie zueinander ausgerichtet waren. Ruhig bis zum Hover —
+       derselbe Stil wie der "Beobachten"-Knopf im Stapel. #}
+    <a href="/watchlist"
+       class="tun ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded
+              border border-rule px-2 text-xs font-medium text-ink
+              hover:border-accent hover:text-accent">
+      Ganze Watchlist <span class="text-soft">({{ view.watchlist_total }})</span></a>
+  {% endcall %}
+  <ul class="divide-y divide-hair">
+  {% for entry in view.offers %}
+    <li>
+      {% set unter_autor %}
+      {{ quellensymbole(entry.sources) }}
+      {% endset %}
+      {{ zeile(
+           entry.title,
+           titel_url="/book/" ~ entry.book_id,
+           autor=entry.author,
+           cover_file=entry.cover_file,
+           borrowable=entry.borrowable,
+           deal=entry.deal,
+           unter_autor=unter_autor,
+           oben=entry.availability,
+           oben_farbe="text-accent" if entry.borrowable else "text-soft",
+           preis=entry.price) }}
+    </li>
+  {% endfor %}
+  </ul>
+  {% if not view.offers %}
+  <p class="py-3 text-sm text-soft italic">Gerade kein Schnäppchen und nichts ausleihbar.</p>
+  {% endif %}
+</section>
+
+<section>
+  {% call abschnitt(view.suggestions|length ~ " von " ~ view.suggestions_total
+                    ~ " zu entscheiden", "ic-binoculars", rand="mb-2") %}
+    <a href="/vorschlaege"
+       class="tun ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded
+              border border-rule px-2 text-xs font-medium text-ink
+              hover:border-accent hover:text-accent">
+      Alle Vorschläge <span class="text-soft">({{ view.suggestions_total }})</span></a>
+  {% endcall %}
+  <ul class="divide-y divide-hair">
+  {% for item in view.suggestions %}
+    <li>
+      {% set pille %}
+      <span class="rounded px-1.5 py-0.5 text-xs font-medium
+                   {{ 'bg-accent/15 text-accent' if item.reason == 'profile_author'
+                      else 'bg-amber/15 text-amber' }}">{{ item.why_short }}</span>
+      {% endset %}
+
+      {% set unter_autor %}
+      {% if item.url %}
+      <a href="{{ item.url }}" target="_blank" rel="noopener"
+         title="{{ item.source_label }}: dort ansehen"
+         class="{{ 'text-accent' if item.source_category == 'library' else 'text-amber' }}
+                hover:opacity-70">
+        <svg class="i"><use href="#ic-{{ 'lib' if item.source_category == 'library'
+                                         else 'shop' }}"/></svg></a>
+      {% endif %}
+      {% endset %}
+
+      {% set kennzahlen %}
+      {# Die Sterne des Tors, wie im Stapel. Ohne Urteil steht hier nichts. #}
+      {% if item.stars is not none %}
+      <span class="flex items-center gap-0.5 text-gold"
+            title="{{ item.stars | sterne }} von 5 — Urteil des Werkzeugs">
+        {% for value in range(1, 6) %}
+        <svg class="i" {% if value <= item.stars %}style="fill:currentColor"{% endif %}>
+          <use href="#ic-star"/></svg>
+        {% endfor %}
+      </span>
+      {% endif %}
+      {% endset %}
+
+      {% set aktionen %}
+      {# Ein Klick, keine Nachfrage — die Beziehung laesst sich stilllegen
+         (ADR 18), und die Zeile darueber bietet genau das an. Dieselben drei
+         Zeichen wie im Stapel, nur als gewoehnliche Absende-Knoepfe: das
+         Formular schickt `zurueck=/`, damit die Seite danach das
+         Zuruecknehmen anbieten kann. #}
+      <form method="post" action="/vorschlaege/entscheiden">
+        <input type="hidden" name="keys" value="{{ item.key }}">
+        <input type="hidden" name="zurueck" value="/">
+        {{ entscheidungen(item.source, item.source_item_id, actions, icons,
+                          absenden=true) }}
+      </form>
+      {% endset %}
+
+      {{ zeile(
+           item.title,
+           titel_url="/discovery/" ~ item.source ~ "/" ~ item.source_item_id,
+           autor=item.author,
+           cover_file=item.cover_file,
+           deal=item.deal,
+           pille=pille,
+           unter_autor=unter_autor,
+           kennzahlen=kennzahlen,
+           pitch=item.pitch or item.blurb,
+           preis=item.price,
+           aktionen=aktionen,
+           aktionen_unter_preis=true) }}
+    </li>
+  {% endfor %}
+  </ul>
+  {% if not view.suggestions %}
+  <p class="py-3 text-sm text-soft italic">Kein offener Vorschlag — ein leerer Stapel
+    ist ein gutes Ergebnis.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

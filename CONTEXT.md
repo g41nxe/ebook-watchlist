@@ -44,13 +44,22 @@ What a Profile has to do with a Book. Several hold at once — a book can be
 owned *and* have been watched. Relations are deactivated rather than deleted,
 so "watched until you bought it" stays visible.
 
-| kind | deutsch | what it says |
-| --- | --- | --- |
-| `watching` | in Beobachtung | on the Watchlist, reported at every price |
-| `owned` | im Besitz | the reader has it |
-| `liked` | Mag ich | read, and it was good |
-| `disliked` | Kein Interesse | read, and it was not |
-| `dismissed` | Ausgeschlossen | never offer this book again |
+| kind | deutsch (the state) | on the button | what it says |
+| --- | --- | --- | --- |
+| `watching` | in Beobachtung | Beobachten | on the Watchlist, reported at every price |
+| `owned` | im Besitz | Hab ich | the reader has it |
+| `liked` | Mag ich | Mag ich | read, and it was good |
+| `disliked` | Kein Interesse | Doof | read, and it was not |
+| `dismissed` | Ausgeschlossen | Ausschließen | never offer this book again |
+
+Two words, two questions (ADR 29 and its addendum). The state name answers
+"what is this book to me?" and stands where books are described in prose — the
+profile, the Digest, the Watchlist status — like a shelf label. The button word
+answers "what do you do with it?" and stands on *every* button: the Suggestion
+pile, the start page, the Watchlist menu, the find page and the book page. For
+`liked` and `disliked` both roles fall on the same word; that is one word doing
+two jobs, not drift. What never happens is the swap: a state name that is no
+button word never reaches a button.
 
 `disliked` and `dismissed` are different statements, and neither implies the
 other. `disliked` is a verdict *after reading* and says something about taste.

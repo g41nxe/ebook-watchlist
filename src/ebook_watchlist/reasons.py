@@ -65,10 +65,14 @@ def why_shown(observation: Observation) -> str:
 
 
 def short_why(observation: Observation) -> str:
-    """Die Kurzform für ein Etikett in der Oberfläche."""
+    """Die Kurzform für ein Etikett in der Oberfläche.
+
+    Ohne das Wort "Thema" davor: die Pille steht immer in Bernstein und neben
+    "Autor:in" (Petrol) — die Farbe sagt schon, dass es ein Thema ist, der
+    Name selbst braucht den Vorspann nicht (Watchlist, Vorschläge, Startseite).
+    """
     if observation.match_reason is MatchReason.WATCHLIST:
         return "Watchlist"
     if observation.match_reason is MatchReason.PROFILE_AUTHOR:
         return "Autor:in"
-    thema = thema_name(observation.category)
-    return f"{THEMA} {thema}" if thema else THEMA
+    return thema_name(observation.category) or THEMA

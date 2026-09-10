@@ -53,8 +53,17 @@ PROFILE_BOUND: frozenset[str] = frozenset({BY_MODEL, BY_CONVERSATION})
 HUMAN_ORIGINS: frozenset[str] = frozenset({BY_READER})
 
 LABELS: dict[str, str] = {
-    BY_MODEL: "vom Werkzeug bewertet",
-    BY_CONVERSATION: "im Gespräch bewertet",
+    # Nicht "vom Werkzeug bewertet": *wer* gemessen hat, ist die kleinere
+    # Auskunft — die groessere ist, *woran* gemessen wurde. Und ein Wort statt
+    # dreien: neben den Sternen steht ohnehin, worauf das Urteil ruht.
+    BY_MODEL: "Leseprofil",
+    # Dieselbe Beschriftung wie bei den eigenen Sternen: die dreizehn Urteile
+    # aus ``owned.yaml`` sind im Gespraech der Leserin ueber ihre eigenen
+    # Buecher entstanden, und fuer sie ist das ihre Bewertung. Getrennt
+    # bleiben die beiden trotzdem, denn sie verhalten sich verschieden: ein
+    # Urteil aus dem Gespraech faellt gegen eine Profilversion und veraltet
+    # mit ihr (PROFILE_BOUND), die selbst vergebenen Sterne nie.
+    BY_CONVERSATION: "deine Bewertung",
     BY_READER: "deine Bewertung",
     BY_LIBRARY_READERS: "Leser:innen der Bibliothek",
 }

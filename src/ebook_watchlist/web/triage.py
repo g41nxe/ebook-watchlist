@@ -25,13 +25,13 @@ from ..models import MatchReason, Observation
 from ..rating import DEFAULT_THRESHOLD
 from ..ratings import BY_MODEL, subject_of
 from ..reasons import short_why, thema_name, why_shown
-from ..relations import RelationKind, labelled
+from ..relations import RELATION_KINDS, RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
 
 #: Was mit einem Stapel geschehen kann. Alle drei schreiben eine Beziehung —
 #: "verworfen" ist keine Löschung, sondern eine Aussage über das Buch.
-ACTIONS: tuple[tuple[str, str], ...] = labelled(
+ACTIONS: tuple[tuple[str, str], ...] = labelled_actions(
     RelationKind.DISMISSED, RelationKind.OWNED, RelationKind.WATCHING
 )
 
@@ -127,7 +127,7 @@ class Pile:
         return not self.items
 
 
-def _cover_file(observation: Observation) -> str | None:
+def _cover_file(observation: Observation, covers: CoverStore | None = None) -> str | None:
     """Das Titelbild, falls es schon im Ordner liegt.
 
     Nachgesehen statt gespeichert: der Name ergibt sich allein aus der Adresse,
@@ -137,15 +137,24 @@ def _cover_file(observation: Observation) -> str | None:
 
     Die Oberfläche lädt nie selbst nach (ADR 3): geholt wird beim Bewerten, und
     nur für das, was durchkommt.
+
+    Der Ordner wird mitgegeben, wo mehrere Zeilen nacheinander fragen: ihn je
+    Zeile neu zu bestimmen kostet ein ``Path.resolve`` — gemessen 0,22 ms je
+    Fund, 6,6 fuer eine Stapelseite.
     """
     if not observation.cover_url:
         return None
     name = file_name(observation.cover_url)
-    return name if CoverStore(paths.covers_dir()).has(name) else None
+    ordner = covers if covers is not None else CoverStore(paths.covers_dir())
+    return name if ordner.has(name) else None
 
 
 def _suggestion(
-    observation: Observation, profile: Profile, judgement=None, bundle=None
+    observation: Observation,
+    profile: Profile,
+    judgement=None,
+    bundle=None,
+    covers: CoverStore | None = None,
 ) -> Suggestion:
     return Suggestion(
         source=observation.source,
@@ -164,7 +173,7 @@ def _suggestion(
         why=why_shown(observation),
         why_short=short_why(observation),
         stars=judgement.stars if judgement else None,
-        cover_file=_cover_file(observation),
+        cover_file=_cover_file(observation, covers),
         pitch=(judgement.pitch or None) if judgement else None,
         bundle=bundle,
     )
@@ -193,6 +202,9 @@ def pending(
     # Eine Stelle rechnet den Buendelvorteil aus — dieselbe, die der
     # Tagesbericht benutzt (ADR 24).
     buendelvorteil = advantage_finder(store, profile)
+    # Einmal fuer die ganze Seite: der Ordner der Titelbilder wird sonst je
+    # Zeile neu aufgeloest.
+    covers = CoverStore(paths.covers_dir())
 
     items: list[Suggestion] = []
     hidden_junk = 0
@@ -223,7 +235,7 @@ def pending(
         if reason and str(observation.match_reason) != reason:
             continue
         items.append(
-            _suggestion(observation, profile, judgement, vorteil)
+            _suggestion(observation, profile, judgement, vorteil, covers)
         )
 
     # Das Beste zuerst. Ohne das stehen oben die Funde, die zufaellig zuletzt
@@ -256,6 +268,13 @@ def decide(
     Quelle wird mitgeschrieben, damit derselbe Fund beim nächsten Lauf nicht
     wieder im Stapel steht.
     """
+    # Zuerst die Art, dann irgendetwas anlegen: `put_relation` prueft sie auch,
+    # aber erst nachdem `find_or_create_book` die Zeile geschrieben hat — eine
+    # unbekannte Art hinterliess so ein Buch ohne jede Beziehung, und das
+    # leitete den Fund von seiner eigenen Seite weg.
+    if kind not in RELATION_KINDS:
+        raise ValueError(f"unbekannte Beziehung {kind!r}")
+
     wanted = set(keys)
     if not wanted:
         return 0
@@ -287,5 +306,13 @@ def decide(
             resolved_at=now,
             reason="aus der Triage",
         )
+        # Das Titelbild liegt schon auf der Platte — geholt wurde es fuer den
+        # Stapel, und geholt wird hier nichts (ADR 3). Ohne diese Zeile verlor
+        # ein Fund beim Uebergang zur Watchlist sein Bild: der Stapel rechnet
+        # den Dateinamen aus der Adresse aus, die Watchlist-Zeile fragt die
+        # `book`-Zeile — und die kannte ihn nicht.
+        bild = _cover_file(observation)
+        if bild and not book.cover_file:
+            store.set_cover(book.id, bild)
         decided += 1
     return decided

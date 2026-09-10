@@ -193,10 +193,11 @@ sie stößt höchstens einen Lauf an (ADR 3).
 
 | Pfad | Was dort steht |
 | --- | --- |
-| `/` | Übersicht: Zustand der Quellen, die letzten Läufe, die Tagesberichte — und der Knopf „jetzt laufen" |
+| `/` | Startseite: wann zuletzt geprüft wurde, was jetzt zu haben ist, worüber zu entscheiden ist — vor dem ersten Lauf erklärt sie sich |
+| `/uebersicht` | Übersicht: Zustand der Quellen, die letzten Läufe, die Tagesberichte — und der Knopf „jetzt laufen". Nicht im Menü; der Zeitpunkt „zuletzt geprüft“ auf der Startseite führt hin |
 | `/watchlist` | Was du beobachtest, mit Preis und Ausleihstatus in einer Zeile |
 | `/book/{id}` | Alles über ein Buch: Beziehungen, Quellen, Preisverlauf, Urteile — und deine eigenen Sterne |
-| `/vorschlaege` | Der Stapel: ankreuzen, dann verwerfen, beobachten oder „habe ich" |
+| `/vorschlaege` | Der Stapel: ankreuzen, dann Ausschließen, Hab ich oder Beobachten |
 | `/profil` | Was das Werkzeug über dich zu wissen glaubt. Nur zum Lesen — mit Absicht |
 
 Start mit `python -m ebook_watchlist.web`. Die Oberfläche bindet an alle

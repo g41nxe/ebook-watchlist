@@ -98,15 +98,15 @@ def test_several_relations_hold_at_once(client: TestClient, db: Store) -> None:
 
 
 def test_switching_a_relation_off_keeps_it_as_history(client: TestClient, db: Store) -> None:
-    """Dass ein Buch einmal beobachtet wurde, ist selbst eine Auskunft."""
+    """Dass ein Buch einmal beobachtet wurde, ist selbst eine Auskunft (ADR 18)
+    — die Beziehung wird stillgelegt, nicht geloescht. Die Seite zeigt sie
+    nicht mehr: was gerade *nicht* gilt, beantwortet keine Frage."""
     book = db.books()[0]
 
     client.post(f"/book/{book.id}/relation", data={"kind": "watching", "active": "0"})
 
-    body = client.get(f"/book/{book.id}").text
     kept = [r for r in db.relations_of("test", book.id) if r.kind == "watching"]
     assert kept and kept[0].active is False
-    assert "Früher" in body
 
 
 def test_an_unknown_relation_is_refused(client: TestClient, db: Store) -> None:
@@ -186,13 +186,32 @@ def test_unchanged_prices_do_not_fill_the_list(db: Store) -> None:
 
 
 def test_the_full_history_is_still_there(db: Store) -> None:
-    """Zusammengefasst wird nur die Preisliste; die Tabelle zeigt jede Sichtung."""
+    """Zusammengefasst wird nur die Preisliste; gespeichert bleibt jede Sichtung."""
     book = db.books()[0]
     for day in range(3):
         sighting(db, book.id, when=NOW + timedelta(days=day), price=999)
 
     page = view.build(db, load_profile(), book.id)
     assert len(page.history) >= 3
+
+
+def test_the_table_shows_the_last_five_sightings_and_says_so(
+    client: TestClient, db: Store
+) -> None:
+    """Elf Zeilen mit elfmal demselben Betrag sind kein Verlauf, sondern
+    Rauschen — und sie schoben alles darunter aus dem Bild. Was sich geaendert
+    hat, steht ohnehin darueber in der Preisliste."""
+    book = db.books()[0]
+    for day in range(8):
+        sighting(db, book.id, when=NOW + timedelta(days=day), price=900 + day)
+
+    page = view.build(db, load_profile(), book.id)
+    assert len(page.recent_history) == 5
+    assert page.hidden_history == 3
+    # Die neuesten fuenf, nicht die aeltesten.
+    assert page.recent_history[0].price == "9,07 €"
+
+    assert "3 ältere" in client.get(f"/book/{book.id}").text
 
 
 def test_availability_appears_for_a_library(client: TestClient, db: Store) -> None:
@@ -283,7 +302,7 @@ def test_a_book_without_a_judgement_shows_nothing_rather_than_zero_stars(
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "noch nicht bewertet" in body
+    assert "Noch nicht bewertet" in body
     assert "zurücknehmen" not in body
 
 
@@ -304,7 +323,7 @@ def test_taking_them_back_writes_no_zero(client: TestClient, db: Store) -> None:
     client.post(f"/book/{book.id}/sterne", data={"stars": ""})
 
     assert db.rating(book_subject(book.id), 1, origin=BY_READER) is None
-    assert "noch nicht bewertet" in client.get(f"/book/{book.id}").text
+    assert "Noch nicht bewertet" in client.get(f"/book/{book.id}").text
 
 
 def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> None:
@@ -316,9 +335,9 @@ def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> 
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "im Gespräch bewertet" in body
+    assert "deine Bewertung" in body
     assert "Reihe und Stimme." in body
-    assert "noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
+    assert "Noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
 
 
 def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: Store) -> None:
@@ -330,7 +349,7 @@ def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: S
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "vom Werkzeug bewertet" in body
+    assert "Leseprofil" in body
     assert "Zu weich." in body
 
 
@@ -439,9 +458,9 @@ def test_the_gates_verdict_on_a_discovery_without_an_isbn_is_found_too(
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "vom Werkzeug bewertet" in body
+    assert "Leseprofil" in body
     assert "Achse D: isoliert." in body
-    assert "noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
+    assert "Noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
 
 
 def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:

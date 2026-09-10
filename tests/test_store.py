@@ -54,6 +54,88 @@ def test_unknown_items_are_simply_absent(tmp_path: Path) -> None:
     assert store.latest_observations("p", [("beam", "nope")]) == {}
 
 
+def test_the_whole_history_of_a_find_newest_first(tmp_path: Path) -> None:
+    """Ein Fund hat keine Buch-Zeile (ADR 18) — seine Geschichte haengt am
+    Paar aus Quelle und Nummer, nicht an einer ``book_id``."""
+    store = Store(tmp_path / "snapshots.db")
+    for price in (1299, 1199, 999):
+        run_id = store.start_run("p", "cli", NOW)
+        store.append(run_id, "p", [observation("beam", "1", price)], NOW)
+
+    seen = store.observations_for_item("p", "beam", "1")
+
+    assert [row.price_cents for row in seen] == [999, 1199, 1299]
+
+
+def test_the_history_of_a_find_does_not_cross_sources_or_profiles(tmp_path: Path) -> None:
+    store = Store(tmp_path / "snapshots.db")
+    run_id = store.start_run("p", "cli", NOW)
+    store.append(
+        run_id, "p", [observation("beam", "1", 100), observation("voebb", "1", 200)], NOW
+    )
+    other = store.start_run("other", "cli", NOW)
+    store.append(other, "other", [observation("beam", "1", 999)], NOW)
+
+    seen = store.observations_for_item("p", "beam", "1")
+
+    assert [row.price_cents for row in seen] == [100]
+
+
+def test_a_book_made_from_a_find_keeps_the_finds_history(tmp_path: Path) -> None:
+    """Die Beobachtungen einer Entdeckung tragen keine ``book_id`` — es gab ja
+    noch kein Buch (ADR 18). Wird eines daraus, hing seine ganze Vorgeschichte
+    in der Luft: die Buchseite sagte "Noch nichts gesehen" und die Kachel der
+    Quelle zeigte keinen Preis, obwohl elf Beobachtungen dazu dastanden.
+
+    Nachgeschlagen statt nachgetragen: der Snapshot wird nie umgeschrieben
+    (ADR 5), und die Verknuepfung zur Quelle sagt ohnehin, welche Nummer
+    dieses Buch dort traegt."""
+    store = Store(tmp_path / "snapshots.db")
+    for price in (1299, 999):
+        run_id = store.start_run("p", "cli", NOW)
+        store.append(run_id, "p", [observation("beam", "1", price)], NOW)
+    book = store.find_or_create_book(isbn=None, title="beam/1", author=None, now=NOW)
+    store.put_book_source(
+        book.id, "beam", outcome="confirmed", source_item_id="1", resolved_at=NOW
+    )
+
+    seen = store.observations_for_book("p", book.id)
+
+    assert [row.price_cents for row in seen] == [999, 1299]
+
+
+def test_a_find_nobody_ever_saw_has_no_history(tmp_path: Path) -> None:
+    store = Store(tmp_path / "snapshots.db")
+    assert store.observations_for_item("p", "beam", "nope") == []
+
+
+def test_every_discovery_comes_back_not_the_newest_five_hundred(tmp_path: Path) -> None:
+    """Die Abfrage hatte eine stille Grenze von 500. Der echte Bestand stand
+    bei 397, und jeder Lauf legt zu — daran waere der Stapel nicht langsam
+    geworden, sondern unvollstaendig: die aeltesten Funde waeren aus der
+    Liste, aus der Zaehlung "N offen" und aus dem Bilderholen gefallen, ohne
+    dass irgendwo etwas davon steht."""
+    store = Store(tmp_path / "snapshots.db")
+    run_id = store.start_run("p", "cli", NOW)
+    store.append(
+        run_id,
+        "p",
+        [
+            Observation(
+                source="beam",
+                source_item_id=str(nummer),
+                title=f"Fund {nummer}",
+                match_reason=MatchReason.GENRE_CATEGORY,
+                price_cents=399,
+            )
+            for nummer in range(600)
+        ],
+        NOW,
+    )
+
+    assert len(store.latest_discoveries("p")) == 600
+
+
 def test_last_finished_run_ignores_the_current_one(tmp_path: Path) -> None:
     store = Store(tmp_path / "snapshots.db")
     first = store.start_run("p", "cli", NOW)

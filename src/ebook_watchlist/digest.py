@@ -13,7 +13,7 @@ from datetime import datetime
 from .config import Profile
 from .deals import deal_flags
 from .models import Attention, Delta, DeltaKind, MatchReason, SourceFailure
-from .rating import Rating
+from .rating import Rating, confidence_label
 from .reasons import why_shown
 
 SECTION_LIBRARY = "Bibliothek"
@@ -147,7 +147,7 @@ def _judgement_text(rating: Rating | None) -> str | None:
     if rating is None:
         return None
     stars = "★" * rating.stars + "☆" * (5 - rating.stars)
-    return f"Bewertung {stars} ({rating.confidence}): {rating.reason}"
+    return f"Bewertung {stars} ({confidence_label(rating.confidence)}): {rating.reason}"
 
 
 def _entry_for(

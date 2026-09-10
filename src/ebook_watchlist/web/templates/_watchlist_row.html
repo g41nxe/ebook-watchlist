@@ -2,140 +2,132 @@
 
    Eigene Datei, weil zwei Wege sie rendern: die Liste, und der enge Lauf, der
    genau diese eine Zeile austauscht, sobald er ein Ergebnis hat (Ticket 51).
-   Zwei Fassungen waeren zwei, die auseinanderlaufen. #}
-{% from "_cover.html" import cover %}
+   Zwei Fassungen waeren zwei, die auseinanderlaufen.
+
+   Das Geruest ist dasselbe wie auf Vorschlagsseite und Startseite
+   (`_buchzeile.html`, Issue #9). Was diese Seite eigenes hat, kommt als
+   Steckplatz herein: die Sammelausgaben-Pille, die Symbole der Quellen, der
+   Betrag waehrend eines engen Laufs und das Menue. #}
+{% from "_buchzeile.html" import zeile %}
+{% from "_quellensymbole.html" import quellensymbole %}
   {# Solange ein enger Lauf laeuft, fragt die Zeile selbst nach — und hoert
      von selbst auf, sobald der Server sie ohne Trigger zurueckgibt. Dasselbe
      Muster wie `_run_panel.html`: kein Websocket, kein Timer, der
      weiterlaeuft (ADR 3). #}
   <li id="eintrag-{{ entry.book_id }}"
-      class="flex flex-wrap items-center gap-x-4 gap-y-2 py-3
-             {{ 'opacity-55' if not entry.active }}"
+      class="{{ 'opacity-55' if not entry.active }}"
       {% if check and check.busy %}
       hx-get="/watchlist/{{ entry.book_id }}/nachsehen"
       hx-trigger="every 2s"
       hx-target="this"
       hx-swap="outerHTML"
       {% endif %}>
-    {{ cover(entry.title, entry.cover_file, entry.borrowable, entry.deal) }}
 
-    <div class="min-w-0 flex-1">
-      <p class="truncate font-serif text-base font-semibold tracking-tight">
-        <a href="/book/{{ entry.book_id }}" class="hover:underline underline-offset-2"
-           >{{ entry.title }}</a>
-        {% if entry.is_bundle %}
-        <span class="ml-1 align-middle rounded bg-amber/15 px-1.5 py-0.5
-                     text-xs font-medium text-amber"
-              title="Mehrere Bände in einer Ausgabe">Sammelausgabe</span>
-        {% endif %}</p>
-      <p class="truncate text-sm text-soft">
-        {{ entry.author or "unbekannt" }}{% if not entry.active %} · pausiert{% endif %}
-      </p>
-      <div class="mt-1 flex flex-wrap items-center gap-2 text-base">
-        {% for state in entry.sources %}
-        {% set library = state.category == "library" %}
-        {% set symbol = "ic-lib" if library else "ic-shop" %}
-        {% if state.url and state.outcome in ("linked", "confirmed") %}
-        <a href="{{ state.url }}" target="_blank" rel="noopener"
-           title="{{ state.display }}: gefunden"
-           class="{{ 'text-accent' if library else 'text-amber' }} hover:opacity-70">
-          <svg class="i"><use href="#{{ symbol }}"/></svg></a>
-        {% else %}
-        <span title="{{ state.display }}: {{ state.label }}" class="text-rule">
-          <svg class="i"><use href="#{{ symbol }}"/></svg></span>
-        {% endif %}
-        {% endfor %}
-        {% if entry.unresolved %}
-        <span class="text-xs text-soft italic">noch nicht gesucht</span>
-        {% endif %}
-      </div>
-    </div>
+    {% set pille %}
+    {% if entry.is_bundle %}
+    <span class="rounded bg-amber/15 px-1.5 py-0.5 text-xs font-medium text-amber"
+          title="Mehrere Bände in einer Ausgabe">Sammelausgabe</span>
+    {% endif %}
+    {% endset %}
 
-    {# Zwei feste Zeilen: die obere bleibt leer, wenn nichts bekannt ist —
-       dadurch stehen die Beträge immer auf derselben Höhe. #}
-    {# ``items-end`` statt ``items-center``: die Preisspalte hat zwei Zeilen,
-       und auf ihrer Mitte zentriert saessen die Symbole acht Pixel ueber dem
-       Betrag. Unten ausgerichtet stehen Betrag und Symbole auf derselben
-       Linie. #}
-    {# `justify-between` erst ab `sm` — siehe `triage.html`: auf dem Telefon
-       standen zwischen Betrag und Menue 143 Pixel Nichts. #}
-    <div class="ml-15 flex w-full items-end gap-3
-                sm:ml-0 sm:w-auto sm:justify-between">
-    <div class="flex shrink-0 items-baseline gap-2 leading-tight
-                sm:w-24 sm:flex-col sm:items-end sm:gap-0">
-      <span class="h-4 text-xs {{ 'text-accent' if entry.borrowable else 'text-soft' }}">
-        {{ entry.availability or "" }}</span>
-      {% if check and check.busy %}
-      {# Der zuletzt bekannte Betrag bleibt lesbar, nur gedaempft — er gilt
-         gerade nicht, wird aber ueberprueft und nicht verworfen. Daneben
-         sagt das Symbol, ob gesucht oder auf einen grossen Lauf gewartet
-         wird (Ticket 51, Entwurf C). #}
-      <span class="flex items-center gap-1.5" title="{{ check.label(now=now) }}">
-        <span class="text-lg font-semibold tabular-nums text-soft/60">{{ entry.price or "—" }}</span>
-        {% if check.label(now=now) == "sucht …" %}
-        <svg class="i animate-spin text-accent"><use href="#ic-spin"/></svg>
-        {% else %}
-        <svg class="i text-soft"><use href="#ic-hourglass"/></svg>
-        {% endif %}
-      </span>
-      {% elif entry.price %}
-      <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if entry.deal }}">{{ entry.price }}</span>
+    {% set unter_autor %}
+    {{ quellensymbole(entry.sources, unresolved=entry.unresolved) }}
+    {% endset %}
+
+    {% set preis_inhalt %}
+    {% if check and check.busy %}
+    {# Der zuletzt bekannte Betrag bleibt lesbar, nur gedaempft — er gilt
+       gerade nicht, wird aber ueberprueft und nicht verworfen. Daneben sagt
+       das Symbol, ob gesucht oder auf einen grossen Lauf gewartet wird
+       (Ticket 51, Entwurf C). #}
+    <span class="flex items-center gap-1.5" title="{{ check.label(now=now) }}">
+      {# `text-soft`, kein eigener Ton: gedaempft ist der Betrag schon dadurch,
+         dass er nicht mehr in `ink` steht. #}
+      <span class="text-lg font-semibold tabular-nums text-soft">{{ entry.price or "—" }}</span>
+      {% if check.label(now=now) == "sucht …" %}
+      <svg class="i animate-spin text-accent"><use href="#ic-spin"/></svg>
       {% else %}
-      <span class="text-lg text-soft">—</span>
+      <svg class="i text-soft"><use href="#ic-hourglass"/></svg>
       {% endif %}
-    </div>
+    </span>
+    {% endif %}
+    {% endset %}
 
-    {# Dauerhaft sichtbar, nicht erst beim Überfahren: auf einem Telefon gibt
-       es kein Überfahren. #}
-    <div class="flex shrink-0 items-center gap-1">
-      {# Ein Aufklappmenü statt sichtbarer Symbole: was hier steht, tut man je
-         Buch **einmal**. Bis Ticket 48 enthielt es als einzigen Eintrag
-         „Prüfen bei" — eine Einstellung, die inzwischen auf der Buchseite
-         steht, wo die übrigen Angaben zu diesem Buch stehen. Geblieben sind
-         die Abschlüsse, und „gekauft" und „nicht interessant" stehen durch
-         eine Linie getrennt: sie nehmen den Eintrag aus der Liste
-         (docs/research/row-actions-and-overflow-menus.md). #}
-      {# Ein Menue soll zugehen, wenn man woanders hinklickt — `details` tut
-         das von sich aus nicht. Alpine statt eines eigenen Skripts: lokaler
-         Zustand ohne Serverwissen ist genau seine Haelfte der Arbeitsteilung
-         (ADR 20). Escape schliesst ebenfalls, damit die Tastatur nicht
-         schlechter dasteht als die Maus. #}
-      <details class="relative" x-data
-               @click.outside="$el.open = false"
-               @keydown.escape.window="$el.open = false">
-        <summary title="was mit diesem Eintrag geschehen soll"
-                 class="cursor-pointer list-none rounded p-1.5 text-soft
-                        hover:bg-hair hover:text-ink">
-          <svg class="i"><use href="#ic-dots"/></svg>
-        </summary>
-        <div class="absolute right-0 z-10 mt-1 w-52 rounded-lg border border-rule
-                    bg-card p-1 shadow-lg">
-          <form method="post" action="/watchlist/{{ entry.book_id }}/active">
-            <input type="hidden" name="active" value="{{ '0' if entry.active else '1' }}">
-            <button type="submit"
-                    class="tun w-full rounded px-2 py-2 text-left text-xs text-ink
-                           hover:bg-hair">
-              {{ 'pausieren' if entry.active else 'aktivieren' }}</button>
-          </form>
-          <form hx-post="/watchlist/{{ entry.book_id }}/nachsehen"
-                hx-target="#eintrag-{{ entry.book_id }}" hx-swap="outerHTML">
-            <button type="submit"
-                    class="tun w-full rounded px-2 py-2 text-left text-xs text-ink
-                           hover:bg-hair">jetzt nachsehen</button>
-          </form>
-          <div class="my-1 border-t border-hair"></div>
-          {% for kind, label in abschluss %}
-          <form method="post" action="/watchlist/{{ entry.book_id }}/abschliessen">
-            <input type="hidden" name="kind" value="{{ kind }}">
-            <button type="submit"
-                    class="tun w-full rounded px-2 py-2 text-left text-xs text-ink
-                           hover:bg-hair">{{ label }}</button>
-          </form>
-          {% endfor %}
-        </div>
-      </details>
-    </div>
-    </div>
+    {% set aktionen %}
+    {# Dauerhaft sichtbar, nicht erst beim Ueberfahren: auf einem Telefon gibt
+       es kein Ueberfahren.
+
+       Ein Aufklappmenue statt sichtbarer Symbole: was hier steht, tut man je
+       Buch **einmal**. Bis Ticket 48 enthielt es als einzigen Eintrag
+       "Pruefen bei" — eine Einstellung, die inzwischen auf der Buchseite
+       steht, wo die uebrigen Angaben zu diesem Buch stehen. Geblieben sind
+       die Abschluesse, und "gekauft" und "nicht interessant" stehen durch eine
+       Linie getrennt: sie nehmen den Eintrag aus der Liste
+       (docs/research/row-actions-and-overflow-menus.md).
+
+       Ein Menue soll zugehen, wenn man woanders hinklickt — `details` tut das
+       von sich aus nicht. Alpine statt eines eigenen Skripts: lokaler Zustand
+       ohne Serverwissen ist genau seine Haelfte der Arbeitsteilung (ADR 20).
+       Escape schliesst ebenfalls, damit die Tastatur nicht schlechter dasteht
+       als die Maus. #}
+    <details class="relative" x-data
+             @click.outside="$el.open = false"
+             @keydown.escape.window="$el.open = false">
+      {# Gross genug zum Treffen: mit `p-1.5` mass der Aufklapper 28 Pixel.
+         Auf dem Telefon mit Rahmen, damit ueberhaupt zu sehen ist, wo man
+         hindrueckt — dort gibt es kein Ueberfahren, das es zeigen koennte.
+         Ab `sm` ohne: ein Menue ist keine Handlung, sondern der Weg zu einer,
+         und mit Rahmen sah es aus wie ein vierter Knopf neben dem Betrag. #}
+      <summary title="was mit diesem Eintrag geschehen soll"
+               class="tun inline-flex h-9 w-9 cursor-pointer list-none items-center
+                      justify-center rounded border border-rule text-soft transition
+                      hover:bg-hair hover:text-ink sm:border-0">
+        <svg class="i"><use href="#ic-dots"/></svg>
+      </summary>
+      {# Das Menue haengt am rechten Rand und ist auf dem Telefon breiter als
+         der Knopf, aber nie breiter als der Bildschirm. #}
+      <div class="absolute right-0 z-10 mt-1 w-52 max-w-[calc(100vw-3rem)]
+                  rounded-lg border border-rule bg-card p-1 shadow-lg">
+        <form method="post" action="/watchlist/{{ entry.book_id }}/active">
+          <input type="hidden" name="active" value="{{ '0' if entry.active else '1' }}">
+          <button type="submit"
+                  class="tun w-full rounded px-2 py-2 text-left text-xs text-ink
+                         hover:bg-hair">
+            {{ 'pausieren' if entry.active else 'aktivieren' }}</button>
+        </form>
+        <form hx-post="/watchlist/{{ entry.book_id }}/nachsehen"
+              hx-target="#eintrag-{{ entry.book_id }}" hx-swap="outerHTML">
+          <button type="submit"
+                  class="tun w-full rounded px-2 py-2 text-left text-xs text-ink
+                         hover:bg-hair">jetzt nachsehen</button>
+        </form>
+        <div class="my-1 border-t border-hair"></div>
+        {% for kind, label in abschluss %}
+        <form method="post" action="/watchlist/{{ entry.book_id }}/abschliessen">
+          <input type="hidden" name="kind" value="{{ kind }}">
+          <button type="submit"
+                  class="tun w-full rounded px-2 py-2 text-left text-xs text-ink
+                         hover:bg-hair">{{ label }}</button>
+        </form>
+        {% endfor %}
+      </div>
+    </details>
+    {% endset %}
+
+    {{ zeile(
+         entry.title,
+         titel_url="/book/" ~ entry.book_id,
+         autor=(entry.author or "unbekannt") ~ ("" if entry.active else " · pausiert"),
+         cover_file=entry.cover_file,
+         borrowable=entry.borrowable,
+         deal=entry.deal,
+         pille=pille,
+         unter_autor=unter_autor,
+         oben=entry.availability,
+         oben_farbe="text-accent" if entry.borrowable else "text-soft",
+         preis=entry.price,
+         preis_inhalt=preis_inhalt,
+         aktionen=aktionen) }}
 
     {% if entry.missing and not entry.missing_known %}
     {# Keine Quelle kennt diesen Titel — und den hast du selbst geschrieben.
@@ -143,7 +135,9 @@
        stehenden Titeln waren am 6.9. sieben schlicht falsch benannt (ADR 27).
        Ruhiger als die Zuordnung: hier ist nichts zu entscheiden, nur etwas zu
        berichtigen. #}
-    <details class="w-full pl-15">
+    {# Eingerueckt bis zur Titelkante: Cover (64) plus Abstand (16). Das alte
+       `pl-15` stammte vom Cover der alten Zeile und sass 20 Pixel daneben. #}
+    <details class="pl-20">
       <summary class="inline-flex cursor-pointer list-none items-center gap-1.5
                       rounded py-1 text-xs text-soft hover:text-ink
                       hover:underline underline-offset-2">
@@ -193,7 +187,9 @@
        (Ticket 41). Der Block sitzt im selben `li` wie der Eintrag und beginnt
        an derselben Kante wie dessen Titel: ein eigenes `li` haette den
        Listen-Trenner zwischen ein Buch und seine eigene Frage gezogen. #}
-    <details class="w-full pl-15">
+    {# Eingerueckt bis zur Titelkante: Cover (64) plus Abstand (16). Das alte
+       `pl-15` stammte vom Cover der alten Zeile und sass 20 Pixel daneben. #}
+    <details class="pl-20">
       <summary class="inline-flex cursor-pointer list-none items-center gap-1.5
                       rounded py-1 text-xs font-medium text-danger
                       hover:underline underline-offset-2">

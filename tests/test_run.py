@@ -149,6 +149,27 @@ def test_output_survives_a_console_that_cannot_render_the_digest(
     assert narrow.kwargs == {"errors": "replace"}
 
 
+def test_a_run_fetches_the_images_of_its_own_pile(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Die Bilder des Stapels wurden nur beim Beurteilen des Rueckstands
+    geholt. Das Tor im Lauf beurteilt aber selbst — was es durchliess, stand
+    danach ohne Bild da, bis zufaellig jemand den Rueckstand beurteilte. Im
+    echten Stapel hatten deshalb neun von sechsundzwanzig Funden keins, und
+    alle neun stammten aus demselben Lauf."""
+    from ebook_watchlist import run as run_modul
+
+    gerufen: list[str] = []
+    monkeypatch.setattr(
+        run_modul,
+        "_fetch_suggestion_covers",
+        lambda store, profile, client: gerufen.append(profile.slug),
+    )
+
+    assert main([]) == EXIT_OK
+    assert gerufen == ["test"]
+
+
 def test_run_journal_records_every_run(data_dir: Path) -> None:
     main([])
     main([])

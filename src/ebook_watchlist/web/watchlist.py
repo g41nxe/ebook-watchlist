@@ -14,7 +14,7 @@ from ..config import Profile
 from ..deals import is_strong_deal
 from ..matching.bundles import looks_like_bundle
 from ..models import Availability, LinkOutcome, Observation
-from ..relations import RelationKind, labelled
+from ..relations import RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
 
@@ -25,7 +25,9 @@ RESTRICTIONS = ("library", "shop")
 #: Womit ein Eintrag die Watchlist verlässt. Dieselben zwei Arten, nach denen
 #: :func:`entries` filtert — und die Namen aus der einen Tabelle statt aus der
 #: Vorlage, in der sie bis hierher zum zweiten Mal standen.
-ABSCHLUSS: tuple[tuple[str, str], ...] = labelled(RelationKind.OWNED, RelationKind.DISMISSED)
+ABSCHLUSS: tuple[tuple[str, str], ...] = labelled_actions(
+    RelationKind.OWNED, RelationKind.DISMISSED
+)
 
 
 def _details(row) -> dict:
@@ -266,10 +268,14 @@ def entries(
     relations = [row for row in relations if row.book_id not in abgeschlossen]
     book_ids = [relation.book_id for relation in relations]
     latest = store.latest_by_book(profile_slug, book_ids)
+    # Drei Abfragen fuer die ganze Liste statt zwei je Zeile: neunzehn
+    # Eintraege kosteten so 9 der 25 ms, die diese Funktion braucht.
+    buecher = store.books_by_id(book_ids)
+    quellen = store.book_sources_of(book_ids)
 
     rows = []
     for relation in relations:
-        book = store.book(relation.book_id)
+        book = buecher.get(relation.book_id)
         if book is None:  # pragma: no cover - nur bei geloeschtem Buch
             continue
         details = _details(relation)
@@ -286,7 +292,7 @@ def entries(
                 candidates=_candidates(_details(link), link.url, abgelehnt=False),
                 rejected=_candidates(_details(link), link.url, abgelehnt=True),
             )
-            for link in store.book_sources(book.id)
+            for link in quellen.get(book.id, ())
         )
         rows.append(
             Entry(

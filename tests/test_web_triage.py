@@ -129,6 +129,44 @@ def test_a_decided_find_never_comes_back(client: TestClient, db: Store) -> None:
     assert "Der Kannibalenhügel" not in client.get("/vorschlaege").text
 
 
+def test_a_decided_find_takes_its_cover_along(client: TestClient, db: Store) -> None:
+    """Beim Hinzufuegen zur Watchlist ging das Titelbild verloren: der Stapel
+    rechnet den Dateinamen aus der Adresse aus, die Watchlist-Zeile fragt die
+    `book`-Zeile — und die kannte ihn nicht. Geholt wird nichts (ADR 3), das
+    Bild liegt laengst da; es bekommt nur einen Besitzer."""
+    from ebook_watchlist import paths
+    from ebook_watchlist.covers import file_name
+    from ebook_watchlist.models import Observation
+
+    url = "https://beam.invalid/media/9783104911854_200x200.jpg"
+    ordner = paths.covers_dir()
+    ordner.mkdir(parents=True, exist_ok=True)
+    (ordner / file_name(url)).write_bytes(b"x")
+    run_id = db.start_run("test", "cli", NOW)
+    db.append(
+        run_id,
+        "test",
+        [
+            Observation(
+                source="beam",
+                source_item_id="7",
+                title="Mit Bild",
+                author="Wer Auch Immer",
+                match_reason=MatchReason.GENRE_CATEGORY,
+                price_cents=399,
+                blurb="Ein Schiff, allein im Dunkeln.",
+                cover_url=url,
+            )
+        ],
+        NOW,
+    )
+
+    client.post("/vorschlaege/entscheiden", data={"kind": "watching", "keys": ["beam:7"]})
+
+    book_id = db.book_by_source_item("beam", "7")
+    assert db.book(book_id).cover_file == file_name(url)
+
+
 def test_dismissing_suppresses_the_book_at_every_source(client: TestClient, db: Store) -> None:
     """Die alte dismissed.yaml konnte nur "dieser Shop soll das nicht mehr
     zeigen" — dasselbe Buch bei der Onleihe wäre wiedergekommen (ADR 18)."""
@@ -191,11 +229,96 @@ def test_an_unknown_key_is_ignored_not_fatal(client: TestClient, db: Store) -> N
 
 
 def test_an_unknown_action_is_refused(client: TestClient, db: Store) -> None:
+    """400 statt 500: die Art ist falsch, nicht der Server. Und geprueft wird,
+    bevor irgendetwas entsteht — sonst blieb eine Buch-Zeile ohne Beziehung
+    zurueck."""
     found(db, item_id="7")
     response = client.post(
         "/vorschlaege/entscheiden", data={"kind": "verschlungen", "keys": ["beam:7"]}
     )
-    assert response.status_code == 500
+    assert response.status_code == 400
+    assert db.book_by_source_item("beam", "7") is None
+
+
+def test_the_title_leads_to_the_page_of_the_find(client: TestClient, db: Store) -> None:
+    """Eine Buchseite gibt es vor der Entscheidung nicht (ADR 18) — die
+    Fundseite schon, und dort steht die Begruendung des Tors."""
+    found(db, item_id="7", title="Der Kannibalenhügel")
+
+    body = client.get("/vorschlaege").text
+
+    assert 'href="/discovery/beam/7"' in body
+    marker = body.index('href="/discovery/beam/7"')
+    assert "Der Kannibalenhügel" in body[marker : marker + 400]
+
+
+def test_clicking_the_title_does_not_tick_the_checkbox(client: TestClient, db: Store) -> None:
+    """Die ganze Zeile bleibt das Label fuers Kaestchen — ein Link darin muss
+    das Umschalten unterdruecken, sonst waehlt ein Klick auf den Titel aus,
+    statt zur Fundseite zu fuehren."""
+    found(db, item_id="7")
+
+    body = client.get("/vorschlaege").text
+
+    start = body.index('href="/discovery/beam/7"')
+    assert "stopPropagation" in body[body.rindex("<a", 0, start) : body.index(">", start)]
+
+
+# --- eine Zeile, eine Entscheidung (Issue #9) -------------------------------
+
+
+def test_each_row_carries_the_three_decisions(client: TestClient, db: Store) -> None:
+    """Neben der Mehrfachauswahl: wer nur diesen einen Fund meint, soll ihn
+    nicht erst ankreuzen muessen."""
+    found(db, item_id="7", title="Der Kannibalenhügel")
+
+    body = client.get("/vorschlaege").text
+
+    assert 'hx-post="/vorschlaege/beam/7/entscheiden"' in body
+    for kind in ("dismissed", "owned", "watching"):
+        assert f'value="{kind}"' in body
+
+
+def test_a_row_decision_touches_exactly_one_find(client: TestClient, db: Store) -> None:
+    """Der Zeilenknopf betrifft immer genau einen Titel — angehakte Zeilen
+    bleiben unberuehrt, auch wenn sie im selben Formular stehen."""
+    found(db, item_id="7", title="Der Kannibalenhügel")
+    found(db, item_id="8", title="Ein anderer Fund")
+
+    client.post("/vorschlaege/beam/7/entscheiden", data={"kind": "owned"})
+
+    titel = {book.title for book in db.books()}
+    assert "Der Kannibalenhügel" in titel
+    assert "Ein anderer Fund" not in titel
+
+
+def test_a_row_decision_answers_with_nothing_so_the_row_disappears(
+    client: TestClient, db: Store
+) -> None:
+    """htmx tauscht die Zeile gegen die Antwort — leer heisst: weg damit."""
+    found(db, item_id="7")
+
+    response = client.post("/vorschlaege/beam/7/entscheiden", data={"kind": "dismissed"})
+
+    assert response.status_code == 200
+    assert response.text.strip() == ""
+
+
+def test_an_unknown_find_in_a_row_decision_is_refused(client: TestClient, db: Store) -> None:
+    response = client.post("/vorschlaege/beam/gibtsnicht/entscheiden", data={"kind": "owned"})
+
+    assert response.status_code == 404
+
+
+def test_the_selection_counter_recounts_when_a_row_vanishes(
+    client: TestClient, db: Store
+) -> None:
+    """Verschwindet eine angehakte Zeile, zaehlte der Zaehler sonst Geister."""
+    found(db, item_id="7")
+
+    body = client.get("/vorschlaege").text
+
+    assert "htmx:after-swap.window" in body
 
 
 # --- die Zusammenstellung für sich -----------------------------------------
@@ -308,6 +431,31 @@ def test_the_row_carries_a_cover_and_the_source_symbol(client: TestClient, db: S
     assert "ic-shop" in body
     assert "ic-tag" in body  # Schnäppchen-Abzeichen auf dem Cover, 3,99 €
     assert "text-amber" in body
+
+
+def test_a_long_title_is_shortened_in_the_row_and_whole_on_the_find_page(
+    client: TestClient, db: Store
+) -> None:
+    """Ein Viertel der Titel der Quelle traegt einen ganzen Werbesatz hinter
+    einem Strich. Ungekuerzt wuchs eine Zeile dadurch auf das Doppelte ihrer
+    Nachbarin, und die Liste liess sich nicht mehr ueberfliegen. Verloren geht
+    nichts: die Fundseite zeigt den ganzen Titel, einen Klick entfernt."""
+    langer_titel = (
+        "Schwarzweiß | Er ist ein kranker Mörder. "
+        "Und er hat es auf deine Tochter abgesehen."
+    )
+    found(db, item_id="lang", title=langer_titel)
+
+    liste = client.get("/vorschlaege").text
+    vor_dem_titel = liste[: liste.index(langer_titel)]
+    titelabsatz = vor_dem_titel[vor_dem_titel.rindex("<p ") :]
+    assert "line-clamp-2" in titelabsatz, titelabsatz
+
+    vor_dem_pitch = liste[: liste.index("Ein Schiff, allein im Dunkeln.")]
+    pitchabsatz = vor_dem_pitch[vor_dem_pitch.rindex("<p ") :]
+    assert "line-clamp-3" in pitchabsatz, pitchabsatz
+
+    assert langer_titel in client.get("/discovery/beam/lang").text
 
 
 def test_the_page_shows_ten_not_fifty(client: TestClient, db: Store) -> None:

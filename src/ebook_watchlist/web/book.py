@@ -15,7 +15,7 @@ from datetime import datetime
 from ..config import Profile
 from ..deals import is_strong_deal
 from ..models import Availability, MatchReason
-from ..rating import RatingUnavailable, load_leseprofil
+from ..rating import RatingUnavailable, confidence_label, load_leseprofil
 from ..ratings import (
     BY_CONVERSATION,
     BY_LIBRARY_READERS,
@@ -28,7 +28,7 @@ from ..ratings import (
     subject_of,
 )
 from ..reasons import short_why, why_shown
-from ..relations import RELATION_KINDS, RelationKind, labelled
+from ..relations import RELATION_KINDS, RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
 from .watchlist import SourceState
@@ -41,12 +41,19 @@ ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL, BY_LIBRAR
 
 #: Was die Leserin über ein Buch sagen kann, in der Reihenfolge, in der es auf
 #: der Seite steht. Mehrere gelten gleichzeitig — das ist der Normalfall.
-KINDS: tuple[tuple[str, str], ...] = labelled(
+#:
+#: Knopfwörter, nicht Zustandsnamen: hier stehen Knöpfe, und derselbe Knopf
+#: heißt im Stapel und auf der Fundseite genauso (ADR 29 mit Nachtrag). Was
+#: gerade gilt, sagt die Farbe des Knopfs, nicht sein Wort.
+#: Vorn die drei, die es auch im Stapel gibt, in derselben Reihenfolge;
+#: hinten die beiden Urteile nach dem Lesen. Sie beantworten eine andere
+#: Frage — nicht "was tue ich damit?", sondern "wie war es?".
+KINDS: tuple[tuple[str, str], ...] = labelled_actions(
     RelationKind.WATCHING,
     RelationKind.OWNED,
+    RelationKind.DISMISSED,
     RelationKind.LIKED,
     RelationKind.DISLIKED,
-    RelationKind.DISMISSED,
 )
 
 #: Herkuenfte, deren Urteil an einer *Ausgabe* haengt statt am Buch der
@@ -142,6 +149,11 @@ class Judgement:
     votes: int | None = None
 
     @property
+    def confidence_label(self) -> str:
+        """Worauf das Urteil ruht, in einem Wort, das fuer sich steht."""
+        return confidence_label(self.confidence)
+
+    @property
     def is_human(self) -> bool:
         return self.origin in HUMAN_ORIGINS
 
@@ -167,6 +179,11 @@ class Judgement:
             # worden sein.
             return False
         return current is not None and self.profile_version != current
+
+
+#: Wie viele Zeilen die Tabelle "Was beobachtet wurde" zeigt. Der Snapshot ist
+#: anhaengend (ADR 5) und wird nie kuerzer — die Seite muss es sein.
+HISTORY_ROWS = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,6 +265,22 @@ class Page:
         return bool(self.history)
 
     @property
+    def recent_history(self) -> tuple[Sighting, ...]:
+        """Die letzten Sichtungen — mehr zeigt die Tabelle nicht.
+
+        Ein Buch, das seit elf Laeufen dasselbe kostet, hatte elf Zeilen mit
+        elfmal demselben Betrag, und alles darunter rutschte aus dem Bild. Was
+        sich geaendert hat, steht ohnehin darueber in der Preisliste; hier geht
+        es um den letzten Stand, nicht um ein Archiv.
+        """
+        return self.history[:HISTORY_ROWS]
+
+    @property
+    def hidden_history(self) -> int:
+        """Wie viele aeltere Sichtungen die Tabelle nicht zeigt."""
+        return max(0, len(self.history) - HISTORY_ROWS)
+
+    @property
     def mismatch(self) -> tuple[SourceState, ...]:
         """Quellen, deren eigener Titel nicht nach demselben Buch klingt.
 
@@ -297,7 +330,9 @@ def _origin(seen) -> Origin | None:
     return None
 
 
-def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
+def _judgements(
+    store: Store, book, seen, *, isbn: str | None = None
+) -> tuple[Judgement, ...]:
     """Alle Urteile, die zu diesem Buch gehören — an drei Sorten Schlüssel.
 
     Was ein Mensch gesagt hat, hängt am Buch. Das Tor schlüsselt dagegen am
@@ -305,11 +340,15 @@ def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
     Buchzeile bekommen (ADR 18) — sein Urteil ist deshalb über die ISBN oder
     über die Produktnummern der Quellen zu finden, unter denen dieses Buch
     gesichtet wurde.
+
+    ``book`` darf ``None`` sein: die Discovery-Seite zeigt einen Fund, zu dem
+    es noch keine Buch-Zeile gibt. Dann bleibt genau das übrig, was am Fund
+    hängt — das Urteil des Tors und fremde Leserstimmen zur ISBN.
     """
-    of_book = book_subject(book.id)
-    subjects = {of_book}
-    if book.isbn:
-        subjects.add(f"isbn:{book.isbn}")
+    of_book = book_subject(book.id) if book is not None else None
+    subjects = {of_book} if of_book else set()
+    if isbn := (book.isbn if book is not None else isbn):
+        subjects.add(f"isbn:{isbn}")
     subjects.update(subject_of(observation) for observation in seen)
 
     rows = store.ratings_for(subjects)
