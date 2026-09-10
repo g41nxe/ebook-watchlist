@@ -259,11 +259,17 @@ def _ask_the_library(store: Store, client: HttpClient, profile: Profile) -> None
     print(f"DNB: {len(offen)} gefragt, {gefunden} beantwortet")
 
 
-def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
+def _apply_gate(store: Store, deltas, profile: Profile, now: datetime, sources=()):
     """Entdeckungen gegen das Leseprofil pruefen (ADR 19).
 
     Ohne Schluessel gibt es kein Tor — dann bleibt alles unbewertet und wird
     gezeigt. Das ist der Zustand vor Ticket 12 und ausdruecklich erlaubt.
+
+    Die Quellen gehen mit, damit das Tor den ganzen Klappentext holen kann,
+    bevor es urteilt: die Kachel einer Trefferliste traegt im Median 197
+    Zeichen und ist zu 85 % abgeschnitten, die Detailseite rund das Zehnfache.
+    Es sind hoechstens so viele Anfragen wie das Budget Buecher zulaesst, und
+    es sind dieselben, die der Rueckstands-Schritt sonst spaeter stellt.
     """
     rater = build_rater(profile.rating_model)
     if rater is None:
@@ -283,6 +289,11 @@ def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
         budget=profile.rating_budget,
         batch_size=profile.rating_batch_size,
         now=now,
+        vervollstaendigen=(
+            lambda observations: _with_full_blurbs(store, profile, observations, sources)
+        )
+        if sources
+        else None,
     )
     if report.held_back or report.over_budget:
         # Fuer das Log. Was die Leserin sehen muss, steht im Digest — stderr
@@ -894,7 +905,7 @@ def _run(
     # Das Tor sitzt hinter dem Snapshot: ein Ausfall kostet ein Urteil, nie
     # Geschichte. Und hinter der Preisregel: ein Buch zu bewerten, das ohnehin
     # niemand zu sehen bekommt, waere Verschwendung (ADR 19).
-    deltas, gate_report = _apply_gate(store, deltas, profile, started_at)
+    deltas, gate_report = _apply_gate(store, deltas, profile, started_at, sources)
 
     # Erst hinter dem Tor, denn erst dann steht fest, was im Stapel bleibt.
     # Bis hierher wurden Bilder fuer Funde nur beim Beurteilen des Rueckstands
