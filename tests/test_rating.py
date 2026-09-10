@@ -199,13 +199,13 @@ def test_the_gate_judges_the_whole_blurb_not_the_teaser(store: Store) -> None:
     rater = StubRater(rating(4))
     geholt: list[str] = []
 
-    def vervollstaendigen(observations):
+    def voller_text(observations):
         geholt.extend(o.key for o in observations)
         return [ganz]
 
     gate.apply(
         [first_seen(angeriss)], store=store, rater=rater, profile_version=1,
-        threshold=3, budget=10, now=NOW, vervollstaendigen=vervollstaendigen,
+        threshold=3, budget=10, now=NOW, full_blurbs=voller_text,
     )
 
     assert geholt == [angeriss.key]

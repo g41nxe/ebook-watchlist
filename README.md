@@ -21,7 +21,7 @@ viele Zeilen dort stehen, entscheidest du. Der Zustand des Werkzeugs steht
 woanders und drängt sich nicht auf.
 
 <p align="center">
-  <img src="docs/bilder/startseite.png" width="800"
+  <img src="docs/bilder/startseite.jpg" width="800"
        alt="Die Startseite: eine Statuszeile mit dem letzten Lauf, darunter was jetzt zu haben ist und was zu entscheiden ist">
 </p>
 

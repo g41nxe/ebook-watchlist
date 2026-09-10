@@ -289,7 +289,7 @@ def _apply_gate(store: Store, deltas, profile: Profile, now: datetime, sources=(
         budget=profile.rating_budget,
         batch_size=profile.rating_batch_size,
         now=now,
-        vervollstaendigen=(
+        full_blurbs=(
             lambda observations: _with_full_blurbs(store, profile, observations, sources)
         )
         if sources
@@ -450,6 +450,13 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
             continue
         try:
             item = source.item(observation.source_item_id)
+        except RateLimited:
+            # 429 heisst Halt, und zwar fuer alles Weitere — dieselbe Regel wie
+            # bei den Titelbildern und bei der DNB (ADR 7). Seit das Tor die
+            # Texte mitten im Lauf nachlaedt, waeren es sonst vierzig
+            # abgelehnte Anfragen hintereinander an dieselbe Quelle.
+            print("Klappentexte: die Quelle drosselt — Rest übersprungen", file=sys.stderr)
+            break
         except Exception as exc:  # noqa: BLE001 - ein Buch, nicht der Stapel
             print(f"  {observation.title[:44]}: {type(exc).__name__}", file=sys.stderr)
             continue

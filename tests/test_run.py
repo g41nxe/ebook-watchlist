@@ -184,6 +184,31 @@ def test_run_journal_records_every_run(data_dir: Path) -> None:
         assert all(run.trigger == "cli" for run in runs)
 
 
+def test_the_gate_gets_the_sources_from_the_run(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Beide Enden sind geprueft — das Tor ruft den Rueckruf, das Nachladen
+    legt keinen Rundgang an. Dazwischen liegt die Weitergabe der Quellen, und
+    faellt sie beim naechsten Umbau weg, urteilt das Tor stillschweigend
+    wieder auf dem Anriss."""
+    from ebook_watchlist import gate
+    from ebook_watchlist import run as run_modul
+
+    gereicht: list[bool] = []
+    echtes_tor = gate.apply
+
+    def beobachtet(deltas, **kwargs):
+        gereicht.append(kwargs.get("full_blurbs") is not None)
+        return echtes_tor(deltas, **kwargs)
+
+    monkeypatch.setattr(run_modul.gate, "apply", beobachtet)
+    # Ohne Bewerter kommt `_apply_gate` gar nicht bis zum Tor.
+    monkeypatch.setattr(run_modul, "build_rater", lambda modell: object())
+
+    assert main([]) == EXIT_OK
+    assert gereicht == [True]
+
+
 def test_reloading_a_blurb_does_not_look_like_a_run(data_dir: Path) -> None:
     """Der Klappentext wird jetzt mitten im Lauf nachgeladen, und dabei
     entsteht eine eigene Zeile im Journal — die Beobachtung muss ja an einem
