@@ -300,5 +300,13 @@ def decide(
             resolved_at=now,
             reason="aus der Triage",
         )
+        # Das Titelbild liegt schon auf der Platte — geholt wurde es fuer den
+        # Stapel, und geholt wird hier nichts (ADR 3). Ohne diese Zeile verlor
+        # ein Fund beim Uebergang zur Watchlist sein Bild: der Stapel rechnet
+        # den Dateinamen aus der Adresse aus, die Watchlist-Zeile fragt die
+        # `book`-Zeile — und die kannte ihn nicht.
+        bild = _cover_file(observation)
+        if bild and not book.cover_file:
+            store.set_cover(book.id, bild)
         decided += 1
     return decided

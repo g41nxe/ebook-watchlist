@@ -7,47 +7,51 @@
 {# Ein Fund, zu dem noch nichts gesagt wurde. Kein Buch, also keine
    Beziehungen, keine Notiz, kein "Prüfen bei" — was es davon gibt, entsteht
    erst mit der Entscheidung (ADR 18). Hier steht dafür, was der Stapel
-   verschweigt: die Begründung des Bewertungstors und der Preisverlauf. #}
-<p class="mb-3 text-sm text-soft">
-  <a href="/vorschlaege" class="text-accent underline decoration-accent/30
-     underline-offset-2 hover:decoration-accent">Vorschläge</a>
-  <span aria-hidden="true">·</span> Fund
+   verschweigt: die ausgeschriebene Begründung des Bewertungstors.
+
+   Aufbau wie die Buchseite, Reihenfolge wie in der Zeile: Titel, Autor,
+   darunter Quelle und Anlass. #}
+<p class="mb-4 text-sm">
+  <a href="/vorschlaege" class="text-soft hover:text-ink">← Vorschläge</a>
 </p>
 
-<div class="flex flex-wrap items-start gap-4">
-  {{ cover(page.title, page.cover_file, false, page.deal) }}
+<div class="flex flex-wrap items-start gap-5">
+  {{ cover(page.title, page.cover_file, false, page.deal, strecken=true, gross=true) }}
 
-  <div class="min-w-0 flex-1">
-    {% if page.origin %}
-    <p class="mb-1">
-      <span class="rounded px-1.5 py-0.5 text-xs font-medium
-                   {{ 'bg-accent/15 text-accent' if page.origin.author_driven
-                      else 'bg-amber/15 text-amber' }}">{{ page.origin.short }}</span>
-    </p>
-    {% endif %}
-
-    <h1 class="font-serif text-2xl font-semibold tracking-tight">
-      {% if page.url %}
-      <a href="{{ page.url }}" target="_blank" rel="noopener"
-         title="{{ page.source_label }}: dort ansehen"
-         class="hover:underline underline-offset-2">{{ page.title }}</a>
-      {% else %}{{ page.title }}{% endif %}
-    </h1>
-
+  {# Mindestens so hoch wie das Cover und mittig gesetzt — dieselbe Regel wie
+     auf der Buchseite, damit ein karger Fund das Cover nicht überragen lässt. #}
+  <div class="flex min-h-36 min-w-0 flex-1 flex-col justify-center">
+    <h1 class="font-serif text-2xl font-semibold tracking-tight">{{ page.title }}</h1>
     <p class="mt-0.5 text-soft">{{ page.author or "unbekannt" }}
       {%- if page.series %} · {{ page.series }}{% endif %}</p>
 
-    {% if page.origin %}
-    <p class="mt-1 text-sm text-soft">{{ page.origin.why }}</p>
-    {% endif %}
+    {# Quelle und Anlass in einer Zeile unter dem Autor, wie in der Buchzeile:
+       das Symbol sagt, *wo* es zu holen ist, die Pille, *warum* es hier steht.
+       Der Satz "neu im Thema Psychothriller" stand daneben und sagte dasselbe
+       ein zweites Mal. #}
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      {% if page.url %}
+      <a href="{{ page.url }}" target="_blank" rel="noopener"
+         title="{{ page.source_label }}: dort ansehen"
+         class="{{ 'text-accent' if page.source_category == 'library' else 'text-amber' }}
+                hover:opacity-70">
+        <svg class="i"><use href="#ic-{{ 'lib' if page.source_category == 'library'
+                                         else 'shop' }}"/></svg></a>
+      {% endif %}
+      {% if page.origin %}
+      <span class="rounded px-1.5 py-0.5 text-xs font-medium
+                   {{ 'bg-accent/15 text-accent' if page.origin.author_driven
+                      else 'bg-amber/15 text-amber' }}">{{ page.origin.short }}</span>
+      {% endif %}
+    </div>
   </div>
 
-  <div class="flex shrink-0 flex-col items-end leading-tight">
+  {# Der Preis steht groß und allein: eine Quellen-Kachel wie auf der Buchseite
+     wäre hier eine Kachel für eine einzige Quelle — ein Fund kennt nur die,
+     die ihn gefunden hat. #}
+  <div class="shrink-0 self-center">
     <span class="text-2xl font-semibold tabular-nums {{ 'text-amber' if page.deal }}">
       {{ page.price or "—" }}</span>
-    {% if page.isbn %}
-    <span class="mt-1 text-xs text-soft tabular-nums">ISBN {{ page.isbn }}</span>
-    {% endif %}
   </div>
 </div>
 
@@ -80,7 +84,7 @@
 <h2 class="mt-8 mb-2 border-b border-rule pb-2 text-sm font-semibold text-soft">Urteil</h2>
 <ul class="space-y-3">
   {% for judgement in machine + fremd %}
-  <li class="rounded-lg border border-rule bg-card px-4 py-3">
+  <li>
     <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <span class="flex items-center gap-0.5 text-gold">
         {% for value in range(1, 6) %}
@@ -105,28 +109,4 @@
   {% endfor %}
 </ul>
 {% endif %}
-
-{# Der Preisverlauf. Der Snapshot ist anhängend (ADR 5) — auch ein Fund ohne
-   Buch-Zeile hat eine Geschichte, sobald ihn zwei Läufe gesehen haben. #}
-<h2 class="mt-8 mb-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  {{ page.seen_count }} {{ 'Beobachtung' if page.seen_count == 1 else 'Beobachtungen' }}
-  bei {{ page.source_label }}</h2>
-<div class="overflow-x-auto">
-  <table class="min-w-xl border-collapse text-sm">
-    <tbody>
-      {% for sighting in page.history %}
-      <tr class="border-b border-hair">
-        <td class="py-2 pr-4 whitespace-nowrap text-soft tabular-nums">
-          {{ sighting.when.strftime("%d.%m.%Y %H:%M") if sighting.when else "—" }}</td>
-        <td class="py-2 pr-4 whitespace-nowrap tabular-nums
-                   {{ 'text-amber' if sighting.deal }}">{{ sighting.price or "—" }}</td>
-        <td class="py-2 pr-4 whitespace-nowrap text-soft">{{ sighting.availability or "" }}</td>
-        {# Ein Titelwechsel unter derselben Nummer heißt: die Quelle hat die
-           Ausgabe getauscht. Das gehört gesagt, nicht verschwiegen (ADR 18). #}
-        <td class="py-2 text-soft">{{ sighting.other_title or "" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
 {% endblock %}

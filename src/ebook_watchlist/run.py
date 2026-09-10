@@ -895,6 +895,13 @@ def _run(
     # Geschichte. Und hinter der Preisregel: ein Buch zu bewerten, das ohnehin
     # niemand zu sehen bekommt, waere Verschwendung (ADR 19).
     deltas, gate_report = _apply_gate(store, deltas, profile, started_at)
+
+    # Erst hinter dem Tor, denn erst dann steht fest, was im Stapel bleibt.
+    # Bis hierher wurden Bilder fuer Funde nur beim Beurteilen des Rueckstands
+    # geholt — das Tor im Lauf beurteilt aber selbst, und was es durchliess,
+    # stand danach ohne Bild da.
+    _fetch_suggestion_covers(store, profile, client)
+
     for source_name, interest_id in context.swept:
         store.mark_interest_seeded(interest_id, source_name, now=started_at)
 

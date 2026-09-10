@@ -129,6 +129,44 @@ def test_a_decided_find_never_comes_back(client: TestClient, db: Store) -> None:
     assert "Der Kannibalenhügel" not in client.get("/vorschlaege").text
 
 
+def test_a_decided_find_takes_its_cover_along(client: TestClient, db: Store) -> None:
+    """Beim Hinzufuegen zur Watchlist ging das Titelbild verloren: der Stapel
+    rechnet den Dateinamen aus der Adresse aus, die Watchlist-Zeile fragt die
+    `book`-Zeile — und die kannte ihn nicht. Geholt wird nichts (ADR 3), das
+    Bild liegt laengst da; es bekommt nur einen Besitzer."""
+    from ebook_watchlist import paths
+    from ebook_watchlist.covers import file_name
+    from ebook_watchlist.models import Observation
+
+    url = "https://beam.invalid/media/9783104911854_200x200.jpg"
+    ordner = paths.covers_dir()
+    ordner.mkdir(parents=True, exist_ok=True)
+    (ordner / file_name(url)).write_bytes(b"x")
+    run_id = db.start_run("test", "cli", NOW)
+    db.append(
+        run_id,
+        "test",
+        [
+            Observation(
+                source="beam",
+                source_item_id="7",
+                title="Mit Bild",
+                author="Wer Auch Immer",
+                match_reason=MatchReason.GENRE_CATEGORY,
+                price_cents=399,
+                blurb="Ein Schiff, allein im Dunkeln.",
+                cover_url=url,
+            )
+        ],
+        NOW,
+    )
+
+    client.post("/vorschlaege/entscheiden", data={"kind": "watching", "keys": ["beam:7"]})
+
+    book_id = db.book_by_source_item("beam", "7")
+    assert db.book(book_id).cover_file == file_name(url)
+
+
 def test_dismissing_suppresses_the_book_at_every_source(client: TestClient, db: Store) -> None:
     """Die alte dismissed.yaml konnte nur "dieser Shop soll das nicht mehr
     zeigen" — dasselbe Buch bei der Onleihe wäre wiedergekommen (ADR 18)."""

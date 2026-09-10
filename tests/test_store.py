@@ -81,6 +81,29 @@ def test_the_history_of_a_find_does_not_cross_sources_or_profiles(tmp_path: Path
     assert [row.price_cents for row in seen] == [100]
 
 
+def test_a_book_made_from_a_find_keeps_the_finds_history(tmp_path: Path) -> None:
+    """Die Beobachtungen einer Entdeckung tragen keine ``book_id`` — es gab ja
+    noch kein Buch (ADR 18). Wird eines daraus, hing seine ganze Vorgeschichte
+    in der Luft: die Buchseite sagte "Noch nichts gesehen" und die Kachel der
+    Quelle zeigte keinen Preis, obwohl elf Beobachtungen dazu dastanden.
+
+    Nachgeschlagen statt nachgetragen: der Snapshot wird nie umgeschrieben
+    (ADR 5), und die Verknuepfung zur Quelle sagt ohnehin, welche Nummer
+    dieses Buch dort traegt."""
+    store = Store(tmp_path / "snapshots.db")
+    for price in (1299, 999):
+        run_id = store.start_run("p", "cli", NOW)
+        store.append(run_id, "p", [observation("beam", "1", price)], NOW)
+    book = store.find_or_create_book(isbn=None, title="beam/1", author=None, now=NOW)
+    store.put_book_source(
+        book.id, "beam", outcome="confirmed", source_item_id="1", resolved_at=NOW
+    )
+
+    seen = store.observations_for_book("p", book.id)
+
+    assert [row.price_cents for row in seen] == [999, 1299]
+
+
 def test_a_find_nobody_ever_saw_has_no_history(tmp_path: Path) -> None:
     store = Store(tmp_path / "snapshots.db")
     assert store.observations_for_item("p", "beam", "nope") == []

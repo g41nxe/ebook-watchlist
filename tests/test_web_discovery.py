@@ -113,16 +113,35 @@ def test_the_gate_reasoning_is_readable_here_and_only_here(
     assert client.get("/vorschlaege").text.count("Täterstimme ohne Reue") == 0
 
 
-def test_the_price_history_of_the_find_is_shown(client: TestClient, db: Store) -> None:
-    """Der Snapshot ist anhängend — ein über mehrere Läufe gesehener Fund hat
-    eine Geschichte, auch ohne Buch-Zeile."""
+def test_the_page_shows_todays_price_not_every_run(client: TestClient, db: Store) -> None:
+    """Der Snapshot ist anhängend, also steht derselbe Fund dort einmal je Lauf
+    — bei einem Titel, an dem sich nichts ändert, waren das elf Zeilen mit
+    elfmal demselben Betrag. Gezeigt wird, was er heute kostet."""
     for tage, preis in ((3, 1299), (2, 1199), (1, 999)):
         fund(db, price=preis, when=NOW - timedelta(days=tage))
 
     body = client.get("/discovery/beam/7").text
 
-    for preis in ("12,99 €", "11,99 €", "9,99 €"):
-        assert preis in body, preis
+    assert "9,99 €" in body
+    assert "12,99 €" not in body
+    assert "Beobachtung" not in body
+
+
+def test_the_head_names_title_author_and_source_and_nothing_else(
+    client: TestClient, db: Store
+) -> None:
+    """Dieselbe Reihenfolge wie in der Zeile: Titel, Autor, darunter Quelle und
+    Anlass. Die ISBN stand zwischen Preis und Titel und gehört keiner
+    Entscheidung — sie fällt weg. Und der Anlass steht einmal, als Pille: der
+    Satz "neu im Thema Psychothriller" sagte dasselbe ein zweites Mal."""
+    fund(db, isbn="9783104911854")
+
+    body = client.get("/discovery/beam/7").text
+
+    assert "9783104911854" not in body
+    assert "neu im Thema" not in body
+    assert body.index("Der Kannibalenhügel") < body.index("Viktor Sauer")
+    assert body.index("Viktor Sauer") < body.index("Psychothriller")
 
 
 def test_the_page_leaves_out_what_a_find_does_not_have(client: TestClient, db: Store) -> None:
@@ -151,7 +170,9 @@ def test_a_find_that_became_a_book_leads_to_its_book_page(
     assert response.headers["location"] == f"/book/{book.id}"
 
 
-def test_the_title_links_to_the_source(client: TestClient, db: Store) -> None:
+def test_the_page_links_to_the_source(client: TestClient, db: Store) -> None:
+    """Der Weg zur Quelle haengt am Symbol unter dem Autor, wie in der Zeile —
+    der Titel bleibt Text, wie auf der Buchseite."""
     fund(db)
 
     body = client.get("/discovery/beam/7").text

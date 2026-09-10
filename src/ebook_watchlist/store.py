@@ -19,10 +19,12 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    and_,
     create_engine,
     delete,
     event,
     func,
+    or_,
     select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
@@ -630,14 +632,34 @@ class Store:
         Der Snapshot ist anhaengend (ADR 5), also *ist* das die Geschichte —
         sie muss nicht gesondert gefuehrt werden. Die Grenze schuetzt die Seite
         vor einem Buch, das seit Jahren jeden Tag beobachtet wird.
+
+        Gefragt wird nach zweierlei: nach der ``book_id`` und nach den Nummern,
+        unter denen die Quellen dieses Buch fuehren. Eine Entdeckung wird ohne
+        ``book_id`` beobachtet — es gibt ja noch kein Buch (ADR 18) —, und wird
+        spaeter eines daraus, haengt ihre ganze Vorgeschichte sonst in der
+        Luft: die Buchseite sagte "Noch nichts gesehen" und die Kachel der
+        Quelle nannte keinen Preis, obwohl elf Beobachtungen dazu dastanden.
+        Nachgeschlagen statt nachgetragen — der Snapshot wird nicht
+        umgeschrieben.
         """
         with self.session() as session:
+            paare = session.execute(
+                select(BookSourceRow.source, BookSourceRow.source_item_id).where(
+                    BookSourceRow.book_id == book_id,
+                    BookSourceRow.source_item_id.is_not(None),
+                )
+            ).all()
+            wege = [ObservationRow.book_id == book_id]
+            wege += [
+                and_(
+                    ObservationRow.source == source,
+                    ObservationRow.source_item_id == item_id,
+                )
+                for source, item_id in paare
+            ]
             stmt = (
                 select(ObservationRow)
-                .where(
-                    ObservationRow.profile_slug == profile_slug,
-                    ObservationRow.book_id == book_id,
-                )
+                .where(ObservationRow.profile_slug == profile_slug, or_(*wege))
                 .order_by(ObservationRow.id.desc())
                 .limit(limit)
             )
