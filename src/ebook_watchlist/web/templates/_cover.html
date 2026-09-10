@@ -27,7 +27,10 @@
    Deshalb erst ab `sm` mitwachsen, davor das feste Mass von 96 auf 144. #}
 {% set hoehe = "h-36 self-start sm:h-auto sm:min-h-36 sm:self-stretch" %}
 {% elif strecken %}
-{% set hoehe = "min-h-16 self-stretch" %}
+{# 96 px Mindesthoehe zu 64 px Breite: genau 2:3, das Mass eines Buchruecken.
+   Mit 64 blieb bei einer kurzen Zeile — Titel, Autor, Symbole — ein
+   quadratisches Bild stehen, und ein quadratisches Cover gibt es nicht. #}
+{% set hoehe = "min-h-24 self-stretch" %}
 {% else %}
 {% set hoehe = "h-36" if gross else "h-16" %}
 {% endif %}

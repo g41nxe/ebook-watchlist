@@ -15,14 +15,19 @@
 
 {% macro kopf(titel, autor=none, reihe=none, cover_file=none, borrowable=false,
               deal=false, pille=none, kacheln=none, herkunft=none) %}
-<div class="flex flex-wrap items-start gap-5">
+{# Auf dem Telefon steht das Cover ueber dem Text, nicht daneben: neben den
+   96 Pixeln des Covers blieben dem Titel 211, und "Er — Er ist hier. Er
+   beobachtet dich. Er will dich zerstoeren." brach darin in vier Zeilen.
+   Untereinander hat er die vollen 327. #}
+<div class="flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:gap-5">
   {{ cover(titel, cover_file, borrowable, deal, strecken=true, gross=true) }}
 
-  {# Mindestens so hoch wie das Cover und mittig gesetzt: wie viel hier steht,
-     haengt davon ab, was das Buch mitbringt — Reihe, Anlass und Quellen sind
-     alle wahlweise. Ohne das Mindestmass ragte das Cover bei einem kargen
+  {# Ab `sm` mindestens so hoch wie das Cover und mittig gesetzt: wie viel hier
+     steht, haengt davon ab, was das Buch mitbringt — Reihe, Anlass und Quellen
+     sind alle wahlweise. Ohne das Mindestmass ragte das Cover bei einem kargen
      Buch unten heraus. #}
-  <div class="flex min-h-36 min-w-0 flex-1 flex-col justify-center">
+  <div class="flex w-full min-w-0 flex-col sm:min-h-36 sm:w-auto sm:flex-1
+              sm:justify-center">
     <h1 class="font-serif text-2xl font-semibold tracking-tight">{{ titel }}</h1>
     <p class="mt-0.5 text-soft">{{ autor or "unbekannt" }}
       {%- if reihe %} · {{ reihe }}{% endif %}</p>

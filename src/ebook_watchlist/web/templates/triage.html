@@ -5,6 +5,7 @@
 {% from "_buchzeile.html" import zeile %}
 {% from "_entscheidungen.html" import entscheidungen %}
 {% from "_zustandsknopf.html" import zustandsknopf %}
+{% from "_pille.html" import pille %}
 
 {% block content %}
 <h1 class="mb-1 font-serif text-2xl font-semibold tracking-tight">Vorschläge</h1>
@@ -60,19 +61,13 @@
 
 <div class="mb-4 flex flex-wrap items-center gap-2 border-b border-rule pb-3">
   {# Filter als Verweise, nicht als Formularfelder: ein Filter ist eine Ansicht,
-     keine Eingabe — und so bleibt er verlinkbar. #}
-  <a href="/vorschlaege"
-     class="tun inline-flex h-7 items-center rounded-full border px-3 text-xs
-            {{ 'border-accent bg-accent/10 text-accent' if not anlass
-               else 'border-rule text-soft hover:border-soft hover:text-ink' }}">alle</a>
-  <a href="/vorschlaege?anlass=profile_author"
-     class="tun inline-flex h-7 items-center rounded-full border px-3 text-xs
-            {{ 'border-accent bg-accent/10 text-accent' if anlass == 'profile_author'
-               else 'border-rule text-soft hover:border-soft hover:text-ink' }}">Autor:innen</a>
-  <a href="/vorschlaege?anlass=genre_category"
-     class="tun inline-flex h-7 items-center rounded-full border px-3 text-xs
-            {{ 'border-amber bg-amber/10 text-amber' if anlass == 'genre_category'
-               else 'border-rule text-soft hover:border-soft hover:text-ink' }}">Themen</a>
+     keine Eingabe — und so bleibt er verlinkbar. Dieselbe Pille wie
+     "Pruefen bei" auf der Buchseite. #}
+  {{ pille("alle", url="/vorschlaege", aktiv=not anlass) }}
+  {{ pille("Autor:innen", url="/vorschlaege?anlass=profile_author",
+           aktiv=anlass == "profile_author") }}
+  {{ pille("Themen", url="/vorschlaege?anlass=genre_category",
+           aktiv=anlass == "genre_category", ton="amber") }}
 
   <span class="ml-auto text-xs text-soft">
     {{ pile.total }} offen{% if pile.items | length < pile.total %},
@@ -164,6 +159,7 @@
          preis=item.price,
          aktionen=aktionen,
          auswahl=auswahl,
+         aktionen_gestapelt=true,
          umschliessend=true) }}
   </li>
   {% endfor %}

@@ -9,6 +9,7 @@
 {% from "_urteil.html" import urteil %}
 {% from "_zustandsknopf.html" import zustandsknopf %}
 {% from "_sterne.html" import sterne %}
+{% from "_pille.html" import pille %}
 
 {% block content %}
 <p class="mb-4 text-sm">
@@ -17,7 +18,7 @@
 
 {# Anlass als Pille, an der Stelle, an der die ISBN stand: die ging in keine
    Entscheidung ein, die Pille sagt, warum dieses Buch ueberhaupt da ist. #}
-{% set pille %}
+{% set anlass_pille %}
 {% if page.origin %}
 <span class="rounded px-1.5 py-0.5 text-xs font-medium
              {{ 'bg-accent/15 text-accent' if page.origin.author_driven
@@ -37,7 +38,7 @@
      ersatz=state.label,
      deal=sichtung.deal if sichtung else false,
      wann=sichtung.when if sichtung else none,
-     pille=pille if loop.first else none) }}
+     pille=anlass_pille if loop.first else none) }}
 {% endfor %}
 {% endset %}
 
@@ -156,19 +157,13 @@
    Angaben zu diesem Buch. #}
 <div class="mt-4 flex flex-wrap items-center gap-2">
   <span class="text-xs text-soft">Prüfen bei</span>
+  {# Bernstein, nicht gruen: gruen gehoert im ganzen Theme der Bibliothek, und
+     "nur Bibliothek" ist hier eine von drei Einstellungen — in Gruen sah die
+     Reihe aus, als waere eine davon die Bibliothek selbst. #}
   {% for value, label in (("", "allen Quellen"), ("library", "nur Bibliothek"), ("shop", "nur Shop")) %}
   <form method="post" action="/book/{{ page.book_id }}/restrict">
     <input type="hidden" name="restrict" value="{{ value }}">
-    <button type="submit"
-            {# Bernstein, nicht gruen: gruen gehoert im ganzen Theme der
-               Bibliothek, und "nur Bibliothek" ist hier eine von drei
-               Einstellungen — in Gruen sah die Reihe aus, als waere eine
-               davon die Bibliothek selbst. #}
-            class="tun inline-flex h-7 items-center rounded-full border px-3 text-xs transition
-                   {{ 'border-amber bg-amber/10 text-amber'
-                      if (page.restrict or '') == value
-                      else 'border-rule text-soft hover:border-amber hover:text-amber' }}">
-      {{ label }}</button>
+    {{ pille(label, aktiv=(page.restrict or "") == value, ton="amber") }}
   </form>
   {% endfor %}
 </div>
@@ -235,27 +230,12 @@
   Ein Durchschnitt aus fremden Stimmen — keine Aussage darüber, ob das Buch zu
   dir passt. Dafür stehen die Sterne oben.
 </p>
-<ul class="space-y-3">
+{# Dieselbe Zeile wie beim Urteil des Tors: Sterne, Zahl, woher — nur ohne
+   Rahmen und ohne "Quelle:" am rechten Rand, wo sie auf dem Telefon allein
+   in einer eigenen Zeile stand. #}
+<ul class="space-y-4">
   {% for stimme in fremd %}
-  <li class="rounded-lg border border-rule bg-card px-4 py-3">
-    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      {# Eine Aussage, eine Schriftgroesse: "2 von 5" stand vorher in drei
-         verschiedenen (16, 12 und 14 px) und las sich dadurch wie drei
-         Angaben. Hervorgehoben wird nur die Zahl. #}
-      <span class="text-sm tabular-nums text-soft">
-        <span class="font-semibold text-ink">{{ stimme.stars | sterne }}</span>&nbsp;/&nbsp;5</span>
-      {% if stimme.votes %}
-      <span class="rounded bg-hair px-1.5 py-0.5 text-xs text-soft tabular-nums">
-        {{ stimme.votes }} Stimmen</span>
-      {% endif %}
-      {% if stimme.when %}
-      <span class="text-xs text-soft">{{ stimme.when.strftime("%d.%m.%Y") }}</span>
-      {% endif %}
-      {# Woher die Stimme kommt, steht am rechten Rand: es ist die Herkunft
-         der Angabe und nicht Teil der Aussage. #}
-      <span class="ml-auto text-xs text-soft">Quelle: {{ stimme.label }}</span>
-    </div>
-  </li>
+  <li>{{ urteil(stimme) }}</li>
   {% endfor %}
 </ul>
 {% endif %}
@@ -313,7 +293,10 @@
 <ul class="divide-y divide-hair">
   {% for state in page.sources %}
   {% set library = state.category == "library" %}
-  <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-sm">
+  {# Auf dem Telefon untereinander: nebeneinander brach jede Zeile an einer
+     anderen Stelle um, und "dort ansehen" stand allein am rechten Rand. #}
+  <li class="flex flex-col gap-1 py-2.5 text-sm
+             sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-3 sm:gap-y-1">
     <span class="flex w-28 shrink-0 items-center gap-1.5
                  {{ 'text-accent' if library else 'text-amber' }}">
       <svg class="i"><use href="#ic-{{ 'lib' if library else 'shop' }}"/></svg>
@@ -328,8 +311,8 @@
     {% endif %}
     {% if state.url %}
     <a href="{{ state.url }}" target="_blank" rel="noopener"
-       class="ml-auto text-accent underline decoration-accent/30 underline-offset-2
-              hover:decoration-accent">dort ansehen</a>
+       class="text-accent underline decoration-accent/30 underline-offset-2
+              hover:decoration-accent sm:ml-auto">dort ansehen</a>
     {% endif %}
   </li>
   {% endfor %}

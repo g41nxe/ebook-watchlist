@@ -15,14 +15,16 @@
    wörtlich dasteht.
 #}
 {% macro zustandsknopf(kind, label, zeichen=none, aktiv=false, wert=none, aus_wenn=none) %}
-{# `px-2` auf dem Telefon: mit `px-3` messen die drei Knoepfe des Stapels
-   zusammen 342 px und brauchen bei 327 px Platz zwei Reihen.
+{# Engeres Polster und kleinere Schrift auf dem Telefon: mit `px-3` und
+   `text-sm` messen die drei Knoepfe des Stapels zusammen 346 px und brauchen
+   bei 327 px Platz zwei Reihen. Mit `px-2` und `text-xs` sind es 276.
    `aus_wenn` traegt die Alpine-Bedingung, unter der der Knopf ruht — der
    Stapel schaltet ihn aus, solange nichts angehakt ist. #}
 <button type="submit"{% if wert %} name="kind" value="{{ wert }}"{% endif %}
         {%- if aus_wenn %} :disabled="{{ aus_wenn }}"{% endif %}
         class="tun inline-flex h-9 items-center justify-center gap-1.5 rounded border
-               px-2 text-sm font-medium transition disabled:opacity-40 sm:px-3
+               px-2 text-xs font-medium transition disabled:opacity-40
+               sm:px-3 sm:text-sm
                {% if aktiv %}border-accent bg-accent/10 text-accent
                {% elif kind in ('dismissed', 'disliked') %}border-rule text-soft hover:border-danger hover:text-danger
                {% elif kind in ('owned', 'liked') %}border-rule text-ink hover:border-amber hover:text-amber

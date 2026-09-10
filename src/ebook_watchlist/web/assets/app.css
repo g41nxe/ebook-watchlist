@@ -272,6 +272,11 @@
   /* Wo mit dem Finger bedient wird, gelten 44 px als Mindestmass. */
   @media (hover: none) {
     .tun { min-height: 44px }
+    /* Ausser bei den Filterpillen: sie sind Ansichten, keine Handlungen, und
+       drei davon nebeneinander mit 44 px Hoehe sahen auf dem Telefon aus wie
+       ein Block statt wie eine Reihe. 36 px bleiben mit dem Finger gut zu
+       treffen. Steht nach `.tun`, weil beide gleich stark sind. */
+    .pille { min-height: 36px }
   }
 }
 

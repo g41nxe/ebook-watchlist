@@ -31,7 +31,9 @@
     oben=none,
     oben_farbe="text-soft",
     preis=none,
+    preis_inhalt=none,
     aktionen=none,
+    aktionen_gestapelt=false,
     auswahl=none,
     umschliessend=false
 ) %}
@@ -108,8 +110,13 @@
      die letzte Reihe. Rechtsbuendig, nicht eingerueckt: eingerueckt stand der
      Betrag unter dem Cover und die Zeichen mitten im Text — mit dem rechten
      Rand als Kante liegen sie ueber allen Zeilen hinweg an derselben Stelle. #}
+  {# Ab `sm` steht der Betrag ueber den Handlungen. Auf dem Telefon haengt es
+     daran, wie viel dort steht: drei Zeichen verdienen eine eigene Zeile
+     (`aktionen_gestapelt`), ein einzelnes Menue nicht — die Watchlist gab
+     sonst drei rechtsbuendige Zeilen fuer einen Betrag und drei Punkte aus. #}
   <div class="flex w-full items-center justify-end gap-3
-              sm:w-auto sm:flex-col sm:items-end sm:gap-2.5 sm:self-center">
+              sm:w-auto sm:flex-col sm:items-end sm:gap-2.5 sm:self-center
+              {{ 'flex-col items-end gap-2.5' if aktionen_gestapelt }}">
     {% if preis is not none or oben %}
     {# Der Betrag steht mittig ueber der Reihe der Zeichen, nicht rechts
        ausgerichtet: die Reihe ist 92 Pixel breit, die Preisspalte 96 — rechts
@@ -119,8 +126,19 @@
     <div class="flex shrink-0 items-baseline gap-2 leading-tight
                 sm:w-24 sm:flex-col sm:items-center sm:gap-0">
       <span class="h-4 text-xs {{ oben_farbe }}">{{ oben or "" }}</span>
+      {# `preis_inhalt` fuer den einen Fall, in dem der Betrag mehr ist als eine
+         Zahl: waehrend ein enger Lauf nachsieht, steht der zuletzt bekannte
+         gedaempft da, mit einem Zeichen daneben (Ticket 51). Die Spalte bleibt
+         dieselbe, damit die Betraege ueber alle Zeilen ausgerichtet sind. #}
+      {# `.strip()`, weil ein leerer Steckplatz aus `{% raw %}{% set %}{% endraw %}`
+         eine Zeichenkette aus Leerzeichen ist und damit wahr — ohne die
+         Pruefung verschwaende der Betrag, sobald eine Seite den Platz
+         vorsorglich anlegt. #}
+      {% if preis_inhalt and preis_inhalt.strip() %}{{ preis_inhalt }}
+      {% else %}
       <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if deal }}">
         {{ preis or "—" }}</span>
+      {% endif %}
     </div>
     {% endif %}
     {% if aktionen %}<div class="shrink-0">{{ aktionen }}</div>{% endif %}

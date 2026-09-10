@@ -22,7 +22,7 @@
 </p>
 
 {# Anlass als Pille, an derselben Stelle wie auf der Buchseite. #}
-{% set pille %}
+{% set anlass_pille %}
 {% if page.origin %}
 <span class="rounded px-1.5 py-0.5 text-xs font-medium
              {{ 'bg-accent/15 text-accent' if page.origin.author_driven
@@ -41,7 +41,7 @@
      verfuegbarkeit=page.availability,
      deal=page.deal,
      wann=page.last_seen,
-     pille=pille) }}
+     pille=anlass_pille) }}
 {% endset %}
 
 {{ kopf(
