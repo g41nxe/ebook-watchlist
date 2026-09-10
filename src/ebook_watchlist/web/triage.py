@@ -43,7 +43,9 @@ ACTIONS: tuple[tuple[str, str], ...] = labelled_actions(
 ICONS: dict[str, str] = {
     "dismissed": "ic-x",
     "owned": "ic-check",
-    "watching": "ic-search",  # weiter danach Ausschau halten
+    # Fernglas statt Lupe: die Lupe sagt "suchen", das Fernglas "im Blick
+    # behalten" — und genau das ist der Unterschied zur Suche im Shop.
+    "watching": "ic-binoculars",
 }
 
 #: Wie viele Zeilen eine Seite zeigt. Der Rückstand ist dreistellig, und eine

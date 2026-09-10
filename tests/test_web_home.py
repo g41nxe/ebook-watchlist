@@ -284,7 +284,13 @@ def test_each_decision_has_its_own_distinct_icon(client: TestClient, db: Store) 
 
     zeichen = {icon_of(kind) for kind in ("dismissed", "owned", "watching")}
     assert len(zeichen) == 3, f"nicht drei verschiedene Zeichen: {zeichen}"
-    assert icon_of("watching") == "ic-search"  # weiter danach Ausschau halten
+    # Fernglas, nicht Lupe: die Lupe heisst ueberall "suchen", und gesucht
+    # wird hier gerade nicht — beobachtet wird von weitem.
+    assert icon_of("watching") == "ic-binoculars"
+    # Ein Verweis auf ein Zeichen, das es im Sprite nicht gibt, bleibt leer
+    # und faellt niemandem auf ausser der Leserin.
+    for zeichen_name in zeichen:
+        assert f'<symbol id="{zeichen_name}"' in body
 
 
 def test_the_owned_button_is_coloured_like_a_purchase_not_like_the_library(

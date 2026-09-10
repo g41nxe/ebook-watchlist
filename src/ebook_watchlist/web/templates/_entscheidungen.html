@@ -1,0 +1,43 @@
+{# Die drei Entscheidungen zu einem Fund: Verwerfen · Hab ich · Beobachten.
+
+   Ein Element für alle Stellen, an denen entschieden wird — Stapel,
+   Startseite, Fundseite —, damit dieselbe Handlung überall gleich aussieht
+   und gleich heißt (ADR 29 trennt dafür Zustandsname und Knopfwort).
+
+   Nur Zeichen, kein Wort: in einer Liste kosten drei beschriftete Knöpfe ein
+   Drittel der Zeilenbreite. Das Wort erscheint beim Überfahren und bei
+   Tastaturfokus — als eigene Blase, nicht als `title`: der native Hinweis
+   kommt erst nach einer Sekunde und auf dem Telefon gar nicht.
+
+   `type="button"`, sonst schickt der Knopf ein umschließendes Formular ab.
+   `stopPropagation`, weil die Zeile im Stapel das Label eines Kästchens ist.
+   htmx statt Absenden, weil die Stapelseite *ein* Formular ist und ein
+   Absende-Knopf darin die angehakte Auswahl schickte statt seiner Zeile.
+#}
+{% macro entscheidungen(source, item_id, actions, icons, ziel="closest li") %}
+<span class="flex items-center gap-1">
+  {% for kind, label in actions %}
+  <span class="group relative flex">
+    <button type="button" aria-label="{{ label }}"
+            onclick="event.stopPropagation()"
+            hx-post="/vorschlaege/{{ source }}/{{ item_id }}/entscheiden"
+            hx-vals='{"kind": "{{ kind }}"}'
+            hx-target="{{ ziel }}" hx-swap="outerHTML"
+            class="tun inline-flex h-7 w-7 items-center justify-center rounded border
+                   transition
+                   {% if kind == 'dismissed' %}border-rule text-soft hover:border-danger hover:text-danger
+                   {% elif kind == 'owned' %}border-rule text-soft hover:border-amber hover:text-amber
+                   {% else %}border-rule text-soft hover:border-accent hover:text-accent{% endif %}">
+      <svg class="i"><use href="#{{ icons[kind] }}"/></svg>
+    </button>
+    {# Die Blase hängt über dem Knopf und nimmt keine Klicks an, damit sie
+       dem Knopf darunter nicht im Weg steht. #}
+    <span class="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1
+                 -translate-x-1/2 rounded bg-ink px-1.5 py-0.5 text-xs
+                 whitespace-nowrap text-paper opacity-0 transition
+                 group-hover:opacity-100 group-focus-within:opacity-100">
+      {{ label }}</span>
+  </span>
+  {% endfor %}
+</span>
+{% endmacro %}
