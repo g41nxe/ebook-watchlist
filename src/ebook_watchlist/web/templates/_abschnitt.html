@@ -1,0 +1,18 @@
+{# Eine Abschnitts-Überschrift, auf Buch- und Fundseite dieselbe (Issue #9).
+
+   Sie besteht aus drei Dingen: einem Zeichen, einem Wort und einer Linie
+   darunter. Grün ist die Voreinstellung — es ist die Farbe der Anwendung, und
+   ein Abschnitt ist eine Ansage; grau bleibt, was Fremdes berichtet
+   ("Was andere Leser:innen sagen").
+
+   Wer rechts noch etwas hineinhängen will (einen Stand, einen Knopf), ruft das
+   Element mit `{% raw %}{% call %}{% endraw %}` auf — der Inhalt landet hinter
+   dem Wort und schiebt sich mit `ml-auto` an den rechten Rand.
+#}
+{% macro abschnitt(titel, zeichen=none, ton="text-accent") %}
+<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm
+           font-semibold {{ ton }}">
+  {% if zeichen %}<svg class="i"><use href="#{{ zeichen }}"/></svg>{% endif %}
+  {{ titel }}{% if caller %}{{ caller() }}{% endif %}
+</h2>
+{% endmacro %}

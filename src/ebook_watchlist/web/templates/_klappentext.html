@@ -1,0 +1,21 @@
+{# Der Klappentext, auf Buch- und Fundseite derselbe (Issue #9).
+
+   Verkürzt, aufklappbar — dasselbe Muster, das der Shop selbst benutzt, nur
+   ohne dass sein Knopf im gespeicherten Text landet (Ticket 40). `details`
+   ohne Skript: zugeklappt zeigt es nur das `summary`, und darin steht der Text
+   mit einer Zeilenbegrenzung.
+
+   `max-w-prose`: über die vollen 720 px liefen rund 95 Zeichen je Zeile, und
+   ab etwa 75 verliert das Auge den Zeilenanfang.
+#}
+{% macro klappentext(text) %}
+{% if text %}
+<details class="klappentext mt-6">
+  <summary class="list-none">
+    <p class="max-w-prose text-sm leading-relaxed">{{ text }}</p>
+    <span class="mehr mt-1 inline-block cursor-pointer text-xs text-accent underline
+                 decoration-accent/30 underline-offset-2 hover:decoration-accent"></span>
+  </summary>
+</details>
+{% endif %}
+{% endmacro %}

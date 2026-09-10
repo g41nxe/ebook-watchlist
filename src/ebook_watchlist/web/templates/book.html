@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ page.title }} — Buchfink{% endblock %}
 
+{% from "_abschnitt.html" import abschnitt %}
+{% from "_klappentext.html" import klappentext %}
+
 {% block content %}
 <p class="mb-4 text-sm">
   <a href="/watchlist" class="text-soft hover:text-ink">← Watchlist</a>
@@ -170,19 +173,8 @@
 {% endif %}
 
 {% if page.blurb %}
-{# Verkuerzt, aufklappbar — dasselbe Muster, das der Shop selbst benutzt, nur
-   ohne dass sein Knopf im gespeicherten Text landet (Ticket 40). `details`
-   ohne Skript: zugeklappt zeigt es nur das `summary`, und darin steht der
-   Text mit einer Zeilenbegrenzung. #}
-<details class="klappentext mt-6">
-  <summary class="list-none">
-    {# `max-w-prose`: ueber die vollen 720 px liefen rund 95 Zeichen je Zeile,
-       und ab etwa 75 verliert das Auge den Zeilenanfang. #}
-    <p class="max-w-prose text-sm leading-relaxed">{{ page.blurb }}</p>
-    <span class="mehr mt-1 inline-block cursor-pointer text-xs text-accent underline
-                 decoration-accent/30 underline-offset-2 hover:decoration-accent"></span>
-  </summary>
-</details>
+{{ abschnitt("Klappentext", "ic-doc") }}
+{{ klappentext(page.blurb) }}
 {% endif %}
 
 {% if page.watching %}
@@ -230,9 +222,7 @@
 </details>
 {% endif %}
 
-<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-accent">
-  <svg class="i text-accent"><use href="#ic-star"/></svg>Wie gut das passt
-</h2>
+{{ abschnitt("Wie gut das passt", "ic-star") }}
 
 {# Sterne der Leserin und Sterne einer Maschine stehen bewusst getrennt und
    sehen bewusst verschieden aus: eine 4 von ihr ist eine Tatsache, eine 4 vom
@@ -314,10 +304,9 @@
 {% endif %}
 
 {% if fremd %}
-<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm
-           font-semibold text-soft">
-  <svg class="i"><use href="#ic-lib"/></svg>Was andere Leser:innen sagen
-</h2>
+{# Grau, nicht gruen: hier berichtet Fremdes, und das ist keine Ansage der
+   Anwendung. #}
+{{ abschnitt("Was andere Leser:innen sagen", "ic-lib", ton="text-soft") }}
 <p class="mb-3 max-w-xl text-xs text-soft">
   Ein Durchschnitt aus fremden Stimmen — keine Aussage darüber, ob das Buch zu
   dir passt. Dafür stehen die Sterne oben.
@@ -350,9 +339,7 @@
 {# Der enge Lauf sitzt an der Ueberschrift der Geschichte, nicht unter den
    Kacheln: er schreibt eine neue Zeile in genau diese Tabelle. Ein Symbol
    statt eines Wortes — was es tut, sagt der Tooltip (Ticket 51). #}
-<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm
-           font-semibold text-accent">
-  Was beobachtet wurde
+{% call abschnitt("Was beobachtet wurde", "ic-clock") %}
   <span class="ml-auto">{% include "_book_status.html" %}</span>
   {% if page.watching %}
   <form hx-post="/book/{{ page.book_id }}/nachsehen"
@@ -362,7 +349,7 @@
       <svg class="i"><use href="#ic-refresh"/></svg></button>
   </form>
   {% endif %}
-</h2>
+{% endcall %}
 {% if not page.has_history %}
 <p class="py-2 text-sm text-soft italic">
   Noch nichts gesehen — der nächste Lauf trägt hier ein.
@@ -427,9 +414,7 @@
 </table>
 </div>
 {% endif %}
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-accent">
-  Was du dazu sagst
-</h2>
+{{ abschnitt("Was du dazu sagst", "ic-tag") }}
 <div class="flex flex-wrap gap-2">
   {% for kind, label in kinds %}
   {% set on = kind in page.active_kinds %}

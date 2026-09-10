@@ -2,6 +2,8 @@
 {% block title %}{{ page.title }} — Buchfink{% endblock %}
 
 {% from "_cover.html" import cover %}
+{% from "_abschnitt.html" import abschnitt %}
+{% from "_klappentext.html" import klappentext %}
 
 {% block content %}
 {# Ein Fund, zu dem noch nichts gesagt wurde. Kein Buch, also keine
@@ -57,8 +59,13 @@
 
 {# Die drei Entscheidungen, dieselben wie im Stapel und auf der Startseite.
    Hier mit Wort: eine Detailseite hat Platz, und wer hier gelandet ist, ist
-   sich gerade unsicher. #}
-<form method="post" action="/vorschlaege/entscheiden" class="mt-5 flex flex-wrap gap-2">
+   sich gerade unsicher.
+
+   Unter derselben Ueberschrift wie auf der Buchseite, aber weiter oben: dort
+   ist die Frage eine unter vielen, hier ist sie der Grund, warum die Seite
+   ueberhaupt offen ist. #}
+{{ abschnitt("Was du dazu sagst", "ic-tag") }}
+<form method="post" action="/vorschlaege/entscheiden" class="flex flex-wrap gap-2">
   <input type="hidden" name="keys" value="{{ page.key }}">
   {% for kind, label in actions %}
   <button type="submit" name="kind" value="{{ kind }}"
@@ -72,8 +79,8 @@
 </form>
 
 {% if page.blurb %}
-<h2 class="mt-8 mb-2 border-b border-rule pb-2 text-sm font-semibold text-soft">Klappentext</h2>
-<p class="max-w-prose text-sm text-ink/80">{{ page.blurb }}</p>
+{{ abschnitt("Klappentext", "ic-doc") }}
+{{ klappentext(page.blurb) }}
 {% endif %}
 
 {# Das Urteil des Tors, ausgeschrieben. Gespeichert und nie gezeigt war es für
@@ -81,7 +88,7 @@
 {% set machine = page.judgements | rejectattr("is_human") | rejectattr("is_foreign") | list %}
 {% set fremd = page.judgements | selectattr("is_foreign") | list %}
 {% if machine or fremd %}
-<h2 class="mt-8 mb-2 border-b border-rule pb-2 text-sm font-semibold text-soft">Urteil</h2>
+{{ abschnitt("Wie gut das passt", "ic-star") }}
 <ul class="space-y-3">
   {% for judgement in machine + fremd %}
   <li>
