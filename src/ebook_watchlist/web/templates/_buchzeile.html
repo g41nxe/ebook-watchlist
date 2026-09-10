@@ -46,7 +46,7 @@
      punkt aus. Der Steckplatz wird dafuer umschlossen, damit jede Seite die
      Ausrichtung erbt, statt sie einzeln zu setzen. #}
   {% if auswahl %}<span class="flex shrink-0 self-center">{{ auswahl }}</span>{% endif %}
-  {{ cover(titel, cover_file, borrowable, deal) }}
+  {{ cover(titel, cover_file, borrowable, deal, strecken=true) }}
 
   {# Anlass, Titel, Autor — die schmalere der beiden Textspalten.
 
@@ -97,11 +97,22 @@
 
   {# Preis und Handlungen sitzen auf halber Hoehe der Zeile, nicht an ihrem
      Fuss: die Textspalten sind unterschiedlich hoch, unten ausgerichtet
-     haengt der Betrag mal am Pitch, mal am Autor. #}
-  <div class="ml-15 flex w-full items-center gap-3 sm:ml-0 sm:w-auto sm:self-center">
+     haengt der Betrag mal am Pitch, mal am Autor.
+
+     Die Zeichen stehen unter dem Preis, nicht neben ihm: nebeneinander kostet
+     die Zone 136 Pixel Zeilenbreite, untereinander 96 — die Breite des
+     Preises, die ohnehin gebraucht wird. Auf dem Telefon bleiben sie
+     nebeneinander, dort ist die Zeile ohnehin gestapelt. #}
+  <div class="ml-15 flex w-full items-center gap-3
+              sm:ml-0 sm:w-auto sm:flex-col sm:items-end sm:gap-2.5 sm:self-center">
     {% if preis is not none or oben %}
+    {# Der Betrag steht mittig ueber der Reihe der Zeichen, nicht rechts
+       ausgerichtet: die Reihe ist 92 Pixel breit, die Preisspalte 96 — rechts
+       gesetzt sass er ueber dem letzten Zeichen statt ueber allen dreien.
+       Die feste Breite bleibt, damit die Betraege ueber alle Zeilen hinweg
+       dieselbe Spalte teilen. #}
     <div class="flex shrink-0 items-baseline gap-2 leading-tight
-                sm:w-24 sm:flex-col sm:items-end sm:gap-0">
+                sm:w-24 sm:flex-col sm:items-center sm:gap-0">
       <span class="h-4 text-xs {{ oben_farbe }}">{{ oben or "" }}</span>
       <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if deal }}">
         {{ preis or "—" }}</span>
