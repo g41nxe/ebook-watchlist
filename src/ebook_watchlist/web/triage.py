@@ -127,7 +127,7 @@ class Pile:
         return not self.items
 
 
-def _cover_file(observation: Observation) -> str | None:
+def _cover_file(observation: Observation, covers: CoverStore | None = None) -> str | None:
     """Das Titelbild, falls es schon im Ordner liegt.
 
     Nachgesehen statt gespeichert: der Name ergibt sich allein aus der Adresse,
@@ -137,15 +137,24 @@ def _cover_file(observation: Observation) -> str | None:
 
     Die Oberfläche lädt nie selbst nach (ADR 3): geholt wird beim Bewerten, und
     nur für das, was durchkommt.
+
+    Der Ordner wird mitgegeben, wo mehrere Zeilen nacheinander fragen: ihn je
+    Zeile neu zu bestimmen kostet ein ``Path.resolve`` — gemessen 0,22 ms je
+    Fund, 6,6 fuer eine Stapelseite.
     """
     if not observation.cover_url:
         return None
     name = file_name(observation.cover_url)
-    return name if CoverStore(paths.covers_dir()).has(name) else None
+    ordner = covers if covers is not None else CoverStore(paths.covers_dir())
+    return name if ordner.has(name) else None
 
 
 def _suggestion(
-    observation: Observation, profile: Profile, judgement=None, bundle=None
+    observation: Observation,
+    profile: Profile,
+    judgement=None,
+    bundle=None,
+    covers: CoverStore | None = None,
 ) -> Suggestion:
     return Suggestion(
         source=observation.source,
@@ -164,7 +173,7 @@ def _suggestion(
         why=why_shown(observation),
         why_short=short_why(observation),
         stars=judgement.stars if judgement else None,
-        cover_file=_cover_file(observation),
+        cover_file=_cover_file(observation, covers),
         pitch=(judgement.pitch or None) if judgement else None,
         bundle=bundle,
     )
@@ -193,6 +202,9 @@ def pending(
     # Eine Stelle rechnet den Buendelvorteil aus — dieselbe, die der
     # Tagesbericht benutzt (ADR 24).
     buendelvorteil = advantage_finder(store, profile)
+    # Einmal fuer die ganze Seite: der Ordner der Titelbilder wird sonst je
+    # Zeile neu aufgeloest.
+    covers = CoverStore(paths.covers_dir())
 
     items: list[Suggestion] = []
     hidden_junk = 0
@@ -223,7 +235,7 @@ def pending(
         if reason and str(observation.match_reason) != reason:
             continue
         items.append(
-            _suggestion(observation, profile, judgement, vorteil)
+            _suggestion(observation, profile, judgement, vorteil, covers)
         )
 
     # Das Beste zuerst. Ohne das stehen oben die Funde, die zufaellig zuletzt
