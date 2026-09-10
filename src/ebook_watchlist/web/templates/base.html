@@ -73,9 +73,9 @@
        Zwei Groessen, zwei Zeichen; wer eines aendert, muss ans andere
        denken.
 
-       Zeichen und Name fuehren auf die Startseite. Ein eigener Punkt "Start"
-       waere der fuenfte in der Reihe unten — und die bricht damit auf 375 px
-       um, siehe die Rechnung dort (Issue #5). #}
+       Zeichen und Name fuehren auf die Startseite. Der Punkt "Home" tut das
+       auch: das Zeichen weiss man erst nach dem ersten Klick, und die Reihe
+       traegt vier Punkte, seit die Uebersicht aus dem Menue ist. #}
     <a href="/" title="Zur Startseite" class="shrink-0">
       <img src="{{ url_for('static', path='buchfink.png') }}?v={{ asset_version }}"
            alt="" width="40" height="40" class="h-7 w-7 sm:h-10 sm:w-10"></a>
@@ -100,7 +100,7 @@
     <nav class="flex flex-1 flex-wrap justify-end gap-1 text-sm
                 sm:ml-auto sm:flex-none sm:justify-start">
       {% set pfad = request.url.path %}
-      {% for ziel, name in (("/uebersicht", "Übersicht"), ("/watchlist", "Watchlist"),
+      {% for ziel, name in (("/", "Home"), ("/watchlist", "Watchlist"),
                             ("/vorschlaege", "Vorschläge"), ("/profil", "Profil")) %}
       {# Wo man steht, stand bisher nirgends — vier gleich aussehende Links.
          `aria-current` sagt es der Vorlesehilfe, die Farbe dem Auge. #}

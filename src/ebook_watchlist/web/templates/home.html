@@ -61,7 +61,12 @@
   <svg class="i"><use href="#ic-clock"/></svg>
   {# Zahl und Wort auf einer Zeile: ein Umbruch dazwischen macht aus
      "vor 2 Tagen" zwei Stücke, die niemand als eines liest oder findet. #}
-  <span class="{{ 'font-medium text-amber' if view.status.stale }}">zuletzt geprüft {{ view.status.when }}{% if view.status.stale %} — vor {{ view.status.age_days }} {{ 'Tag' if view.status.age_days == 1 else 'Tagen' }}{% endif %}</span>
+  {# Der Zeitpunkt fuehrt auf die Uebersicht: dort stehen die Laeufe, aus
+     denen er kommt. Seit sie nicht mehr im Menue steht, ist das ihr Weg —
+     ein Zustand der Quellen ist nichts, was man taeglich aufschlaegt. #}
+  <a href="/uebersicht" title="Laeufe, Quellen und Tagesberichte"
+     class="{{ 'font-medium text-amber' if view.status.stale }} underline
+            decoration-rule underline-offset-2 hover:decoration-current">zuletzt geprüft {{ view.status.when }}{% if view.status.stale %} — vor {{ view.status.age_days }} {{ 'Tag' if view.status.age_days == 1 else 'Tagen' }}{% endif %}</a>
   <span aria-hidden="true">·</span>
   {% if view.status.failed %}
   <span class="font-medium text-danger">letzter Lauf fehlgeschlagen</span>

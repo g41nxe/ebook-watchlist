@@ -191,7 +191,7 @@ def test_a_broken_configuration_is_a_page_not_a_traceback_on_post(
 
 @pytest.mark.parametrize(
     ("pfad", "name"),
-    [("/uebersicht", "Übersicht"), ("/watchlist", "Watchlist"), ("/vorschlaege", "Vorschläge"),
+    [("/", "Home"), ("/watchlist", "Watchlist"), ("/vorschlaege", "Vorschläge"),
      ("/profil", "Profil")],
 )
 def test_the_navigation_marks_the_page_you_are_on(

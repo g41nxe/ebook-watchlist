@@ -430,14 +430,18 @@ def test_the_dashboard_lives_at_uebersicht(client: TestClient) -> None:
     assert "Noch kein Lauf verzeichnet" in response.text
 
 
-def test_the_navigation_points_at_the_new_address_and_has_no_start_entry(
+def test_the_navigation_leads_home_and_the_dashboard_stays_reachable(
     client: TestClient,
 ) -> None:
-    """Fünf Punkte brechen auf 375 px um — der Weg nach Hause ist das Zeichen."""
-    body = client.get("/uebersicht").text
+    """Vier Punkte, und einer davon fuehrt nach Hause: die Uebersicht ist ein
+    Zustand der Quellen, den man nicht taeglich aufschlaegt. Verschwinden darf
+    sie deswegen nicht — der Zeitpunkt auf der Startseite fuehrt hin, denn
+    dort stehen die Laeufe, aus denen er kommt."""
+    body = client.get("/watchlist").text
 
-    assert 'href="/uebersicht"' in body
-    assert ">Start<" not in body
+    assert ">Home<" in body
+    assert ">Übersicht<" not in body
+    assert 'href="/uebersicht"' in client.get("/").text
 
 
 def test_the_emblem_and_the_name_lead_home(client: TestClient) -> None:
