@@ -54,6 +54,38 @@ def test_unknown_items_are_simply_absent(tmp_path: Path) -> None:
     assert store.latest_observations("p", [("beam", "nope")]) == {}
 
 
+def test_the_whole_history_of_a_find_newest_first(tmp_path: Path) -> None:
+    """Ein Fund hat keine Buch-Zeile (ADR 18) — seine Geschichte haengt am
+    Paar aus Quelle und Nummer, nicht an einer ``book_id``."""
+    store = Store(tmp_path / "snapshots.db")
+    for price in (1299, 1199, 999):
+        run_id = store.start_run("p", "cli", NOW)
+        store.append(run_id, "p", [observation("beam", "1", price)], NOW)
+
+    seen = store.observations_for_item("p", "beam", "1")
+
+    assert [row.price_cents for row in seen] == [999, 1199, 1299]
+
+
+def test_the_history_of_a_find_does_not_cross_sources_or_profiles(tmp_path: Path) -> None:
+    store = Store(tmp_path / "snapshots.db")
+    run_id = store.start_run("p", "cli", NOW)
+    store.append(
+        run_id, "p", [observation("beam", "1", 100), observation("voebb", "1", 200)], NOW
+    )
+    other = store.start_run("other", "cli", NOW)
+    store.append(other, "other", [observation("beam", "1", 999)], NOW)
+
+    seen = store.observations_for_item("p", "beam", "1")
+
+    assert [row.price_cents for row in seen] == [100]
+
+
+def test_a_find_nobody_ever_saw_has_no_history(tmp_path: Path) -> None:
+    store = Store(tmp_path / "snapshots.db")
+    assert store.observations_for_item("p", "beam", "nope") == []
+
+
 def test_last_finished_run_ignores_the_current_one(tmp_path: Path) -> None:
     store = Store(tmp_path / "snapshots.db")
     first = store.start_run("p", "cli", NOW)

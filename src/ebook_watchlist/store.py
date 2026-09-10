@@ -643,6 +643,29 @@ class Store:
             )
             return [_to_observation(row) for row in session.scalars(stmt)]
 
+    def observations_for_item(
+        self, profile_slug: str, source: str, source_item_id: str, limit: int = 200
+    ) -> list[Observation]:
+        """Die ganze Geschichte eines Funds, neueste zuerst.
+
+        Dasselbe wie :meth:`observations_for_book`, nur am Paar aus Quelle und
+        Nummer statt an einer ``book_id`` — ein Fund hat keine Buch-Zeile,
+        solange nichts ueber ihn gesagt wurde (ADR 18). Die Grenze schuetzt
+        vor einem Titel, der seit Monaten in jedem Lauf auftaucht.
+        """
+        with self.session() as session:
+            stmt = (
+                select(ObservationRow)
+                .where(
+                    ObservationRow.profile_slug == profile_slug,
+                    ObservationRow.source == source,
+                    ObservationRow.source_item_id == source_item_id,
+                )
+                .order_by(ObservationRow.id.desc())
+                .limit(limit)
+            )
+            return [_to_observation(row) for row in session.scalars(stmt)]
+
     def latest_discoveries(
         self, profile_slug: str, limit: int = 500
     ) -> list[Observation]:

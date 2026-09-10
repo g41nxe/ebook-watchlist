@@ -297,7 +297,9 @@ def _origin(seen) -> Origin | None:
     return None
 
 
-def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
+def _judgements(
+    store: Store, book, seen, *, isbn: str | None = None
+) -> tuple[Judgement, ...]:
     """Alle Urteile, die zu diesem Buch gehören — an drei Sorten Schlüssel.
 
     Was ein Mensch gesagt hat, hängt am Buch. Das Tor schlüsselt dagegen am
@@ -305,11 +307,15 @@ def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
     Buchzeile bekommen (ADR 18) — sein Urteil ist deshalb über die ISBN oder
     über die Produktnummern der Quellen zu finden, unter denen dieses Buch
     gesichtet wurde.
+
+    ``book`` darf ``None`` sein: die Discovery-Seite zeigt einen Fund, zu dem
+    es noch keine Buch-Zeile gibt. Dann bleibt genau das übrig, was am Fund
+    hängt — das Urteil des Tors und fremde Leserstimmen zur ISBN.
     """
-    of_book = book_subject(book.id)
-    subjects = {of_book}
-    if book.isbn:
-        subjects.add(f"isbn:{book.isbn}")
+    of_book = book_subject(book.id) if book is not None else None
+    subjects = {of_book} if of_book else set()
+    if isbn := (book.isbn if book is not None else isbn):
+        subjects.add(f"isbn:{isbn}")
     subjects.update(subject_of(observation) for observation in seen)
 
     rows = store.ratings_for(subjects)

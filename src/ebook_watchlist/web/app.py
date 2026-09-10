@@ -30,7 +30,7 @@ from ..models import LinkOutcome
 from ..relations import RelationKind
 from ..sources import registry
 from ..store import RunRow, Store
-from . import assignments, book, home, profile_page, triage, watchlist
+from . import assignments, book, discovery, home, profile_page, triage, watchlist
 from .recheck import Rechecker
 from .runs import RunLauncher, journal_status
 
@@ -667,6 +667,36 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return RedirectResponse(f"/book/{book_id}", status_code=303)
+
+    # --- Die Seite zu einem Fund (Issue #9) ---------------------------------
+
+    @app.get("/discovery/{source}/{item_id}", response_class=HTMLResponse)
+    def discovery_page(request: Request, source: str, item_id: str) -> HTMLResponse:
+        """Die Buchseite ohne das, was es vor einer Entscheidung nicht gibt.
+
+        Sobald der Fund eine Buch-Zeile hat, ist die Buchseite die reichere
+        Ansicht — dann fuehrt diese Adresse dorthin, statt eine aermere
+        Fassung desselben Buchs zu zeigen.
+        """
+        profile = load_profile()
+        store = _store_for(paths.db_path())
+        book_id = store.book_by_source_item(source, item_id)
+        if book_id is not None:
+            return RedirectResponse(f"/book/{book_id}", status_code=303)
+        page = discovery.build(store, profile, source, item_id)
+        if page is None:
+            raise HTTPException(status_code=404, detail="kein solcher Fund")
+        return TEMPLATES.TemplateResponse(
+            request,
+            "discovery.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "page": page,
+                "actions": triage.ACTIONS,
+                "icons": home.ICONS,
+            },
+        )
 
     # --- Triage (Ticket 08) -------------------------------------------------
 
