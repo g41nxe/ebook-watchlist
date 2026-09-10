@@ -349,7 +349,7 @@ def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: S
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "vom Werkzeug bewertet" in body
+    assert "Übereinstimmung mit Leseprofil" in body
     assert "Zu weich." in body
 
 
@@ -458,7 +458,7 @@ def test_the_gates_verdict_on_a_discovery_without_an_isbn_is_found_too(
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "vom Werkzeug bewertet" in body
+    assert "Übereinstimmung mit Leseprofil" in body
     assert "Achse D: isoliert." in body
     assert "noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
 

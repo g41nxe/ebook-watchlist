@@ -121,7 +121,7 @@ def test_the_row_menu_holds_the_endings_not_the_setting(
 
     # Handlungswoerter, nicht Zustandsnamen: im Menue *tut* man etwas (Issue #5).
     assert "Hab ich" in body
-    assert "Verwerfen" in body
+    assert "Ausschließen" in body
     assert "Prüfen bei" not in body
 
 

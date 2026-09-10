@@ -49,8 +49,8 @@ so "watched until you bought it" stays visible.
 | `watching` | in Beobachtung | Beobachten | on the Watchlist, reported at every price |
 | `owned` | im Besitz | Hab ich | the reader has it |
 | `liked` | Mag ich | Mag ich | read, and it was good |
-| `disliked` | Kein Interesse | Kein Interesse | read, and it was not |
-| `dismissed` | Ausgeschlossen | Verwerfen | never offer this book again |
+| `disliked` | Kein Interesse | Doof | read, and it was not |
+| `dismissed` | Ausgeschlossen | Ausschließen | never offer this book again |
 
 Two words, two questions (ADR 29 and its addendum). The state name answers
 "what is this book to me?" and stands where books are described in prose — the

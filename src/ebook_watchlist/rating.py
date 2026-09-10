@@ -63,6 +63,21 @@ DEFAULT_THRESHOLD = 3
 #: sondern "nachgesehen und es steht nirgends" (bewertungsschema.md, 3).
 BELEGT, TEILS, VERMUTET = "belegt", "teils", "vermutet"
 
+#: Wie das der Leserin gesagt wird. Die gespeicherten Werte bleiben, wie sie
+#: sind — sie stehen im Bewertungsschema, im Prompt und in tausend Zeilen der
+#: Datenbank. Gezeigt wird ein Wort, das fuer sich steht: "teils" allein neben
+#: vier Sternen beantwortet keine Frage, "teilweise belegt" schon.
+CONFIDENCE_LABELS: dict[str, str] = {
+    BELEGT: "im Text belegt",
+    TEILS: "teilweise belegt",
+    VERMUTET: "nur vermutet",
+}
+
+
+def confidence_label(confidence: str) -> str:
+    """Das Wort fuer die Leserin. Unbekanntes bleibt, wie es ist."""
+    return CONFIDENCE_LABELS.get(confidence, confidence)
+
 # Die Herkunft steht in ``ratings`` — der Store braucht sie und darf
 # dieses Modul nicht importieren.
 

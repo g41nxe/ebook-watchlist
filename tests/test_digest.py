@@ -184,7 +184,7 @@ def test_a_suggestion_carries_its_judgement() -> None:
     text = render_text(digest)
     assert "★★★★☆" in text
     assert "Achse D: isoliertes Setting" in text
-    assert "(teils)" in text
+    assert "(teilweise belegt)" in text
     assert "Achse D" in render_html(digest)
 
 

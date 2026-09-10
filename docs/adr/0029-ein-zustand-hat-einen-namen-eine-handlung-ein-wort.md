@@ -77,3 +77,14 @@ bleiben stillgelegte Beziehungen (ADR 18).
 
 Der Zustandsname bleibt, wo Bücher in Prosa beschrieben werden: Profil,
 Tagesbericht, Watchlist-Status.
+
+**Zwei Wörter noch einmal geschärft (10.09.2026).** Aus „Verwerfen" wird
+„Ausschließen": verworfen wird ein Vorschlag, ausgeschlossen ein Buch — und
+genau das tut der Knopf, bei jeder Quelle und dauerhaft (ADR 18). Aus „Kein
+Interesse" wird „Doof": das Gegenstück zu „Mag ich" ist ein Urteil über das
+Buch, kein höflicher Rückzug, und „kein Interesse" klang wie „nicht mehr
+zeigen" — also wie der Knopf daneben.
+
+Die Reihenfolge auf der Buchseite folgt daraus: vorn die drei, die es auch im
+Stapel gibt, hinten die beiden Urteile nach dem Lesen. Sie beantworten eine
+andere Frage — nicht „was tue ich damit?", sondern „wie war es?".

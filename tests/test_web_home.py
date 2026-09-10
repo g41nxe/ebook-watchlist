@@ -322,7 +322,7 @@ def test_a_decision_is_a_verb_on_the_button_and_the_same_verb_on_the_pile(
     start = client.get("/").text
     stapel = client.get("/vorschlaege").text
 
-    for wort in ("Verwerfen", "Hab ich", "Beobachten"):
+    for wort in ("Ausschließen", "Hab ich", "Beobachten"):
         assert wort in start, wort
         assert wort in stapel, wort
     assert "Ausgeschlossen" not in start

@@ -15,7 +15,7 @@ from datetime import datetime
 from ..config import Profile
 from ..deals import is_strong_deal
 from ..models import Availability, MatchReason
-from ..rating import RatingUnavailable, load_leseprofil
+from ..rating import RatingUnavailable, confidence_label, load_leseprofil
 from ..ratings import (
     BY_CONVERSATION,
     BY_LIBRARY_READERS,
@@ -45,12 +45,15 @@ ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL, BY_LIBRAR
 #: Knopfwörter, nicht Zustandsnamen: hier stehen Knöpfe, und derselbe Knopf
 #: heißt im Stapel und auf der Fundseite genauso (ADR 29 mit Nachtrag). Was
 #: gerade gilt, sagt die Farbe des Knopfs, nicht sein Wort.
+#: Vorn die drei, die es auch im Stapel gibt, in derselben Reihenfolge;
+#: hinten die beiden Urteile nach dem Lesen. Sie beantworten eine andere
+#: Frage — nicht "was tue ich damit?", sondern "wie war es?".
 KINDS: tuple[tuple[str, str], ...] = labelled_actions(
     RelationKind.WATCHING,
     RelationKind.OWNED,
+    RelationKind.DISMISSED,
     RelationKind.LIKED,
     RelationKind.DISLIKED,
-    RelationKind.DISMISSED,
 )
 
 #: Herkuenfte, deren Urteil an einer *Ausgabe* haengt statt am Buch der
@@ -144,6 +147,11 @@ class Judgement:
     when: datetime | None
     #: Auf wie vielen Stimmen die Angabe ruht — nur bei fremden Urteilen.
     votes: int | None = None
+
+    @property
+    def confidence_label(self) -> str:
+        """Worauf das Urteil ruht, in einem Wort, das fuer sich steht."""
+        return confidence_label(self.confidence)
 
     @property
     def is_human(self) -> bool:

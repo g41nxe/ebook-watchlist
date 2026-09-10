@@ -53,7 +53,10 @@ PROFILE_BOUND: frozenset[str] = frozenset({BY_MODEL, BY_CONVERSATION})
 HUMAN_ORIGINS: frozenset[str] = frozenset({BY_READER})
 
 LABELS: dict[str, str] = {
-    BY_MODEL: "vom Werkzeug bewertet",
+    # Nicht "vom Werkzeug bewertet": *wer* gemessen hat, ist die kleinere
+    # Auskunft — die groessere ist, *was* gemessen wurde. Das Tor vergleicht
+    # ein Buch mit dem Leseprofil, und genau das sagt die Zeile jetzt.
+    BY_MODEL: "Übereinstimmung mit Leseprofil",
     BY_CONVERSATION: "im Gespräch bewertet",
     BY_READER: "deine Bewertung",
     BY_LIBRARY_READERS: "Leser:innen der Bibliothek",

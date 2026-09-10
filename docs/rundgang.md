@@ -197,7 +197,7 @@ sie stößt höchstens einen Lauf an (ADR 3).
 | `/uebersicht` | Übersicht: Zustand der Quellen, die letzten Läufe, die Tagesberichte — und der Knopf „jetzt laufen" |
 | `/watchlist` | Was du beobachtest, mit Preis und Ausleihstatus in einer Zeile |
 | `/book/{id}` | Alles über ein Buch: Beziehungen, Quellen, Preisverlauf, Urteile — und deine eigenen Sterne |
-| `/vorschlaege` | Der Stapel: ankreuzen, dann Verwerfen, Hab ich oder Beobachten |
+| `/vorschlaege` | Der Stapel: ankreuzen, dann Ausschließen, Hab ich oder Beobachten |
 | `/profil` | Was das Werkzeug über dich zu wissen glaubt. Nur zum Lesen — mit Absicht |
 
 Start mit `python -m ebook_watchlist.web`. Die Oberfläche bindet an alle

@@ -70,11 +70,17 @@ RELATION_LABELS: dict[RelationKind, str] = {
 #: das beides kann — die Listen duerfen sich treffen, sie duerfen nur nicht
 #: die Rollen tauschen.
 ACTION_LABELS: dict[RelationKind, str] = {
-    RelationKind.DISMISSED: "Verwerfen",
+    # "Ausschliessen", nicht "Verwerfen": verworfen wird ein Vorschlag,
+    # ausgeschlossen ein Buch — und genau das tut der Knopf, bei jeder Quelle
+    # und dauerhaft (ADR 18). Der Zustandsname daneben heisst "Ausgeschlossen".
+    RelationKind.DISMISSED: "Ausschließen",
     RelationKind.OWNED: "Hab ich",
     RelationKind.WATCHING: "Beobachten",
     RelationKind.LIKED: "Mag ich",
-    RelationKind.DISLIKED: "Kein Interesse",
+    # "Doof" statt "Kein Interesse": das Gegenstueck zu "Mag ich" ist ein
+    # Urteil ueber das Buch, kein hoeflicher Rueckzug — und "kein Interesse"
+    # klingt wie "nicht mehr zeigen", was der Knopf daneben tut.
+    RelationKind.DISLIKED: "Doof",
 }
 
 

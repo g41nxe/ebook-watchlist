@@ -203,12 +203,15 @@
          Mindesthoehe von 44 px die Breite mit, sonst waere der Stern 22 px
          breit und ein Fingerziel nur der Hoehe nach. Auf dem Schreibtisch
          bleibt er so gross wie sein Inhalt. #}
-      <button type="submit" title="{{ value }} von 5"
+      {# Der Name des Knopfs steht als `aria-label` am Knopf und nicht als
+         verborgener Text darin: sichtbar war er nicht, im Textinhalt der
+         Seite aber schon — "Meine Bewertung 1 von 5 2 von 5 3 von 5 …",
+         fuenfmal dieselbe Auskunft vor dem einen Satz, der zaehlt. #}
+      <button type="submit" title="{{ value }} von 5" aria-label="{{ value }} von 5"
               class="tun inline-flex aspect-square items-center justify-center p-0.5
                      text-lg transition
                      {{ 'text-ink' if on else 'text-rule hover:text-soft' }}">
         <svg class="i" {% if on %}style="fill:currentColor"{% endif %}><use href="#ic-star"/></svg>
-        <span class="sr-only">{{ value }} von 5</span>
       </button>
     </form>
     {% endfor %}

@@ -19,7 +19,8 @@
     <span class="font-semibold text-ink">{{ judgement.stars | sterne }}</span>&nbsp;/&nbsp;5</span>
   <span class="text-sm text-soft">{{ judgement.label }}</span>
   {% if judgement.confidence %}
-  <span class="rounded bg-hair px-1.5 py-0.5 text-xs text-soft">{{ judgement.confidence }}</span>
+  <span class="rounded bg-hair px-1.5 py-0.5 text-xs text-soft"
+        >{{ judgement.confidence_label }}</span>
   {% endif %}
   {% if judgement.when %}
   <span class="text-xs text-soft">{{ judgement.when.strftime("%d.%m.%Y") }}</span>
