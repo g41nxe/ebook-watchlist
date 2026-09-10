@@ -87,14 +87,15 @@
     <details class="relative" x-data
              @click.outside="$el.open = false"
              @keydown.escape.window="$el.open = false">
-      {# Still wie vorher, nur gross genug zum Treffen: mit `p-1.5` mass der
-         Aufklapper 28 Pixel. Kein Rahmen — ein Menue ist keine Handlung,
-         sondern der Weg zu einer, und mit Rahmen sah es aus wie ein vierter
-         Knopf neben dem Betrag. #}
+      {# Gross genug zum Treffen: mit `p-1.5` mass der Aufklapper 28 Pixel.
+         Auf dem Telefon mit Rahmen, damit ueberhaupt zu sehen ist, wo man
+         hindrueckt — dort gibt es kein Ueberfahren, das es zeigen koennte.
+         Ab `sm` ohne: ein Menue ist keine Handlung, sondern der Weg zu einer,
+         und mit Rahmen sah es aus wie ein vierter Knopf neben dem Betrag. #}
       <summary title="was mit diesem Eintrag geschehen soll"
                class="tun inline-flex h-9 w-9 cursor-pointer list-none items-center
-                      justify-center rounded text-soft transition
-                      hover:bg-hair hover:text-ink">
+                      justify-center rounded border border-rule text-soft transition
+                      hover:bg-hair hover:text-ink sm:border-0">
         <svg class="i"><use href="#ic-dots"/></svg>
       </summary>
       {# Das Menue haengt am rechten Rand und ist auf dem Telefon breiter als
