@@ -54,9 +54,9 @@ HUMAN_ORIGINS: frozenset[str] = frozenset({BY_READER})
 
 LABELS: dict[str, str] = {
     # Nicht "vom Werkzeug bewertet": *wer* gemessen hat, ist die kleinere
-    # Auskunft — die groessere ist, *was* gemessen wurde. Und "geschaetzt",
-    # weil das Tor aus einem Klappentext schliesst und nicht aus dem Buch.
-    BY_MODEL: "geschätzte Übereinstimmung",
+    # Auskunft — die groessere ist, *woran* gemessen wurde. Und ein Wort statt
+    # dreien: neben den Sternen steht ohnehin, worauf das Urteil ruht.
+    BY_MODEL: "Leseprofil",
     # Dieselbe Beschriftung wie bei den eigenen Sternen: die dreizehn Urteile
     # aus ``owned.yaml`` sind im Gespraech der Leserin ueber ihre eigenen
     # Buecher entstanden, und fuer sie ist das ihre Bewertung. Getrennt
