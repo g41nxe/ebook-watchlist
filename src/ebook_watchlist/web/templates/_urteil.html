@@ -24,7 +24,10 @@
     {{ judgement.votes }} Stimmen</span>
   {% endif %}
   <span class="text-sm text-soft">{{ judgement.label }}</span>
-  {% if judgement.confidence %}
+  {# Worauf das Urteil ruht — nur bei den eigenen. Eine fremde Stimme ist ein
+     Durchschnitt aus Stimmen, und "im Text belegt" daneben behauptete, jemand
+     habe für sie im Klappentext nachgesehen. #}
+  {% if judgement.confidence and not judgement.is_foreign %}
   <span class="rounded bg-hair px-1.5 py-0.5 text-xs text-soft"
         >{{ judgement.confidence_label }}</span>
   {% endif %}
@@ -38,7 +41,10 @@
     gegen Profil {{ judgement.profile_version }}, heute gilt {{ profile_version }}</span>
   {% endif %}
 </div>
-{% if judgement.reason %}
+{# Die Begruendung einer fremden Stimme lautet "Durchschnitt der Leser:innen
+   aus 22 Stimmen" — das steht schon in der Pille daneben. Zweimal dasselbe
+   ist keine zweite Auskunft. #}
+{% if judgement.reason and not judgement.is_foreign %}
 <p class="mt-1.5 max-w-prose text-sm text-ink/80">{{ judgement.reason }}</p>
 {% endif %}
 {% endmacro %}
