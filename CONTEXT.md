@@ -48,16 +48,18 @@ so "watched until you bought it" stays visible.
 | --- | --- | --- | --- |
 | `watching` | in Beobachtung | Beobachten | on the Watchlist, reported at every price |
 | `owned` | im Besitz | Hab ich | the reader has it |
-| `liked` | Mag ich | — | read, and it was good |
-| `disliked` | Kein Interesse | — | read, and it was not |
+| `liked` | Mag ich | Mag ich | read, and it was good |
+| `disliked` | Kein Interesse | Kein Interesse | read, and it was not |
 | `dismissed` | Ausgeschlossen | Verwerfen | never offer this book again |
 
-Two words, two questions (ADR 29). The state name answers "what is this book
-to me?" and stands where books are described — the book page, the profile —
-like a shelf label. The button word answers "what do you do with it?" and
-stands where a decision is made — the Suggestion pile, the start page, the
-Watchlist menu. Neither crosses over: a state never appears on a button, a
-button word never describes a book.
+Two words, two questions (ADR 29 and its addendum). The state name answers
+"what is this book to me?" and stands where books are described in prose — the
+profile, the Digest, the Watchlist status — like a shelf label. The button word
+answers "what do you do with it?" and stands on *every* button: the Suggestion
+pile, the start page, the Watchlist menu, the find page and the book page. For
+`liked` and `disliked` both roles fall on the same word; that is one word doing
+two jobs, not drift. What never happens is the swap: a state name that is no
+button word never reaches a button.
 
 `disliked` and `dismissed` are different statements, and neither implies the
 other. `disliked` is a verdict *after reading* and says something about taste.

@@ -98,15 +98,15 @@ def test_several_relations_hold_at_once(client: TestClient, db: Store) -> None:
 
 
 def test_switching_a_relation_off_keeps_it_as_history(client: TestClient, db: Store) -> None:
-    """Dass ein Buch einmal beobachtet wurde, ist selbst eine Auskunft."""
+    """Dass ein Buch einmal beobachtet wurde, ist selbst eine Auskunft (ADR 18)
+    — die Beziehung wird stillgelegt, nicht geloescht. Die Seite zeigt sie
+    nicht mehr: was gerade *nicht* gilt, beantwortet keine Frage."""
     book = db.books()[0]
 
     client.post(f"/book/{book.id}/relation", data={"kind": "watching", "active": "0"})
 
-    body = client.get(f"/book/{book.id}").text
     kept = [r for r in db.relations_of("test", book.id) if r.kind == "watching"]
     assert kept and kept[0].active is False
-    assert "Früher" in body
 
 
 def test_an_unknown_relation_is_refused(client: TestClient, db: Store) -> None:

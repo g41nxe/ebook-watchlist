@@ -81,14 +81,13 @@ def test_no_longer_interested_works_the_same_way(client: TestClient, db: Store) 
 
 def test_the_history_survives(client: TestClient, db: Store) -> None:
     """Stillgelegt, nicht gelöscht: dass ein Buch einmal beobachtet wurde, ist
-    selbst eine Auskunft (ADR 18). Auf der Buchseite steht danach
-    „Früher: beobachtet"."""
+    selbst eine Auskunft (ADR 18)."""
     buch_id = beobachtet(db)
 
     client.post(f"/watchlist/{buch_id}/abschliessen", data={"kind": "owned"})
 
-    assert "watching" in arten(db, buch_id)
-    assert "Früher" in client.get(f"/book/{buch_id}").text
+    assert arten(db, buch_id)["watching"] is False
+    assert arten(db, buch_id)["owned"] is True
 
 
 def test_a_kind_that_is_not_an_ending_changes_nothing(client: TestClient, db: Store) -> None:

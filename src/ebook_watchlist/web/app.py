@@ -30,7 +30,16 @@ from ..models import LinkOutcome
 from ..relations import RelationKind
 from ..sources import registry
 from ..store import RunRow, Store
-from . import assignments, book, discovery, home, profile_page, triage, watchlist
+from . import (
+    assignments,
+    book,
+    discovery,
+    home,
+    profile_page,
+    symbols,
+    triage,
+    watchlist,
+)
 from .recheck import Rechecker
 from .runs import RunLauncher, journal_status
 
@@ -572,6 +581,7 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "page": page,
                 "kinds": book.KINDS,
+                "icons": symbols.RELATION_ICONS,
                 "restrictions": watchlist.RESTRICTIONS,
                 "price_points": book.price_points(page.history),
             },
@@ -742,16 +752,25 @@ def create_app() -> FastAPI:
 
         Zurueck dorthin, wo entschieden wurde: von der Startseite aus auf die
         Startseite, mit dem Angebot, es rueckgaengig zu machen — ein Klick
-        ohne Nachfrage braucht einen Weg zurueck (ADR 30). Ein Formularfeld
-        ist kein Ziel; alles ausser "/" fuehrt in den Stapel.
+        ohne Nachfrage braucht einen Weg zurueck (ADR 30). Von der Fundseite
+        aus auf die Buchseite: der Fund *ist* jetzt ein Buch (ADR 18), und in
+        den Stapel zurueckzuspringen hiesse, die eigene Entscheidung dort zu
+        suchen, wo sie gerade verschwunden ist. Ein Formularfeld ist kein Ziel;
+        was nicht zu diesen beiden Faellen passt, fuehrt in den Stapel.
         """
+        store = _store_for(paths.db_path())
         triage.decide(
-            _store_for(paths.db_path()),
+            store,
             load_profile(),
             keys,
             kind,
             now=datetime.now(),
         )
+        if zurueck == "buch" and len(keys) == 1:
+            source, _, item_id = keys[0].partition(":")
+            book_id = store.book_by_source_item(source, item_id)
+            if book_id is not None:
+                return RedirectResponse(f"/book/{book_id}", status_code=303)
         if zurueck == "/":
             if len(keys) == 1:
                 return RedirectResponse(

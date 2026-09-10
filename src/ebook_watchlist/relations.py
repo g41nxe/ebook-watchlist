@@ -53,23 +53,28 @@ RELATION_LABELS: dict[RelationKind, str] = {
 }
 
 
-#: Was auf dem **Knopf** steht, der ein Buch in eine Beziehung bringt — eine
-#: Liste fuer Stapel, Startseite und Watchlist-Menue (Issue #5, ADR 29).
+#: Was auf dem **Knopf** steht, der ein Buch in eine Beziehung bringt —
+#: auf *jedem* Knopf: Stapel, Startseite, Watchlist-Menue, Fund- und Buchseite
+#: (Issue #5, ADR 29 mit Nachtrag).
 #:
 #: Zwei Listen mit klarer Zustaendigkeit, nicht vier Fassungen einer. Der
 #: Zustandsname oben antwortet auf "was ist dieses Buch fuer mich?" und steht,
-#: wo Buecher beschrieben werden — Buchseite, Profil — wie ein Regalschild.
-#: Der Knopf antwortet auf "was tust du damit?" und traegt ein Taetigkeitswort.
-#: "Hab ich" verstoesst absichtlich gegen die Regel oben: die galt fuer
-#: Regalschilder; auf einem Knopf ist der Ich-Satz die Antwort, nicht der Name.
-#: Kein Wort wandert auf die andere Seite — das prueft test_relations.py.
+#: wo Buecher beschrieben werden — im Profil, in "Frueher: …", im Tagesbericht
+#: — wie ein Regalschild. Der Knopf antwortet auf "was tust du damit?" und
+#: traegt ein Taetigkeitswort. "Hab ich" verstoesst absichtlich gegen die Regel
+#: oben: die galt fuer Regalschilder; auf einem Knopf ist der Ich-Satz die
+#: Antwort, nicht der Name.
 #:
-#: `liked` und `disliked` sind kein Ausgang einer Entscheidung im Stapel und
-#: bekommen deshalb hier kein Wort.
+#: Bei `liked` und `disliked` fallen beide Rollen auf dasselbe Wort: "Mag ich"
+#: ist Regalschild und Antwort zugleich. Das ist keine Drift, sondern ein Wort,
+#: das beides kann — die Listen duerfen sich treffen, sie duerfen nur nicht
+#: die Rollen tauschen.
 ACTION_LABELS: dict[RelationKind, str] = {
     RelationKind.DISMISSED: "Verwerfen",
     RelationKind.OWNED: "Hab ich",
     RelationKind.WATCHING: "Beobachten",
+    RelationKind.LIKED: "Mag ich",
+    RelationKind.DISLIKED: "Kein Interesse",
 }
 
 

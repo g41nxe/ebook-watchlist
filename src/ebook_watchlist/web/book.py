@@ -28,7 +28,7 @@ from ..ratings import (
     subject_of,
 )
 from ..reasons import short_why, why_shown
-from ..relations import RELATION_KINDS, RelationKind, labelled
+from ..relations import RELATION_KINDS, RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
 from .watchlist import SourceState
@@ -41,7 +41,11 @@ ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL, BY_LIBRAR
 
 #: Was die Leserin über ein Buch sagen kann, in der Reihenfolge, in der es auf
 #: der Seite steht. Mehrere gelten gleichzeitig — das ist der Normalfall.
-KINDS: tuple[tuple[str, str], ...] = labelled(
+#:
+#: Knopfwörter, nicht Zustandsnamen: hier stehen Knöpfe, und derselbe Knopf
+#: heißt im Stapel und auf der Fundseite genauso (ADR 29 mit Nachtrag). Was
+#: gerade gilt, sagt die Farbe des Knopfs, nicht sein Wort.
+KINDS: tuple[tuple[str, str], ...] = labelled_actions(
     RelationKind.WATCHING,
     RelationKind.OWNED,
     RelationKind.LIKED,

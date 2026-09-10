@@ -53,3 +53,27 @@ Ausgangszustand, den `RELATION_LABELS` beendet hat.
 - Wer eine vierte Ansicht mit Entscheidungsknöpfen baut, liest aus
   `ACTION_LABELS`; wer einen Zustand zeigt, aus `RELATION_LABELS`. Eine dritte
   Liste gibt es nicht.
+
+## Nachtrag (10.09.2026, Issue #9)
+
+**Auf jedem Knopf steht das Knopfwort — auch auf der Buchseite.** Die
+Entscheidung oben hatte die Buchseite den Zustandsnamen lesen lassen, weil ihre
+fünf Schaltflächen wie Regalschilder gedacht waren. Nebeneinandergestellt hielt
+das nicht: auf der Fundseite hieß derselbe Knopf „Beobachten", auf der
+Buchseite „in Beobachtung", und beide tun dasselbe. Die eigene Regel des ADR —
+*ein Zustandsname steht nie auf einem Knopf* — sprach dabei gegen die eigene
+Zuordnung.
+
+`ACTION_LABELS` trägt deshalb jetzt alle fünf Arten. `liked` und `disliked`
+behalten ihr Wort aus beiden Listen: „Mag ich" ist Regalschild und Antwort
+zugleich. Die Listen dürfen sich also treffen; verboten bleibt der
+Rollentausch, und das prüft `test_relations.py` jetzt an den Ansichten statt
+an einem Schnittmengen-Vergleich.
+
+**Was gerade gilt, sagt die Farbe.** Der aktive Knopf ist gefüllt. Die Zeile
+„Früher: im Besitz, Mag ich" ist von der Buchseite verschwunden: sie sagte, was
+gerade *nicht* gilt, an der wichtigsten Stelle der Seite. In der Datenbank
+bleiben stillgelegte Beziehungen (ADR 18).
+
+Der Zustandsname bleibt, wo Bücher in Prosa beschrieben werden: Profil,
+Tagesbericht, Watchlist-Status.

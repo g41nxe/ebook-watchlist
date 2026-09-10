@@ -28,6 +28,7 @@ from ..reasons import short_why, thema_name, why_shown
 from ..relations import RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
+from .symbols import RELATION_ICONS
 
 #: Was mit einem Stapel geschehen kann. Alle drei schreiben eine Beziehung —
 #: "verworfen" ist keine Löschung, sondern eine Aussage über das Buch.
@@ -35,18 +36,9 @@ ACTIONS: tuple[tuple[str, str], ...] = labelled_actions(
     RelationKind.DISMISSED, RelationKind.OWNED, RelationKind.WATCHING
 )
 
-#: Ein Zeichen je Entscheidung, aus dem Sprite in ``base.html``. Keins davon
-#: ist anderswo schon besetzt: ``ic-play`` heißt in der Watchlist-Zeile
-#: "aktivieren", ``ic-user`` steht im Profil für Autor:innen — beide passten
-#: weder farblich noch inhaltlich. Dieselben Zeichen auf Stapel, Startseite
-#: und Fundseite: eine Handlung, ein Bild.
-ICONS: dict[str, str] = {
-    "dismissed": "ic-x",
-    "owned": "ic-check",
-    # Fernglas statt Lupe: die Lupe sagt "suchen", das Fernglas "im Blick
-    # behalten" — und genau das ist der Unterschied zur Suche im Shop.
-    "watching": "ic-binoculars",
-}
+#: Ein Zeichen je Entscheidung, aus einer Stelle: Stapel, Startseite, Fund- und
+#: Buchseite zeigen dieselben (``symbols.RELATION_ICONS``).
+ICONS: dict[str, str] = RELATION_ICONS
 
 #: Wie viele Zeilen eine Seite zeigt. Der Rückstand ist dreistellig, und eine
 #: Seite mit dreihundert Einträgen ist keine Aufgabe, sondern eine Strafe —

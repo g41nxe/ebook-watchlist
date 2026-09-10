@@ -168,6 +168,22 @@ def test_the_page_leaves_out_what_a_find_does_not_have(client: TestClient, db: S
     assert "Notiz" not in body
 
 
+def test_deciding_here_leads_to_the_new_book(client: TestClient, db: Store) -> None:
+    """Mit der Entscheidung wird aus dem Fund ein Buch (ADR 18), und die
+    Buchseite ist die reichere Ansicht. In den Stapel zurueckzuspringen hiesse,
+    die eigene Entscheidung dort zu suchen, wo sie gerade verschwunden ist."""
+    fund(db)
+
+    antwort = client.post(
+        "/vorschlaege/entscheiden",
+        data={"kind": "watching", "keys": ["beam:7"], "zurueck": "buch"},
+    )
+
+    book_id = db.book_by_source_item("beam", "7")
+    assert book_id is not None
+    assert antwort.headers["location"] == f"/book/{book_id}"
+
+
 def test_a_find_that_became_a_book_leads_to_its_book_page(
     client: TestClient, db: Store
 ) -> None:

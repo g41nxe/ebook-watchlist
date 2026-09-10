@@ -7,6 +7,7 @@
 {% from "_quellenkachel.html" import kachel %}
 {% from "_beobachtungen.html" import beobachtungen %}
 {% from "_urteil.html" import urteil %}
+{% from "_zustandsknopf.html" import zustandsknopf %}
 
 {% block content %}
 <p class="mb-4 text-sm">
@@ -87,7 +88,6 @@
 </div>
 {% endif %}
 
-{% if page.watching %}
 {# Bis hierher gab es das Umbenennen nur auf der Watchlist, und dort nur,
    wenn keine Quelle den Titel fand (ADR 27) — es ist aber eine Eigenschaft
    *dieses Buchs*. Zugeklappt, weil man es selten braucht.
@@ -130,7 +130,56 @@
       Ein geänderter Titel wirft die Zuordnungen weg und wird sofort neu gesucht.</p>
   </form>
 </details>
+
+{# Die erste Frage der Seite, wie auf der Fundseite: was sagst du dazu?
+   Sie stand bisher unter dem Preisverlauf, also hinter allem, was das
+   Werkzeug zu sagen hat. #}
+{{ abschnitt("Was du dazu sagst", "ic-tag") }}
+{# Dieselben Knoepfe wie auf der Fundseite, nur mit Zustandsnamen statt
+   Knopfwoertern (ADR 29) — und einer davon kann gerade gelten. #}
+<div class="flex flex-wrap gap-2">
+  {% for kind, label in kinds %}
+  {% set on = kind in page.active_kinds %}
+  <form method="post" action="/book/{{ page.book_id }}/relation">
+    <input type="hidden" name="kind" value="{{ kind }}">
+    <input type="hidden" name="active" value="{{ '0' if on else '1' }}">
+    {{ zustandsknopf(kind, label, zeichen=icons[kind], aktiv=on) }}
+  </form>
+  {% endfor %}
+</div>
+
+{% if page.watching %}
+{# An welcher Art Quelle geprueft wird. Stand bis Ticket 48 im
+   Drei-Punkte-Menue der Watchlist-Zeile — dort war es der einzige Eintrag,
+   und es ist eine Einstellung, keine Handlung. Hier steht es bei den anderen
+   Angaben zu diesem Buch. #}
+<div class="mt-4 flex flex-wrap items-center gap-2">
+  <span class="text-xs text-soft">Prüfen bei</span>
+  {% for value, label in (("", "allen Quellen"), ("library", "nur Bibliothek"), ("shop", "nur Shop")) %}
+  <form method="post" action="/book/{{ page.book_id }}/restrict">
+    <input type="hidden" name="restrict" value="{{ value }}">
+    <button type="submit"
+            {# Bernstein, nicht gruen: gruen gehoert im ganzen Theme der
+               Bibliothek, und "nur Bibliothek" ist hier eine von drei
+               Einstellungen — in Gruen sah die Reihe aus, als waere eine
+               davon die Bibliothek selbst. #}
+            class="tun inline-flex h-7 items-center rounded-full border px-3 text-xs transition
+                   {{ 'border-amber bg-amber/10 text-amber'
+                      if (page.restrict or '') == value
+                      else 'border-rule text-soft hover:border-amber hover:text-amber' }}">
+      {{ label }}</button>
+  </form>
+  {% endfor %}
+</div>
 {% endif %}
+
+{# Stillgelegte Beziehungen stehen hier nicht mehr. "Frueher: im Besitz, Mag
+   ich" war eine Zeile ueber das, was gerade *nicht* gilt — sie kostete Platz
+   an der wichtigsten Stelle der Seite und beantwortete keine Frage. In der
+   Datenbank bleiben sie (ADR 18): dass ein Buch einmal beobachtet wurde, ist
+   selbst eine Auskunft. #}
+
+
 
 {% if page.blurb %}
 {{ abschnitt("Klappentext", "ic-doc") }}
@@ -263,52 +312,6 @@
 {% endif %}
 
 {{ beobachtungen(page.recent_history, page.hidden_history) }}
-{% endif %}
-{{ abschnitt("Was du dazu sagst", "ic-tag") }}
-<div class="flex flex-wrap gap-2">
-  {% for kind, label in kinds %}
-  {% set on = kind in page.active_kinds %}
-  <form method="post" action="/book/{{ page.book_id }}/relation">
-    <input type="hidden" name="kind" value="{{ kind }}">
-    <input type="hidden" name="active" value="{{ '0' if on else '1' }}">
-    <button type="submit"
-            class="tun inline-flex h-7 items-center rounded-full border px-3 text-sm transition
-                   {{ 'border-accent bg-accent/10 text-accent'
-                      if on else 'border-rule text-soft hover:border-soft hover:text-ink' }}">
-      {{ label }}
-    </button>
-  </form>
-  {% endfor %}
-</div>
-
-{% if page.watching %}
-{# An welcher Art Quelle geprueft wird. Stand bis Ticket 48 im
-   Drei-Punkte-Menue der Watchlist-Zeile — dort war es der einzige Eintrag,
-   und es ist eine Einstellung, keine Handlung. Hier steht es bei den anderen
-   Angaben zu diesem Buch. #}
-<div class="mt-4 flex flex-wrap items-center gap-2">
-  <span class="text-xs text-soft">Prüfen bei</span>
-  {% for value, label in (("", "allen Quellen"), ("library", "nur Bibliothek"), ("shop", "nur Shop")) %}
-  <form method="post" action="/book/{{ page.book_id }}/restrict">
-    <input type="hidden" name="restrict" value="{{ value }}">
-    <button type="submit"
-            class="tun inline-flex h-7 items-center rounded-full border px-3 text-xs transition
-                   {{ 'border-accent bg-accent/10 text-accent'
-                      if (page.restrict or '') == value
-                      else 'border-rule text-soft hover:border-soft hover:text-ink' }}">
-      {{ label }}</button>
-  </form>
-  {% endfor %}
-</div>
-{% endif %}
-
-{% set past = page.relations | selectattr("is_history") | list %}
-{% if past %}
-{# Stillgelegt, nicht geloescht: "beobachtet, bis du es gekauft hast". #}
-<p class="mt-3 text-xs text-soft">
-  Früher:
-  {% for relation in past %}{{ relation.label }}{% if not loop.last %}, {% endif %}{% endfor %}
-</p>
 {% endif %}
 {# Seit die Kacheln im Kopf stehen, sagt dieser Abschnitt den Preis nicht
    noch einmal — was bleibt, ist der Zustand der Zuordnung. Das ist
