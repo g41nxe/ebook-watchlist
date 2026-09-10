@@ -198,6 +198,30 @@ def test_an_unknown_action_is_refused(client: TestClient, db: Store) -> None:
     assert response.status_code == 500
 
 
+def test_the_title_leads_to_the_page_of_the_find(client: TestClient, db: Store) -> None:
+    """Eine Buchseite gibt es vor der Entscheidung nicht (ADR 18) — die
+    Fundseite schon, und dort steht die Begruendung des Tors."""
+    found(db, item_id="7", title="Der Kannibalenhügel")
+
+    body = client.get("/vorschlaege").text
+
+    assert 'href="/discovery/beam/7"' in body
+    marker = body.index('href="/discovery/beam/7"')
+    assert "Der Kannibalenhügel" in body[marker : marker + 400]
+
+
+def test_clicking_the_title_does_not_tick_the_checkbox(client: TestClient, db: Store) -> None:
+    """Die ganze Zeile bleibt das Label fuers Kaestchen — ein Link darin muss
+    das Umschalten unterdruecken, sonst waehlt ein Klick auf den Titel aus,
+    statt zur Fundseite zu fuehren."""
+    found(db, item_id="7")
+
+    body = client.get("/vorschlaege").text
+
+    start = body.index('href="/discovery/beam/7"')
+    assert "stopPropagation" in body[body.rindex("<a", 0, start) : body.index(">", start)]
+
+
 # --- eine Zeile, eine Entscheidung (Issue #9) -------------------------------
 
 

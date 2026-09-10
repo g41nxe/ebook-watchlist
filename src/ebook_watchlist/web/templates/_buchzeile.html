@@ -1,0 +1,88 @@
+{# Eine Buchzeile — dieselbe auf Watchlist, Vorschlägen und Startseite
+   (Issue #9).
+
+   Vorher schrieb jede der drei Seiten ihre eigene Fassung, und die Teile,
+   die wirklich gleich sind, waren Zeile für Zeile kopiert. Geteilt ist
+   deshalb das Gerüst; was eine Seite eigenes hat, kommt als **Steckplatz**
+   herein, fertig gerendert (`{% raw %}{% set x %}…{% endset %}{% endraw %}`).
+
+   Die Zonen, von links: Auswahl · Cover · Anlass/Titel/Autor · Kennzahlen ·
+   Preis · Handlungen. Was eine Seite nicht mitgibt, erscheint nicht — die
+   Watchlist kennt keinen Pitch, ein Fund keine Verfügbarkeit.
+
+   Der Preis behält seine eigene schmale Spalte mit einer festen Zeile
+   darüber, damit die Beträge über alle drei Seiten hinweg auf derselben
+   Höhe stehen (ab `sm`; auf dem Telefon gibt es nichts, wogegen
+   auszurichten wäre).
+#}
+{% from "_cover.html" import cover %}
+
+{% macro zeile(
+    titel,
+    titel_url=none,
+    autor=none,
+    cover_file=none,
+    borrowable=false,
+    deal=false,
+    pille=none,
+    unter_autor=none,
+    kennzahlen=none,
+    pitch=none,
+    oben=none,
+    oben_farbe="text-soft",
+    preis=none,
+    aktionen=none,
+    auswahl=none,
+    umschliessend=false
+) %}
+{# `umschliessend`: die Vorschlagsseite macht die ganze Zeile zum Label ihres
+   Kästchens — auf dem Telefon ist ein Kästchen von 16 Pixeln kein Ziel.
+   Alles Anklickbare darin traegt deshalb `stopPropagation`. #}
+{% set tag = "label" if umschliessend else "div" %}
+<{{ tag }} class="flex flex-wrap items-start gap-x-4 gap-y-2 py-3
+            {{ 'cursor-pointer hover:bg-card' if umschliessend }}">
+  {{ auswahl if auswahl }}
+  {{ cover(titel, cover_file, borrowable, deal) }}
+
+  {# Anlass, Titel, Autor — die schmalere der beiden Textspalten.
+
+     Grundbreite null (`flex-[1_1_0%]`), keine feste `basis`: sonst fordern
+     die beiden Textspalten ihre Grundbreite zuerst und draengen Preis und
+     Knoepfe auf eine zweite Zeile — gemessen 872 px Bedarf bei 720 px Platz,
+     die Zeile wuchs dabei von 125 auf 167 px. Mit Basis null bekommen die
+     festen Teile ihren Platz zuerst, und die zwei Textspalten teilen sich,
+     was uebrig bleibt: 1 zu 1,6 zugunsten des Pitches. #}
+  <div class="min-w-40 flex-[1_1_0%]">
+    {% if pille %}<p class="mb-0.5">{{ pille }}</p>{% endif %}
+    <p class="font-serif text-base font-semibold tracking-tight">
+      {% if titel_url %}
+      <a href="{{ titel_url }}" onclick="event.stopPropagation()"
+         class="hover:underline underline-offset-2">{{ titel }}</a>
+      {% else %}{{ titel }}{% endif %}
+    </p>
+    <p class="truncate text-sm text-soft">{{ autor or "unbekannt" }}</p>
+    {% if unter_autor %}<div class="mt-1">{{ unter_autor }}</div>{% endif %}
+  </div>
+
+  {# Kennzahlen und Pitch — die breitere Spalte. Sie bekommt den groesseren
+     Teil, weil der Pitch der laengste Inhalt der Zeile ist. #}
+  {% if kennzahlen or pitch %}
+  <div class="min-w-40 flex-[1.6_1_0%]">
+    {% if kennzahlen %}{{ kennzahlen }}{% endif %}
+    {% if pitch %}<p class="{{ 'mt-1' if kennzahlen }} text-sm text-ink/80">{{ pitch }}</p>{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="ml-15 flex w-full items-end gap-3 sm:ml-0 sm:w-auto">
+    {% if preis is not none or oben %}
+    <div class="flex shrink-0 items-baseline gap-2 leading-tight
+                sm:w-24 sm:flex-col sm:items-end sm:gap-0">
+      <span class="h-4 text-xs {{ oben_farbe }}">{{ oben or "" }}</span>
+      <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if deal }}">
+        {{ preis or "—" }}</span>
+    </div>
+    {% endif %}
+    {% if aktionen %}<div class="shrink-0">{{ aktionen }}</div>{% endif %}
+  </div>
+</{{ tag }}>
+{% endmacro %}
