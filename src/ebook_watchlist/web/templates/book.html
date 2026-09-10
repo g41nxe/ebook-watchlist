@@ -77,7 +77,7 @@
     <svg class="i"><use href="#ic-warn"/></svg>
     Eine Quelle nennt dieses Buch ganz anders
   </p>
-  <ul class="mt-1.5 space-y-0.5 text-ink/80">
+  <ul class="mt-1.5 space-y-0.5 text-ink">
     {% for state in page.mismatch %}
     <li>{{ state.display }}: „{{ state.matched_title }}“{% if state.matched_author %},
       {{ state.matched_author }}{% endif %}</li>

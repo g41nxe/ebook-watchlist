@@ -55,7 +55,9 @@
        das Symbol, ob gesucht oder auf einen grossen Lauf gewartet wird
        (Ticket 51, Entwurf C). #}
     <span class="flex items-center gap-1.5" title="{{ check.label(now=now) }}">
-      <span class="text-lg font-semibold tabular-nums text-soft/60">{{ entry.price or "—" }}</span>
+      {# `text-soft`, kein eigener Ton: gedaempft ist der Betrag schon dadurch,
+         dass er nicht mehr in `ink` steht. #}
+      <span class="text-lg font-semibold tabular-nums text-soft">{{ entry.price or "—" }}</span>
       {% if check.label(now=now) == "sucht …" %}
       <svg class="i animate-spin text-accent"><use href="#ic-spin"/></svg>
       {% else %}
@@ -85,15 +87,14 @@
     <details class="relative" x-data
              @click.outside="$el.open = false"
              @keydown.escape.window="$el.open = false">
-      {# Ein Knopf, kein Streifen aus drei Punkten: mit `p-1.5` mass der
-         Aufklapper 28 Pixel und war auf dem Telefon kaum zu treffen — neben
-         einem Betrag sahen die drei Punkte ausserdem aus, als waeren sie
-         heruntergefallen. Jetzt derselbe Rahmen und dieselbe Groesse wie die
-         Zeichen im Stapel. #}
+      {# Still wie vorher, nur gross genug zum Treffen: mit `p-1.5` mass der
+         Aufklapper 28 Pixel. Kein Rahmen — ein Menue ist keine Handlung,
+         sondern der Weg zu einer, und mit Rahmen sah es aus wie ein vierter
+         Knopf neben dem Betrag. #}
       <summary title="was mit diesem Eintrag geschehen soll"
                class="tun inline-flex h-9 w-9 cursor-pointer list-none items-center
-                      justify-center rounded border border-rule text-soft transition
-                      hover:border-accent hover:text-accent">
+                      justify-center rounded text-soft transition
+                      hover:bg-hair hover:text-ink">
         <svg class="i"><use href="#ic-dots"/></svg>
       </summary>
       {# Das Menue haengt am rechten Rand und ist auf dem Telefon breiter als

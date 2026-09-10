@@ -33,6 +33,7 @@
     preis=none,
     preis_inhalt=none,
     aktionen=none,
+    aktionen_unter_preis=false,
     auswahl=none,
     umschliessend=false
 ) %}
@@ -103,7 +104,7 @@
        beide dieselbe Hoehe kosten duerfen. #}
     {% if pitch %}
     <p class="line-clamp-2 sm:line-clamp-3 {{ 'mt-1' if kennzahlen }}
-              text-sm text-ink/80">{{ pitch }}</p>
+              text-sm text-ink">{{ pitch }}</p>
     {% endif %}
   </div>
   {% endif %}
@@ -120,12 +121,14 @@
      die letzte Reihe. Rechtsbuendig, nicht eingerueckt: eingerueckt stand der
      Betrag unter dem Cover und die Zeichen mitten im Text — mit dem rechten
      Rand als Kante liegen sie ueber allen Zeilen hinweg an derselben Stelle. #}
-  {# Ab `sm` steht der Betrag ueber den Handlungen; auf dem Telefon daneben.
-     Untereinander gab die Zeile dort drei rechtsbuendige Reihen aus, zwei
-     davon fuer je eine Sache. #}
+  {# Preis und Handlungen stehen nebeneinander — ausser wo unter dem Betrag
+     drei Zeichen stehen (`aktionen_unter_preis`, Stapelseite): die brauchen
+     dieselbe Breite wie die Preisspalte und bekommen deshalb eine eigene
+     Reihe. Ein einzelnes Menue unter dem Betrag sah dagegen aus, als waere es
+     heruntergefallen. #}
   <div class="order-last flex flex-1 items-center justify-end gap-3
-              sm:order-none sm:w-auto sm:flex-none sm:flex-col sm:items-end
-              sm:gap-2.5 sm:self-center">
+              sm:order-none sm:w-auto sm:flex-none sm:self-center
+              {{ 'sm:flex-col sm:items-end sm:gap-2.5' if aktionen_unter_preis }}">
     {% if preis is not none or oben %}
     {# Der Betrag steht mittig ueber der Reihe der Zeichen, nicht rechts
        ausgerichtet: die Reihe ist 92 Pixel breit, die Preisspalte 96 — rechts

@@ -21,7 +21,7 @@
            gekuerzt = $refs.text.scrollHeight > $refs.text.clientHeight + 1
          })">
   <summary class="list-none">
-    <p x-ref="text" class="max-w-prose text-sm leading-relaxed">{{ text }}</p>
+    <p x-ref="text" class="max-w-prose text-sm leading-relaxed text-ink">{{ text }}</p>
     {# `x-show` und nicht `:class="hidden"`: beides sind Klassen derselben
        Staerke, und `inline-block` steht im Stylesheet weiter unten — der
        Verweis blieb sichtbar. `x-show` schreibt `display` direkt ans Element. #}
