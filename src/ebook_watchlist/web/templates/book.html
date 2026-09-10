@@ -8,6 +8,7 @@
 {% from "_beobachtungen.html" import beobachtungen %}
 {% from "_urteil.html" import urteil %}
 {% from "_zustandsknopf.html" import zustandsknopf %}
+{% from "_sterne.html" import sterne %}
 
 {% block content %}
 <p class="mb-4 text-sm">
@@ -188,40 +189,23 @@
 
 {{ abschnitt("Wie gut das passt", "ic-star") }}
 
-{# Sterne der Leserin und Sterne einer Maschine stehen bewusst getrennt und
-   sehen bewusst verschieden aus: eine 4 von ihr ist eine Tatsache, eine 4 vom
-   Modell ein Vorschlag (ADR 17). Ein gemeinsamer Durchschnitt waere genau die
-   Vermischung, die das verhindern soll. #}
-{# Ohne Sterne heisst die Zeile "Noch nicht bewertet" und sonst nichts:
-   vorher stand daneben noch "Meine Bewertung" und, kursiv dahinter, ein
-   zweites Mal "noch nicht bewertet" — drei Beschriftungen fuer eine leere
-   Angabe. Die Sterne bleiben, sie sind der einzige Weg, eine zu machen. #}
+{# Ohne eigene Sterne steht hier nur ein Satz. Vorher standen daneben fuenf
+   leere Sterne und, kursiv dahinter, ein zweites Mal "noch nicht bewertet" —
+   drei Beschriftungen fuer eine leere Angabe, und in der festen Spalte von
+   112 Pixeln brach der Satz auch noch um. Der Satz *ist* der Weg zu den
+   Sternen: er klappt sie auf. Weg sind sie damit nicht, nur nicht im Bild,
+   solange es nichts zu zeigen gibt. #}
+{% if page.my_stars is none %}
+<details>
+  <summary class="inline-flex cursor-pointer list-none items-center gap-1.5 rounded
+                  py-1 text-sm text-soft hover:text-ink hover:underline
+                  underline-offset-2">Noch nicht bewertet</summary>
+  <div class="mt-1">{{ sterne(page.book_id) }}</div>
+</details>
+{% else %}
 <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-  <span class="w-28 shrink-0 text-sm text-soft">
-    {{ "Meine Bewertung" if page.my_stars is not none else "Noch nicht bewertet" }}</span>
-  <span class="flex items-center gap-0.5">
-    {% for value in range(1, 6) %}
-    {% set on = page.my_stars is not none and value <= page.my_stars %}
-    <form method="post" action="/book/{{ page.book_id }}/sterne">
-      <input type="hidden" name="stars" value="{{ value }}">
-      {# `aspect-square` neben `tun`: auf einem Beruehrungsgeraet zwingt die
-         Mindesthoehe von 44 px die Breite mit, sonst waere der Stern 22 px
-         breit und ein Fingerziel nur der Hoehe nach. Auf dem Schreibtisch
-         bleibt er so gross wie sein Inhalt. #}
-      {# Der Name des Knopfs steht als `aria-label` am Knopf und nicht als
-         verborgener Text darin: sichtbar war er nicht, im Textinhalt der
-         Seite aber schon — "Meine Bewertung 1 von 5 2 von 5 3 von 5 …",
-         fuenfmal dieselbe Auskunft vor dem einen Satz, der zaehlt. #}
-      <button type="submit" title="{{ value }} von 5" aria-label="{{ value }} von 5"
-              class="tun inline-flex aspect-square items-center justify-center p-0.5
-                     text-lg transition
-                     {{ 'text-ink' if on else 'text-rule hover:text-soft' }}">
-        <svg class="i" {% if on %}style="fill:currentColor"{% endif %}><use href="#ic-star"/></svg>
-      </button>
-    </form>
-    {% endfor %}
-  </span>
-  {% if page.my_stars is not none %}
+  <span class="shrink-0 text-sm text-soft">Meine Bewertung</span>
+  {{ sterne(page.book_id, page.my_stars) }}
   {# Zuruecknehmen schreibt keine Null: "nicht bewertet" und "passt ueberhaupt
      nicht" sind zwei verschiedene Auskuenfte. #}
   <form method="post" action="/book/{{ page.book_id }}/sterne">
@@ -229,8 +213,8 @@
     <button type="submit" class="text-xs text-soft underline underline-offset-2
                                  hover:text-ink">zurücknehmen</button>
   </form>
-  {% endif %}
 </div>
+{% endif %}
 
 {# Fremde Stimmen stehen fuer sich. Sie sagen etwas ueber das *Buch*, nicht
    ueber die Passung zum Leseprofil — und duerfen deshalb nicht neben einem

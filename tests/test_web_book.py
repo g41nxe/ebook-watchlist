@@ -335,7 +335,7 @@ def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> 
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "im Gespräch bewertet" in body
+    assert "geschätzt im Gespräch" in body
     assert "Reihe und Stimme." in body
     assert "Noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
 
@@ -349,7 +349,7 @@ def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: S
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "Übereinstimmung mit Leseprofil" in body
+    assert "geschätzte Übereinstimmung" in body
     assert "Zu weich." in body
 
 
@@ -458,7 +458,7 @@ def test_the_gates_verdict_on_a_discovery_without_an_isbn_is_found_too(
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "Übereinstimmung mit Leseprofil" in body
+    assert "geschätzte Übereinstimmung" in body
     assert "Achse D: isoliert." in body
     assert "Noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
 

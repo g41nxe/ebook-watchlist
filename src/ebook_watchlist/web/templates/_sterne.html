@@ -1,0 +1,33 @@
+{# Die fünf Sterne der Leserin — anklickbar, einer je Wert.
+
+   Sterne der Leserin und Sterne einer Maschine stehen bewusst getrennt und
+   sehen bewusst verschieden aus: eine 4 von ihr ist eine Tatsache, eine 4 vom
+   Modell ein Vorschlag (ADR 17).
+
+   Je Stern ein Formular: ohne Skript gibt es keinen anderen Weg, fünf
+   verschiedene Werte an dieselbe Adresse zu schicken.
+#}
+{% macro sterne(book_id, my_stars=none) %}
+<span class="flex items-center gap-0.5">
+  {% for value in range(1, 6) %}
+  {% set on = my_stars is not none and value <= my_stars %}
+  <form method="post" action="/book/{{ book_id }}/sterne">
+    <input type="hidden" name="stars" value="{{ value }}">
+    {# `aspect-square` neben `tun`: auf einem Beruehrungsgeraet zwingt die
+       Mindesthoehe von 44 px die Breite mit, sonst waere der Stern 22 px breit
+       und ein Fingerziel nur der Hoehe nach. Auf dem Schreibtisch bleibt er so
+       gross wie sein Inhalt.
+
+       Der Name des Knopfs steht als `aria-label` am Knopf und nicht als
+       verborgener Text darin: sichtbar war er nicht, im Textinhalt der Seite
+       aber schon — fuenfmal "N von 5" vor dem einen Satz, der zaehlt. #}
+    <button type="submit" title="{{ value }} von 5" aria-label="{{ value }} von 5"
+            class="tun inline-flex aspect-square items-center justify-center p-0.5
+                   text-lg transition
+                   {{ 'text-ink' if on else 'text-rule hover:text-soft' }}">
+      <svg class="i" {% if on %}style="fill:currentColor"{% endif %}><use href="#ic-star"/></svg>
+    </button>
+  </form>
+  {% endfor %}
+</span>
+{% endmacro %}

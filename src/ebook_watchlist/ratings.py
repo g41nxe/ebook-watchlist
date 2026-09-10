@@ -54,10 +54,14 @@ HUMAN_ORIGINS: frozenset[str] = frozenset({BY_READER})
 
 LABELS: dict[str, str] = {
     # Nicht "vom Werkzeug bewertet": *wer* gemessen hat, ist die kleinere
-    # Auskunft — die groessere ist, *was* gemessen wurde. Das Tor vergleicht
-    # ein Buch mit dem Leseprofil, und genau das sagt die Zeile jetzt.
-    BY_MODEL: "Übereinstimmung mit Leseprofil",
-    BY_CONVERSATION: "im Gespräch bewertet",
+    # Auskunft — die groessere ist, *was* gemessen wurde. Und "geschaetzt",
+    # weil das Tor aus einem Klappentext schliesst und nicht aus dem Buch.
+    BY_MODEL: "geschätzte Übereinstimmung",
+    # Dieselbe Schaetzung, nur im Gespraech entstanden statt im Lauf: die
+    # dreizehn Urteile aus ``owned.yaml``. Nicht "von mir" — die Datei haelt
+    # ausdruecklich fest, dass die Leserin diese Sterne *nicht* selbst
+    # vergeben hat, und eine 4 von ihr ist etwas anderes (ADR 17).
+    BY_CONVERSATION: "geschätzt im Gespräch",
     BY_READER: "deine Bewertung",
     BY_LIBRARY_READERS: "Leser:innen der Bibliothek",
 }
