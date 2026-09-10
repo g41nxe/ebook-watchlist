@@ -53,7 +53,15 @@ class Library:
 #: Zwei Zeichen, nicht eins: der Buchfink traegt die Kopfzeile bei 40 px, das
 #: gezeichnete Zeichen den Browser-Tab bei 16 — dort zerfaellt der Vogel zu
 #: einem Kruemel, waehrend Rechteck und Abzeichen noch unterscheidbar sind.
-ICONS = ("favicon.svg", "buchfink.png", "buchfink-tag.png")
+ICONS = (
+    "favicon.svg",
+    "buchfink.png",
+    "buchfink-tag.png",
+    # Das Titelbild des Leerzustands. 620 KB, und das ist vertretbar: es steht
+    # auf genau einer Seite, und zwar auf der, die eine Leserin einmal sieht
+    # und danach nie wieder.
+    "hero-lesezimmer.jpg",
+)
 
 LIBRARIES = (
     Library(

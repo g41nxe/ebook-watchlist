@@ -10,10 +10,16 @@
    startseite-tracking-werkzeuge.md). #}
 {# Das einzige Bild der Startseite, und nur hier: ein Willkommensgruss vor
    dem ersten Lauf. Rueckkehrer mit echten Daten sehen es nie wieder — die
-   oberste Bildschirmhaelfte gehoert dann ihnen, nicht Buchfink (ADR 30). #}
-<div class="mb-6 flex justify-center">
-  <img src="{{ url_for('static', path='buchfink-tag.png') }}?v={{ asset_version }}" alt=""
-       width="140" height="140" class="h-[140px] w-[140px] rounded-full border-2 border-ink object-cover">
+   oberste Bildschirmhaelfte gehoert dann ihnen, nicht Buchfink (ADR 30).
+
+   Das Lesezimmer statt des runden Abzeichens: es zeigt in einem Bild, wovon
+   die drei Argumente darunter reden — ein Regal, ein Sessel, und die
+   Watchlist auf dem Tisch. `width`/`height` stehen dran, damit die Seite
+   beim Laden nicht springt; `aspect-[24/10]` schneidet oben und unten,
+   falls ein spaeteres Bild andere Masse hat. #}
+<div class="mb-6 overflow-hidden rounded-lg border border-hair">
+  <img src="{{ url_for('static', path='hero-lesezimmer.jpg') }}?v={{ asset_version }}" alt=""
+       width="1571" height="663" class="aspect-[24/10] w-full object-cover">
 </div>
 <h1 class="mb-4 text-center font-serif text-2xl font-semibold tracking-tight">Weniger Suchen. Mehr Lesen.</h1>
 <div class="rounded-lg border border-hair bg-card px-5 py-6">

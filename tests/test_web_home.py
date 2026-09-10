@@ -94,12 +94,12 @@ def test_before_the_first_run_the_page_explains_and_points_to_the_watchlist(
     assert "zuletzt geprüft" not in body
 
 
-def test_the_empty_state_greets_with_the_mascot(client: TestClient) -> None:
+def test_the_empty_state_greets_with_the_hero(client: TestClient) -> None:
     """Das einzige Bild der Startseite, und nur hier: ein Willkommensgruss vor
     dem ersten Lauf, keine Ablenkung, sobald echte Daten da sind."""
     body = client.get("/").text
 
-    assert "buchfink-tag.png" in body
+    assert "hero-lesezimmer.jpg" in body
 
 
 def test_a_broken_configuration_is_reported_on_the_start_page_too(
