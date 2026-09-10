@@ -198,6 +198,63 @@ def test_an_unknown_action_is_refused(client: TestClient, db: Store) -> None:
     assert response.status_code == 500
 
 
+# --- eine Zeile, eine Entscheidung (Issue #9) -------------------------------
+
+
+def test_each_row_carries_the_three_decisions(client: TestClient, db: Store) -> None:
+    """Neben der Mehrfachauswahl: wer nur diesen einen Fund meint, soll ihn
+    nicht erst ankreuzen muessen."""
+    found(db, item_id="7", title="Der Kannibalenhügel")
+
+    body = client.get("/vorschlaege").text
+
+    assert 'hx-post="/vorschlaege/beam/7/entscheiden"' in body
+    for kind in ("dismissed", "owned", "watching"):
+        assert f'value="{kind}"' in body
+
+
+def test_a_row_decision_touches_exactly_one_find(client: TestClient, db: Store) -> None:
+    """Der Zeilenknopf betrifft immer genau einen Titel — angehakte Zeilen
+    bleiben unberuehrt, auch wenn sie im selben Formular stehen."""
+    found(db, item_id="7", title="Der Kannibalenhügel")
+    found(db, item_id="8", title="Ein anderer Fund")
+
+    client.post("/vorschlaege/beam/7/entscheiden", data={"kind": "owned"})
+
+    titel = {book.title for book in db.books()}
+    assert "Der Kannibalenhügel" in titel
+    assert "Ein anderer Fund" not in titel
+
+
+def test_a_row_decision_answers_with_nothing_so_the_row_disappears(
+    client: TestClient, db: Store
+) -> None:
+    """htmx tauscht die Zeile gegen die Antwort — leer heisst: weg damit."""
+    found(db, item_id="7")
+
+    response = client.post("/vorschlaege/beam/7/entscheiden", data={"kind": "dismissed"})
+
+    assert response.status_code == 200
+    assert response.text.strip() == ""
+
+
+def test_an_unknown_find_in_a_row_decision_is_refused(client: TestClient, db: Store) -> None:
+    response = client.post("/vorschlaege/beam/gibtsnicht/entscheiden", data={"kind": "owned"})
+
+    assert response.status_code == 404
+
+
+def test_the_selection_counter_recounts_when_a_row_vanishes(
+    client: TestClient, db: Store
+) -> None:
+    """Verschwindet eine angehakte Zeile, zaehlte der Zaehler sonst Geister."""
+    found(db, item_id="7")
+
+    body = client.get("/vorschlaege").text
+
+    assert "htmx:after-swap.window" in body
+
+
 # --- die Zusammenstellung für sich -----------------------------------------
 
 

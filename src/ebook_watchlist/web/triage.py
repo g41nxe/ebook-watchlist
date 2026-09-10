@@ -35,6 +35,17 @@ ACTIONS: tuple[tuple[str, str], ...] = labelled_actions(
     RelationKind.DISMISSED, RelationKind.OWNED, RelationKind.WATCHING
 )
 
+#: Ein Zeichen je Entscheidung, aus dem Sprite in ``base.html``. Keins davon
+#: ist anderswo schon besetzt: ``ic-play`` heißt in der Watchlist-Zeile
+#: "aktivieren", ``ic-user`` steht im Profil für Autor:innen — beide passten
+#: weder farblich noch inhaltlich. Dieselben Zeichen auf Stapel, Startseite
+#: und Fundseite: eine Handlung, ein Bild.
+ICONS: dict[str, str] = {
+    "dismissed": "ic-x",
+    "owned": "ic-check",
+    "watching": "ic-search",  # weiter danach Ausschau halten
+}
+
 #: Wie viele Zeilen eine Seite zeigt. Der Rückstand ist dreistellig, und eine
 #: Seite mit dreihundert Einträgen ist keine Aufgabe, sondern eine Strafe —
 #: der eigentliche Schnitt kommt aber vom Bewertungstor (ADR 19), nicht hier.

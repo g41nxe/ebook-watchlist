@@ -722,6 +722,7 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "pile": pile,
                 "actions": triage.ACTIONS,
+                "icons": triage.ICONS,
                 "anlass": anlass,
             },
         )
@@ -759,6 +760,29 @@ def create_app() -> FastAPI:
             return RedirectResponse("/", status_code=303)
         target = f"/vorschlaege?anlass={anlass}" if anlass else "/vorschlaege"
         return RedirectResponse(target, status_code=303)
+
+    @app.post("/vorschlaege/{source}/{item_id}/entscheiden", response_class=HTMLResponse)
+    def triage_decide_one(source: str, item_id: str, kind: str = Form(...)) -> HTMLResponse:
+        """Genau diesen einen Fund entscheiden (Issue #9).
+
+        Eine eigene Route statt eines Knopfes im grossen Formular: die Seite
+        ist *ein* Formular, ein Absende-Knopf darin schickte die angehakte
+        Auswahl statt seiner Zeile — und ein Knopf kann nicht gleichzeitig
+        `kind` und `keys` senden. Also htmx, wie beim Lauf-Panel.
+
+        Die Antwort ist leer: htmx tauscht die Zeile dagegen aus, und damit
+        ist sie weg. Die Auswahl der uebrigen Zeilen bleibt unberuehrt.
+        """
+        decided = triage.decide(
+            _store_for(paths.db_path()),
+            load_profile(),
+            [f"{source}:{item_id}"],
+            kind,
+            now=datetime.now(),
+        )
+        if not decided:
+            raise HTTPException(status_code=404, detail="kein solcher Fund")
+        return HTMLResponse("")
 
     @app.post("/vorschlaege/zuruecknehmen")
     def triage_undo(

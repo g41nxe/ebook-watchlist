@@ -24,15 +24,9 @@ from .watchlist import Entry
 OFFERS = 5
 SUGGESTIONS = 2
 
-#: Ein Zeichen je Entscheidung, aus dem Sprite in ``base.html``. Keins davon
-#: ist anderswo schon besetzt: ``ic-play`` heißt in der Watchlist-Zeile
-#: "aktivieren", ``ic-user`` steht im Profil für Autor:innen — beide passten
-#: hier weder farblich noch inhaltlich.
-ICONS: dict[str, str] = {
-    "dismissed": "ic-x",
-    "owned": "ic-check",
-    "watching": "ic-search",  # weiter danach Ausschau halten
-}
+#: Die Zeichen der drei Entscheidungen stehen bei den Entscheidungen selbst
+#: (``triage.ICONS``) — Startseite, Stapel und Fundseite zeigen dieselben.
+ICONS = triage.ICONS
 
 #: Die drei Verkaufsargumente aus der README — nur im Leerzustand. Wer die
 #: Seite täglich öffnet, kennt sie; wer sie zum ersten Mal öffnet, hat sonst
