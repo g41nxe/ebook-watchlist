@@ -184,6 +184,44 @@ def test_run_journal_records_every_run(data_dir: Path) -> None:
         assert all(run.trigger == "cli" for run in runs)
 
 
+def test_reloading_a_blurb_does_not_look_like_a_run(data_dir: Path) -> None:
+    """Der Klappentext wird jetzt mitten im Lauf nachgeladen, und dabei
+    entsteht eine eigene Zeile im Journal — die Beobachtung muss ja an einem
+    Lauf haengen. Sie darf aber nicht als *der* letzte Lauf gelten: sie ist
+    frueher fertig als der Rundgang, der sie angestossen hat, und die
+    Startseite haette danach "zuletzt geprueft … 0 Aenderungen" gemeldet.
+
+    Dieselbe Unterscheidung wie beim engen Lauf aus Ticket 51: ein Eintrag ist
+    kein Rundgang."""
+    from datetime import datetime
+
+    from ebook_watchlist import paths
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.run import _with_full_blurbs
+    from ebook_watchlist.sources.fake import FakeSource
+    from ebook_watchlist.store import ENTRY_TRIGGER, Store
+
+    store, profile = Store(paths.db_path()), load_profile()
+    rundgang = store.start_run(profile.slug, "cli", datetime.now())
+    store.finish_run(rundgang, status="ok", delta_count=3, finished_at=datetime.now())
+    angerissen = Observation(
+        source="fake",
+        source_item_id="fake-2",
+        title="Der Schwarm",
+        match_reason=MatchReason.GENRE_CATEGORY,
+        price_cents=1299,
+        blurb="Manche Menschen haben Geheimnisse…",
+    )
+
+    quelle = FakeSource(data_dir / "fake-source.yaml")
+    _with_full_blurbs(store, profile, [angerissen], [quelle])
+
+    laeufe = store.recent_runs(profile.slug)
+    assert laeufe[0].id == rundgang, "das Nachladen gilt als letzter Lauf"
+    assert all(lauf.trigger != ENTRY_TRIGGER for lauf in laeufe)
+
+
 def test_a_second_digest_on_the_same_day_does_not_erase_the_first(data_dir: Path) -> None:
     """A manual re-run must not silently overwrite what the cron job produced."""
     from ebook_watchlist.run import _write_html

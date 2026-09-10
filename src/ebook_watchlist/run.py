@@ -37,7 +37,7 @@ from .render import render_html, render_text
 from .seed import seed
 from .sources import build_sources
 from .sources.base import RunContext
-from .store import Store
+from .store import ENTRY_TRIGGER, Store
 
 EXIT_OK = 0
 EXIT_ALREADY_RUNNING = 0
@@ -435,7 +435,13 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
 
     print(f"{len(offen)} Klappentexte nachladen …")
     now = datetime.now()
-    run_id = store.start_run(profile.slug, "cli", now, pid=os.getpid())
+    # Als Eintrag, nicht als Rundgang: die Beobachtungen brauchen eine Zeile
+    # im Journal, aber diese Zeile darf nicht als *der* letzte Lauf gelten.
+    # Seit das Tor die Klappentexte mitten im Lauf nachlaedt, waere sie sonst
+    # genau das — frueher fertig als der Rundgang, der sie angestossen hat,
+    # und die Startseite meldete "zuletzt geprueft … 0 Aenderungen"
+    # (dieselbe Unterscheidung wie beim engen Lauf, Ticket 51).
+    run_id = store.start_run(profile.slug, ENTRY_TRIGGER, now, pid=os.getpid())
     geholt: dict[tuple[str, str], Observation] = {}
     frisch: list[Observation] = []
     for observation in offen:
