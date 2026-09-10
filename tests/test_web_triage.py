@@ -391,6 +391,31 @@ def test_the_row_carries_a_cover_and_the_source_symbol(client: TestClient, db: S
     assert "text-amber" in body
 
 
+def test_a_long_title_is_shortened_in_the_row_and_whole_on_the_find_page(
+    client: TestClient, db: Store
+) -> None:
+    """Ein Viertel der Titel der Quelle traegt einen ganzen Werbesatz hinter
+    einem Strich. Ungekuerzt wuchs eine Zeile dadurch auf das Doppelte ihrer
+    Nachbarin, und die Liste liess sich nicht mehr ueberfliegen. Verloren geht
+    nichts: die Fundseite zeigt den ganzen Titel, einen Klick entfernt."""
+    langer_titel = (
+        "Schwarzweiß | Er ist ein kranker Mörder. "
+        "Und er hat es auf deine Tochter abgesehen."
+    )
+    found(db, item_id="lang", title=langer_titel)
+
+    liste = client.get("/vorschlaege").text
+    vor_dem_titel = liste[: liste.index(langer_titel)]
+    titelabsatz = vor_dem_titel[vor_dem_titel.rindex("<p ") :]
+    assert "line-clamp-2" in titelabsatz, titelabsatz
+
+    vor_dem_pitch = liste[: liste.index("Ein Schiff, allein im Dunkeln.")]
+    pitchabsatz = vor_dem_pitch[vor_dem_pitch.rindex("<p ") :]
+    assert "line-clamp-3" in pitchabsatz, pitchabsatz
+
+    assert langer_titel in client.get("/discovery/beam/lang").text
+
+
 def test_the_page_shows_ten_not_fifty(client: TestClient, db: Store) -> None:
     """Der Stapel wird vom Tor ohnehin neu erzeugt — gezeigt wird nur, was auch
     bewertet werden muss."""

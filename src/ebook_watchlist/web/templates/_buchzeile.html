@@ -57,11 +57,17 @@
      festen Teile ihren Platz zuerst, und die zwei Textspalten teilen sich,
      was uebrig bleibt: 1 zu 1,6 zugunsten des Pitches. #}
   <div class="min-w-40 flex-[1_1_0%]">
-    <p class="font-serif text-base font-semibold tracking-tight">
+    {# Hoechstens zwei Zeilen. Ein Viertel der Titel der Quelle traegt hinter
+       einem Strich einen ganzen Werbesatz ("… | Er ist ein kranker Moerder.
+       Und er hat es auf deine Tochter abgesehen."); ungekuerzt wuchs so eine
+       Zeile auf das Doppelte ihrer Nachbarin, und die Liste liess sich nicht
+       mehr ueberfliegen. Gekuerzt wird nur die Ansicht: den ganzen Titel
+       zeigen die Fundseite und der Hinweis beim Ueberfahren. #}
+    <p class="line-clamp-2 font-serif text-base font-semibold tracking-tight">
       {% if titel_url %}
-      <a href="{{ titel_url }}" onclick="event.stopPropagation()"
+      <a href="{{ titel_url }}" title="{{ titel }}" onclick="event.stopPropagation()"
          class="hover:underline underline-offset-2">{{ titel }}</a>
-      {% else %}{{ titel }}{% endif %}
+      {% else %}<span title="{{ titel }}">{{ titel }}</span>{% endif %}
     </p>
     <p class="truncate text-sm text-soft">{{ autor or "unbekannt" }}</p>
     {# Anlass und Quelle in einer Zeile unter dem Autor: die Pille sagt,
@@ -80,7 +86,12 @@
   {% if kennzahlen or pitch %}
   <div class="min-w-40 flex-[1.6_1_0%]">
     {% if kennzahlen %}{{ kennzahlen }}{% endif %}
-    {% if pitch %}<p class="{{ 'mt-1' if kennzahlen }} text-sm text-ink/80">{{ pitch }}</p>{% endif %}
+    {# Drei Zeilen, aus demselben Grund wie beim Titel: der Pitch ist ein
+       Satz, der Klappentext ein Absatz — nebeneinander in einer Liste muessen
+       beide dieselbe Hoehe kosten duerfen. #}
+    {% if pitch %}
+    <p class="line-clamp-3 {{ 'mt-1' if kennzahlen }} text-sm text-ink/80">{{ pitch }}</p>
+    {% endif %}
   </div>
   {% endif %}
 
