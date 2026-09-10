@@ -1,0 +1,57 @@
+{# Eine Kachel je Quelle: was sie über dieses Buch weiß und wo es dort steht.
+
+   Die beiden Arten sagen Verschiedenes — der Shop einen Preis, die Bibliothek
+   eine Verfügbarkeit. Eine gemeinsame Zeile zwänge beides in dieselbe Form
+   (Ticket 52).
+
+   Die ganze Kachel ist der Verweis; ein eigenes „öffnen" daneben sagte
+   dasselbe zweimal. Die Farbe steht an der Kachel, damit `currentColor` beim
+   Überfahren stimmt — deshalb nennt jeder Wert seine Farbe ausdrücklich, sonst
+   erbte ein Preis von 9,99 das Bernstein und sähe aus wie ein Schnäppchen.
+
+   Eine Stelle für Buch- und Fundseite (Issue #9): ein Fund kennt genau eine
+   Quelle, ein Buch bis zu zwei — die Kachel ist dieselbe.
+#}
+{% macro kachel(display, library=false, url=none, preis=none, verfuegbarkeit=none,
+                ersatz=none, deal=false, wann=none, pille=none) %}
+{% set ton = ("text-accent" if library else "text-amber") if url else "text-soft" %}
+<{{ "a" if url else "div" }}
+   {% if url %}href="{{ url }}" target="_blank" rel="noopener"
+   title="{{ display }} öffnen" class="kachel-klickbar cursor-pointer {% else %}
+   {# `max-w-xs`: bei einer einzigen Kachel zog `flex-1` sie ueber die ganze
+      Breite, und ein Preis in einem 720 Pixel breiten Kasten sieht aus wie
+      ein Fehler. Zwei Kacheln teilen sich denselben Deckel. #}
+   class="{% endif %}{{ ton }} relative flex min-w-52 max-w-xs flex-1 flex-col
+          justify-between overflow-hidden rounded-lg border border-rule bg-card
+          px-3 pt-2 pr-14 pb-2.5">
+  <svg class="kachelbild {{ ton }}" aria-hidden="true">
+    <use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
+  <div class="relative mb-2 flex flex-wrap items-center gap-1.5 text-xs
+              tracking-wide uppercase">
+    <svg class="i"><use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
+    {{ display }}
+    {# Der Anlass steht in der Kachel statt unter dem Autor: dort war er eine
+       eigene Zeile fuer zwei Woerter, und der Kopf wuchs um sie. #}
+    {% if pille %}<span class="ml-1 normal-case">{{ pille }}</span>{% endif %}
+  </div>
+  <div class="relative">
+    {% if preis %}
+    <span class="block font-serif text-lg leading-none font-medium tabular-nums
+                 {{ 'text-amber' if deal else 'text-ink' }}">{{ preis }}</span>
+    {% elif verfuegbarkeit %}
+    <span class="block text-lg leading-none font-medium
+                 {{ 'text-accent' if verfuegbarkeit == 'ausleihbar' else 'text-ink' }}"
+          >{{ verfuegbarkeit }}</span>
+    {% else %}
+    <span class="block text-lg leading-none font-medium text-soft">{{ ersatz or "—" }}</span>
+    {% endif %}
+    {# Der Zeitpunkt gehoert zu *dieser* Quelle: zwei Quellen koennen zu
+       verschiedenen Zeiten gesprochen haben, heute nur zufaellig nicht. Ohne
+       Zeitpunkt steht ein Strich: die Zeile bleibt, sonst rutscht der Wert
+       dieser Kachel tiefer als der ihrer Nachbarin, und ein Strich sagt "dazu
+       ist nichts bekannt" — leer sagt gar nichts. #}
+    <span class="mt-2 block text-[11px] tabular-nums text-soft">
+      {% if wann %}{{ wann.strftime("%d.%m. %H:%M") }}{% else %}&mdash;{% endif %}</span>
+  </div>
+</{{ "a" if url else "div" }}>
+{% endmacro %}

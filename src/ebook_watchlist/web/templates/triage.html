@@ -169,7 +169,14 @@
 </ul>
 
 {# Die Leiste bleibt am unteren Rand stehen: bei fünfzig Zeilen wäre ein Knopf
-   ganz unten eine Reise. #}
+   ganz unten eine Reise.
+
+   Links, was die Auswahl betrifft, rechts, was mit ihr geschieht — und alle
+   Knöpfe in derselben Größe: "alle" und "keine" waren zwei Größen kleiner als
+   die Handlungen daneben und sahen dadurch wie etwas anderes aus, obwohl sie
+   dasselbe sind. Der Satz, dass „Verwerfen" nichts löscht, stand daneben und
+   erklärte bei jedem Besuch dasselbe; was die Entscheidung bedeutet, steht in
+   der Einleitung oben und auf der Buchseite, wo sie sich zurücknehmen lässt. #}
 <div class="sticky bottom-0 mt-4 flex flex-wrap items-center gap-2 border-t border-rule
             bg-paper/95 py-3 backdrop-blur">
   <span class="text-sm text-soft">
@@ -177,33 +184,35 @@
   </span>
   {# Auswaehlen gehoert hierher und nicht zu den Filtern oben: ein Filter ist
      eine Ansicht, eine Auswahl ist der erste Teil einer Handlung. #}
-  <span x-cloak class="mr-1 flex items-center gap-1.5 text-xs">
+  <span x-cloak class="flex items-center gap-2">
     <button type="button" @click="mark(true)"
-            class="tun inline-flex h-7 items-center rounded border border-rule px-2 text-soft
+            class="tun inline-flex h-9 items-center justify-center rounded border
+                   border-rule px-3 text-sm font-medium text-soft
                    hover:border-soft hover:text-ink">alle</button>
     <button type="button" @click="mark(false)" :disabled="chosen === 0"
-            class="tun inline-flex h-7 items-center rounded border border-rule px-2 text-soft
+            class="tun inline-flex h-9 items-center justify-center rounded border
+                   border-rule px-3 text-sm font-medium text-soft
                    hover:border-soft hover:text-ink
                    disabled:opacity-40 disabled:hover:border-rule
                    disabled:hover:text-soft">keine</button>
   </span>
-  {% for kind, label in actions %}
-  {# Ohne Alpine bleibt der Knopf klickbar und tut wie bisher nichts, wenn
-     nichts angehakt ist — das ist der heutige Zustand, nicht schlechter. #}
-  {# Dieselbe Farblogik wie auf der Startseite: bernstein fuer "Hab ich"
-     (meist gekauft), gruen fuer "Beobachten" (Bibliothek/Watchlist). #}
-  <button type="submit" name="kind" value="{{ kind }}" :disabled="chosen === 0"
-          class="rounded border tun inline-flex h-9 items-center justify-center px-3 text-sm font-medium transition
-                 disabled:opacity-40
-                 {% if kind == 'dismissed' %}border-rule text-soft hover:border-danger hover:text-danger
-                 {% elif kind == 'owned' %}border-rule text-ink hover:border-amber hover:text-amber
-                 {% else %}border-rule text-ink hover:border-accent hover:text-accent{% endif %}">
-    {{ label }}
-  </button>
-  {% endfor %}
-  <span class="ml-auto text-xs text-soft">
-    „Verwerfen" löscht nichts — es hält fest, dass dieses Buch nicht mehr
-    vorgeschlagen werden soll.
+
+  <span class="ml-auto flex flex-wrap items-center gap-2">
+    {% for kind, label in actions %}
+    {# Ohne Alpine bleibt der Knopf klickbar und tut wie bisher nichts, wenn
+       nichts angehakt ist — das ist der heutige Zustand, nicht schlechter. #}
+    {# Dasselbe Zeichen wie in der Zeile und auf der Fundseite: eine Handlung,
+       ein Bild. Und dieselbe Farblogik wie auf der Startseite: bernstein fuer
+       "Hab ich" (meist gekauft), gruen fuer "Beobachten" (Bibliothek). #}
+    <button type="submit" name="kind" value="{{ kind }}" :disabled="chosen === 0"
+            class="tun inline-flex h-9 items-center justify-center gap-1.5 rounded border
+                   px-3 text-sm font-medium transition disabled:opacity-40
+                   {% if kind == 'dismissed' %}border-rule text-soft hover:border-danger hover:text-danger
+                   {% elif kind == 'owned' %}border-rule text-ink hover:border-amber hover:text-amber
+                   {% else %}border-rule text-ink hover:border-accent hover:text-accent{% endif %}">
+      <svg class="i"><use href="#{{ icons[kind] }}"/></svg>{{ label }}
+    </button>
+    {% endfor %}
   </span>
 </div>
 </form>

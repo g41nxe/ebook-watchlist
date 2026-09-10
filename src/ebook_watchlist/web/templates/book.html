@@ -3,145 +3,60 @@
 
 {% from "_abschnitt.html" import abschnitt %}
 {% from "_klappentext.html" import klappentext %}
+{% from "_buchkopf.html" import kopf %}
+{% from "_quellenkachel.html" import kachel %}
+{% from "_beobachtungen.html" import beobachtungen %}
+{% from "_urteil.html" import urteil %}
 
 {% block content %}
 <p class="mb-4 text-sm">
   <a href="/watchlist" class="text-soft hover:text-ink">← Watchlist</a>
 </p>
 
-<div class="flex flex-wrap items-start gap-5">
-  {# Das Cover traegt dieselben Abzeichen wie in den Listen, nur groesser:
-     hier ist es viermal so gross wie in einer Zeile, und das Listenmass
-     wirkte daneben verloren (Ticket 52). #}
-  {# Das Cover schliesst unten mit den Kacheln ab: es waechst mit der Spalte
-     daneben, statt eine feste Hoehe zu haben. Wie hoch die wird, haengt
-     davon ab, was das Buch mitbringt — ISBN und Reihe sind wahlweise. #}
-  <div class="relative w-24 shrink-0 self-stretch">
-  <div class="h-full min-h-36 w-24 overflow-hidden rounded shadow-[0_2px_8px_rgba(0,0,0,.4)]">
-    {% if page.cover_file %}
-    <img src="/covers/{{ page.cover_file }}" alt="" class="h-full w-full object-cover">
-    {% else %}
-    {# Der Farbton haengt am Titel, damit dasselbe Buch immer gleich aussieht
-       und sich zwei nebeneinander unterscheiden lassen. Er bleibt aber im
-       Gruen des Zeichens der Anwendung (160-187 statt des ganzen Kreises):
-       ein Platzhalter ist unser Buch, kein fremdes, und ein zufaellig
-       violettes oder rotes Rueckenschild gehoerte zu nichts. #}
-    {% set hue = 160 + ((page.title | sum_chars) % 28) %}
-    <svg viewBox="0 0 44 64" class="h-full w-full" aria-hidden="true">
-      <rect width="44" height="64" rx="2" fill="hsl({{ hue }} 30% 30%)"/>
-      <rect width="5" height="64" fill="hsl({{ hue }} 32% 21%)"/>
-      <rect x="12" y="16" width="22" height="1.5" rx="0.75" fill="hsl({{ hue }} 24% 60%)"/>
-      <rect x="12" y="21" width="16" height="1.5" rx="0.75" fill="hsl({{ hue }} 24% 53%)"/>
-      <rect x="12" y="40" width="12" height="1.5" rx="0.75" fill="hsl({{ hue }} 24% 46%)"/>
-    </svg>
-    {% endif %}
-  </div>
-  {% if page.borrowable or page.deal %}
-  <span class="absolute -top-2 -right-2 flex flex-col gap-1">
-    {% if page.borrowable %}
-    <span title="in der Bibliothek ausleihbar" class="badge badge-gross bg-accent">
-      <svg><use href="#ic-lib"/></svg></span>
-    {% endif %}
-    {% if page.deal %}
-    <span title="Schnäppchen" class="badge badge-gross bg-amber">
-      <svg class="zipfel"><use href="#ic-tag"/></svg></span>
-    {% endif %}
-  </span>
-  {% endif %}
-  </div>
+{# Anlass als Pille, an der Stelle, an der die ISBN stand: die ging in keine
+   Entscheidung ein, die Pille sagt, warum dieses Buch ueberhaupt da ist. #}
+{% set pille %}
+{% if page.origin %}
+<span class="rounded px-1.5 py-0.5 text-xs font-medium
+             {{ 'bg-accent/15 text-accent' if page.origin.author_driven
+                else 'bg-amber/15 text-amber' }}">{{ page.origin.short }}</span>
+{% endif %}
+{% endset %}
 
-  {# Mindestens so hoch wie das Cover und mittig gesetzt: wie viel hier steht,
-     haengt davon ab, was das Buch mitbringt — ISBN, Reihe, Notiz, Herkunft
-     sind alle wahlweise. Ohne das Mindestmass ragte das Cover bei einem
-     kargen Buch unten heraus. #}
-  <div class="flex min-h-36 min-w-0 flex-1 flex-col justify-center">
-    <h1 class="font-serif text-2xl font-semibold tracking-tight">{{ page.title }}</h1>
-    <p class="mt-0.5 text-soft">{{ page.author or "unbekannt" }}</p>
-    {# Nur wenn etwas drinsteht: eine leere Liste hat Hoehe null, ihre
-       Raender aber nicht — bei einem Buch ohne Reihe und ohne ISBN klafften
-       dadurch 29 Pixel fuer nichts. #}
-    {% if page.series or page.isbn %}
-    <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-      {% if page.series %}
-      <div><dt class="inline text-soft">Reihe</dt> <dd class="inline">{{ page.series }}</dd></div>
-      {% endif %}
-      {% if page.isbn %}
-      <div><dt class="inline text-soft">ISBN</dt>
-        <dd class="inline tabular-nums">{{ page.isbn }}</dd></div>
-      {% endif %}
-    </dl>
-    {% endif %}
+{% set kacheln %}
+{% for state in page.sources %}
+{% set sichtung = page.latest_at(state.display) %}
+{{ kachel(
+     state.display,
+     library=state.category == "library",
+     url=state.url if state.outcome in ("linked", "confirmed") else none,
+     preis=sichtung.price if sichtung else none,
+     verfuegbarkeit=sichtung.availability if sichtung else none,
+     ersatz=state.label,
+     deal=sichtung.deal if sichtung else false,
+     wann=sichtung.when if sichtung else none,
+     pille=pille if loop.first else none) }}
+{% endfor %}
+{% endset %}
 
-    {# Je Quelle eine Kachel: die beiden sagen Verschiedenes — die eine einen
-       Preis, die andere eine Verfuegbarkeit. Eine gemeinsame Zeile zwaenge
-       beides in dieselbe Form (Ticket 52).
+{# Warum dieses Buch hereinkam, ausgeschrieben. Dieselben Worte wie im
+   Tagesbericht und im Stapel, aus einer Stelle (Ticket 22). #}
+{% set herkunft %}
+{% if page.origin %}
+<p class="mt-3 text-sm text-soft">{{ page.origin.why }}{% if page.origin.when %},
+  zuletzt gesehen am {{ page.origin.when.strftime("%d.%m.%Y") }}{% endif %}</p>
+{% endif %}
+{% endset %}
 
-       Die ganze Kachel ist der Verweis; ein eigenes "oeffnen" daneben sagte
-       dasselbe zweimal. Die Farbe steht an der Kachel, damit `currentColor`
-       beim Ueberfahren stimmt — deshalb nennt jeder Wert seine Farbe
-       ausdruecklich, sonst erbte ein Preis von 9,99 das Bernstein und saehe
-       aus wie ein Schnaeppchen. #}
-    {% if page.sources %}
-    <div class="mt-3 flex flex-wrap items-stretch gap-3">
-      {% for state in page.sources %}
-      {% set sichtung = page.latest_at(state.display) %}
-      {% set library = state.category == "library" %}
-      {% set gefunden = state.url and state.outcome in ("linked", "confirmed") %}
-      {% set ton = ("text-accent" if library else "text-amber") if gefunden else "text-soft" %}
-      <{{ "a" if gefunden else "div" }}
-         {% if gefunden %}href="{{ state.url }}" target="_blank" rel="noopener"
-         title="{{ state.display }} öffnen" class="kachel-klickbar cursor-pointer {% else %}
-         class="{% endif %}{{ ton }} relative flex min-w-52 flex-1 flex-col
-                justify-between overflow-hidden rounded-lg border border-rule bg-card
-                px-3 pt-2 pr-14 pb-2.5">
-        <svg class="kachelbild {{ ton }}" aria-hidden="true">
-          <use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
-        <div class="relative mb-2 flex items-center gap-1.5 text-xs tracking-wide uppercase">
-          <svg class="i"><use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
-          {{ state.display }}
-        </div>
-        <div class="relative">
-          {% if sichtung and sichtung.price %}
-          <span class="block font-serif text-lg leading-none font-medium tabular-nums
-                       {{ 'text-amber' if sichtung.deal else 'text-ink' }}">{{ sichtung.price }}</span>
-          {% elif sichtung and sichtung.availability %}
-          <span class="block text-lg leading-none font-medium
-                       {{ 'text-accent' if sichtung.availability == 'ausleihbar' else 'text-ink' }}"
-                >{{ sichtung.availability }}</span>
-          {% else %}
-          <span class="block text-lg leading-none font-medium text-soft">{{ state.label }}</span>
-          {% endif %}
-          {# Der Zeitpunkt gehoert zu *dieser* Quelle: zwei Quellen koennen zu
-             verschiedenen Zeiten gesprochen haben, heute nur zufaellig
-             nicht. Ohne Zeitpunkt steht ein Strich: die Zeile bleibt, sonst
-             rutscht der Wert dieser Kachel tiefer als der ihrer Nachbarin,
-             und ein Strich sagt "dazu ist nichts bekannt" — leer sagt gar
-             nichts. #}
-          <span class="mt-1 block text-xs tabular-nums text-soft">
-            {% if sichtung and sichtung.when %}{{ sichtung.when.strftime("%d.%m. %H:%M") }}
-            {% else %}&mdash;{% endif %}</span>
-        </div>
-      </{{ "a" if gefunden else "div" }}>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {# Warum dieses Buch ueberhaupt hereinkam. Ein Watchlist-Titel bekommt
-       hier nichts: warum er da steht, weiss die Leserin, sie hat ihn
-       hingeschrieben. Ein Fund ist die eigentliche Frage - und wer ihn
-       nicht ueber den Tagesbericht oeffnet, hatte bisher keine Antwort (Ticket 22).
-       Dieselben Worte wie im Tagesbericht und im Stapel, aus einer Stelle. #}
-    {% if page.origin %}
-    <p class="mt-3 flex flex-wrap items-center gap-2 text-sm">
-      <span class="rounded px-1.5 py-0.5 text-xs font-medium
-                   {{ 'bg-accent/15 text-accent' if page.origin.author_driven
-                      else 'bg-amber/15 text-amber' }}">{{ page.origin.short }}</span>
-      <span class="text-soft">{{ page.origin.why }}{% if page.origin.when %},
-        zuletzt gesehen am {{ page.origin.when.strftime("%d.%m.%Y") }}{% endif %}</span>
-    </p>
-    {% endif %}
-  </div>
-</div>
+{{ kopf(
+     page.title,
+     autor=page.author,
+     reihe=page.series,
+     cover_file=page.cover_file,
+     borrowable=page.borrowable,
+     deal=page.deal,
+     kacheln=kacheln,
+     herkunft=herkunft) }}
 
 {% if page.note %}
 {# Die wertvollste Zeile des Eintrags, und bis Ticket 52 unsichtbar: bei 15
@@ -268,37 +183,9 @@
 {% set fremd = page.judgements | selectattr("is_foreign") | list %}
 {% set machine = page.judgements | rejectattr("is_human") | rejectattr("is_foreign") | list %}
 {% if machine %}
-<ul class="mt-4 space-y-3">
+<ul class="mt-4 space-y-4">
   {% for judgement in machine %}
-  <li class="rounded-lg border border-rule bg-card px-4 py-3">
-    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <span class="flex items-center gap-0.5 text-gold">
-        {% for value in range(1, 6) %}
-        <svg class="i" {% if value <= judgement.stars %}style="fill:currentColor"{% endif %}>
-          <use href="#ic-star"/></svg>
-        {% endfor %}
-      </span>
-      {# Die Zahl neben den Sternen: fuenf Symbole abzuzaehlen ist Arbeit, die
-         eine Ziffer abnimmt. Dieselbe Schreibweise wie bei den fremden
-         Stimmen. #}
-      <span class="text-sm tabular-nums text-soft">
-        <span class="font-semibold text-ink">{{ judgement.stars | sterne }}</span>&nbsp;/&nbsp;5</span>
-      <span class="text-sm text-soft">{{ judgement.label }}</span>
-      <span class="rounded bg-hair px-1.5 py-0.5 text-xs text-soft">{{ judgement.confidence }}</span>
-      {% if judgement.when %}
-      <span class="text-xs text-soft">{{ judgement.when.strftime("%d.%m.%Y") }}</span>
-      {% endif %}
-      {% if judgement.stale(page.profile_version) %}
-      {# Ein Maschinenurteil gegen einen alten Massstab ist Auskunft, keine
-         Grundlage — beim naechsten Lauf wird es neu eingeholt (ADR 19). #}
-      <span class="rounded bg-danger/10 px-1.5 py-0.5 text-xs text-danger">
-        gegen Profil {{ judgement.profile_version }}, heute gilt {{ page.profile_version }}</span>
-      {% endif %}
-    </div>
-    {% if judgement.reason %}
-    <p class="mt-1.5 text-sm text-ink/80">{{ judgement.reason }}</p>
-    {% endif %}
-  </li>
+  <li>{{ urteil(judgement, page.profile_version) }}</li>
   {% endfor %}
 </ul>
 {% endif %}
@@ -375,49 +262,7 @@
 </ul>
 {% endif %}
 
-{# Der Wrapper durfte schon scrollen, die Tabelle wollte nur nicht: mit
-   `w-full` allein schrumpfte sie auf die Breite des Telefons, und dort zerfiel
-   "4,99 €" in zwei Zeilen und die Kopfzelle "Dort anders genannt" in drei.
-   Eine Mindestbreite laesst sie stattdessen scrollen. #}
-<div class="overflow-x-auto">
-<table class="w-full min-w-xl border-collapse text-sm whitespace-nowrap">
-  <thead>
-    <tr class="border-b border-rule text-left text-soft">
-      <th class="py-1.5 pr-3 font-semibold">Wann</th>
-      <th class="py-1.5 pr-3 font-semibold">Quelle</th>
-      <th class="py-1.5 pr-3 font-semibold">Preis</th>
-      <th class="py-1.5 pr-3 font-semibold">Bibliothek</th>
-      <th class="py-1.5 font-semibold">Dort anders genannt</th>
-    </tr>
-  </thead>
-  <tbody class="divide-y divide-hair">
-    {% for sighting in page.recent_history %}
-    <tr class="align-top">
-      <td class="py-2 pr-3 tabular-nums whitespace-nowrap text-soft">
-        {{ sighting.when.strftime("%d.%m. %H:%M") if sighting.when else "" }}</td>
-      <td class="py-2 pr-3">{{ sighting.source }}</td>
-      <td class="py-2 pr-3 tabular-nums {{ 'text-amber' if sighting.deal }}">
-        {{ sighting.price or "—" }}</td>
-      <td class="py-2 pr-3 {{ 'text-accent' if sighting.availability == 'ausleihbar' }}">
-        {{ sighting.availability or "—" }}</td>
-      {# Nur, wenn die Quelle anders benennt — sonst wiederholte die Spalte
-         in jeder Zeile denselben Titel, und der eine Fall, auf den es
-         ankommt, ginge darin unter (ADR 9). #}
-      <td class="py-2 whitespace-normal
-                 {{ 'text-danger' if sighting.other_title else 'text-soft' }}">
-        {{ sighting.other_title or "—" }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-{% if page.hidden_history %}
-{# Nicht verschwiegen, nur nicht gezeigt: der Snapshot behaelt jede Sichtung
-   (ADR 5), die Seite zeigt den letzten Stand. #}
-<p class="mt-2 text-xs text-soft">
-  {{ page.hidden_history }} ältere Sichtung{{ "en" if page.hidden_history > 1 }}
-  nicht gezeigt.</p>
-{% endif %}
+{{ beobachtungen(page.recent_history, page.hidden_history) }}
 {% endif %}
 {{ abschnitt("Was du dazu sagst", "ic-tag") }}
 <div class="flex flex-wrap gap-2">

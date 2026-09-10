@@ -10,10 +10,23 @@
 #}
 {% macro klappentext(text) %}
 {% if text %}
-<details class="klappentext mt-6">
+{# "mehr anzeigen" nur, wenn es mehr zu sehen gibt: ob der Text ueberhaupt an
+   die fuenf Zeilen stoesst, weiss erst der Browser — er haengt an Schriftgroesse
+   und Fensterbreite. Genau die Haelfte der Arbeitsteilung aus ADR 20, die
+   Alpine gehoert. Ohne Alpine bleibt der Verweis stehen und tut, was er
+   heute tut. #}
+<details class="klappentext mt-6"
+         x-data="{ gekuerzt: true }"
+         x-init="$nextTick(() => {
+           gekuerzt = $refs.text.scrollHeight > $refs.text.clientHeight + 1
+         })">
   <summary class="list-none">
-    <p class="max-w-prose text-sm leading-relaxed">{{ text }}</p>
-    <span class="mehr mt-1 inline-block cursor-pointer text-xs text-accent underline
+    <p x-ref="text" class="max-w-prose text-sm leading-relaxed">{{ text }}</p>
+    {# `x-show` und nicht `:class="hidden"`: beides sind Klassen derselben
+       Staerke, und `inline-block` steht im Stylesheet weiter unten — der
+       Verweis blieb sichtbar. `x-show` schreibt `display` direkt ans Element. #}
+    <span x-show="gekuerzt"
+          class="mehr mt-1 inline-block cursor-pointer text-xs text-accent underline
                  decoration-accent/30 underline-offset-2 hover:decoration-accent"></span>
   </summary>
 </details>

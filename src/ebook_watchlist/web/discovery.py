@@ -22,7 +22,16 @@ from ..deals import is_strong_deal
 from ..reasons import thema_name
 from ..sources import registry
 from ..store import Store
-from .book import _AVAILABILITY, Judgement, Origin, Sighting, _judgements, _origin, _price
+from .book import (
+    _AVAILABILITY,
+    HISTORY_ROWS,
+    Judgement,
+    Origin,
+    Sighting,
+    _judgements,
+    _origin,
+    _price,
+)
 from .triage import _cover_file
 
 
@@ -59,8 +68,23 @@ class Page:
         return self.history[0].price if self.history else None
 
     @property
-    def seen_count(self) -> int:
-        return len(self.history)
+    def availability(self) -> str | None:
+        """Was die Quelle zuletzt zur Ausleihe sagte — bei einem Shop nichts."""
+        return self.history[0].availability if self.history else None
+
+    @property
+    def last_seen(self):
+        """Wann die Quelle zuletzt gesprochen hat."""
+        return self.history[0].when if self.history else None
+
+    @property
+    def recent_history(self) -> tuple[Sighting, ...]:
+        """Die letzten Sichtungen — dieselbe Grenze wie auf der Buchseite."""
+        return self.history[:HISTORY_ROWS]
+
+    @property
+    def hidden_history(self) -> int:
+        return max(0, len(self.history) - HISTORY_ROWS)
 
 
 def build(store: Store, profile: Profile, source: str, item_id: str) -> Page | None:

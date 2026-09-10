@@ -113,18 +113,31 @@ def test_the_gate_reasoning_is_readable_here_and_only_here(
     assert client.get("/vorschlaege").text.count("Täterstimme ohne Reue") == 0
 
 
-def test_the_page_shows_todays_price_not_every_run(client: TestClient, db: Store) -> None:
-    """Der Snapshot ist anhängend, also steht derselbe Fund dort einmal je Lauf
-    — bei einem Titel, an dem sich nichts ändert, waren das elf Zeilen mit
-    elfmal demselben Betrag. Gezeigt wird, was er heute kostet."""
+def test_the_price_stands_in_the_tile_of_its_source(client: TestClient, db: Store) -> None:
+    """Wie auf der Buchseite: der Preis gehört zu der Quelle, die ihn genannt
+    hat, nicht in eine Ecke der Seite. Ein Fund kennt genau eine."""
     for tage, preis in ((3, 1299), (2, 1199), (1, 999)):
         fund(db, price=preis, when=NOW - timedelta(days=tage))
 
     body = client.get("/discovery/beam/7").text
+    kachel = body[body.index("kachel-klickbar") :]
+    kachel = kachel[: kachel.index("</a>")]
 
-    assert "9,99 €" in body
-    assert "12,99 €" not in body
-    assert "Beobachtung" not in body
+    assert "9,99 €" in kachel
+    assert "Shop" in kachel
+
+
+def test_the_table_shows_the_last_five_sightings(client: TestClient, db: Store) -> None:
+    """Der Snapshot ist anhängend, also steht derselbe Fund dort einmal je Lauf
+    — bei einem Titel, an dem sich nichts ändert, waren das elf Zeilen mit
+    elfmal demselben Betrag. Dieselbe Grenze wie auf der Buchseite."""
+    for tage in range(8):
+        fund(db, price=900 + tage, when=NOW - timedelta(days=tage))
+
+    body = client.get("/discovery/beam/7").text
+
+    assert "Was beobachtet wurde" in body
+    assert "3 ältere" in body
 
 
 def test_the_head_names_title_author_and_source_and_nothing_else(
