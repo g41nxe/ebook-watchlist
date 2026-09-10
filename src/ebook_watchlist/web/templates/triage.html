@@ -175,6 +175,10 @@
    der Einleitung oben und auf der Buchseite, wo sie sich zurücknehmen lässt. #}
 <div class="sticky bottom-0 mt-4 flex flex-wrap items-center gap-2 border-t border-rule
             bg-paper/95 py-3 backdrop-blur">
+  {# Zaehler und Auswahlknoepfe sind eine Gruppe und stehen mittig in dem
+     Platz, der neben den Handlungen bleibt: linksbuendig sassen sie in einer
+     Ecke, sobald die Leiste umbrach, und die Reihe sah aus wie zwei Leisten. #}
+  <span class="flex flex-1 items-center justify-center gap-2">
   <span class="text-sm text-soft">
     Auswahl:<span x-cloak class="ml-1 tabular-nums text-ink" x-text="chosen"></span>
   </span>
@@ -192,8 +196,9 @@
                    disabled:opacity-40 disabled:hover:border-rule
                    disabled:hover:text-soft">keine</button>
   </span>
+  </span>
 
-  <span class="ml-auto flex flex-wrap items-center gap-2">
+  <span class="flex flex-wrap items-center justify-center gap-2">
     {% for kind, label in actions %}
     {# Derselbe Knopf wie auf Fund- und Buchseite: dasselbe Wort, dasselbe
        Zeichen, dieselbe Farbe (ADR 29). Ohne Alpine bleibt er klickbar und

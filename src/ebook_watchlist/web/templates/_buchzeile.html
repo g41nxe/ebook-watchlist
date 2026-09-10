@@ -46,7 +46,14 @@
      ausgerichtet klebte es an der Titelzeile und sah wie deren Aufzaehlungs-
      punkt aus. Der Steckplatz wird dafuer umschlossen, damit jede Seite die
      Ausrichtung erbt, statt sie einzeln zu setzen. #}
-  {% if auswahl %}<span class="flex shrink-0 self-center">{{ auswahl }}</span>{% endif %}
+  {# Auf dem Telefon rutscht das Kaestchen ans Ende der Zeile und teilt sich
+     die letzte Reihe mit Preis und Zeichen: links das Kaestchen, rechts die
+     Handlungen. Vorn stehend nahm es dem Titel 36 der 327 Pixel und trennte
+     ihn vom Cover. `order-last` bei beiden — gleicher Rang heisst
+     Dokumentreihenfolge, also Kaestchen zuerst. #}
+  {% if auswahl %}
+  <span class="order-last flex shrink-0 self-center sm:order-none">{{ auswahl }}</span>
+  {% endif %}
   {{ cover(titel, cover_file, borrowable, deal, strecken=true) }}
 
   {# Anlass, Titel, Autor — die schmalere der beiden Textspalten.
@@ -85,7 +92,11 @@
   {# Kennzahlen und Pitch — die breitere Spalte. Sie bekommt den groesseren
      Teil, weil der Pitch der laengste Inhalt der Zeile ist. #}
   {% if kennzahlen or pitch %}
-  <div class="min-w-40 flex-[1.6_1_0%]">
+  {# `basis-full` auf dem Telefon: sonst blieb neben dem Pitch genug Platz fuer
+     das Kaestchen, und es stand mitten im Text statt in der letzten Reihe.
+     Ab `sm` wieder Grundbreite null, damit die festen Teile ihren Platz
+     zuerst bekommen. #}
+  <div class="min-w-40 basis-full flex-[1.6_1_0%] sm:basis-0">
     {% if kennzahlen %}{{ kennzahlen }}{% endif %}
     {# Drei Zeilen, aus demselben Grund wie beim Titel: der Pitch ist ein
        Satz, der Klappentext ein Absatz — nebeneinander in einer Liste muessen
@@ -112,8 +123,9 @@
   {# Ab `sm` steht der Betrag ueber den Handlungen; auf dem Telefon daneben.
      Untereinander gab die Zeile dort drei rechtsbuendige Reihen aus, zwei
      davon fuer je eine Sache. #}
-  <div class="flex w-full items-center justify-end gap-3
-              sm:w-auto sm:flex-col sm:items-end sm:gap-2.5 sm:self-center">
+  <div class="order-last flex flex-1 items-center justify-end gap-3
+              sm:order-none sm:w-auto sm:flex-none sm:flex-col sm:items-end
+              sm:gap-2.5 sm:self-center">
     {% if preis is not none or oben %}
     {# Der Betrag steht mittig ueber der Reihe der Zeichen, nicht rechts
        ausgerichtet: die Reihe ist 92 Pixel breit, die Preisspalte 96 — rechts
