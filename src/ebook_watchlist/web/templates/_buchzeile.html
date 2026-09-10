@@ -90,7 +90,8 @@
        Satz, der Klappentext ein Absatz — nebeneinander in einer Liste muessen
        beide dieselbe Hoehe kosten duerfen. #}
     {% if pitch %}
-    <p class="line-clamp-3 {{ 'mt-1' if kennzahlen }} text-sm text-ink/80">{{ pitch }}</p>
+    <p class="line-clamp-2 sm:line-clamp-3 {{ 'mt-1' if kennzahlen }}
+              text-sm text-ink/80">{{ pitch }}</p>
     {% endif %}
   </div>
   {% endif %}
@@ -103,8 +104,12 @@
      die Zone 136 Pixel Zeilenbreite, untereinander 96 — die Breite des
      Preises, die ohnehin gebraucht wird. Auf dem Telefon bleiben sie
      nebeneinander, dort ist die Zeile ohnehin gestapelt. #}
-  <div class="ml-15 flex w-full items-center gap-3
-              sm:ml-0 sm:w-auto sm:flex-col sm:items-end sm:gap-2.5 sm:self-center">
+  {# Auf dem Telefon steht die Zeile gestapelt, und Preis und Zeichen bilden
+     die letzte Reihe. Rechtsbuendig, nicht eingerueckt: eingerueckt stand der
+     Betrag unter dem Cover und die Zeichen mitten im Text — mit dem rechten
+     Rand als Kante liegen sie ueber allen Zeilen hinweg an derselben Stelle. #}
+  <div class="flex w-full items-center justify-end gap-3
+              sm:w-auto sm:flex-col sm:items-end sm:gap-2.5 sm:self-center">
     {% if preis is not none or oben %}
     {# Der Betrag steht mittig ueber der Reihe der Zeichen, nicht rechts
        ausgerichtet: die Reihe ist 92 Pixel breit, die Preisspalte 96 — rechts

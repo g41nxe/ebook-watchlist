@@ -20,8 +20,14 @@
 {% macro cover(title, cover_file=None, borrowable=False, deal=False,
                strecken=False, gross=False) %}
 {% set breite = "w-24" if gross else ("w-16" if strecken else "w-11") %}
-{% if strecken %}
-{% set hoehe = ("min-h-36" if gross else "min-h-16") ~ " self-stretch" %}
+{% if strecken and gross %}
+{# Auf dem Telefon steht der Kopf gestapelt und wird dadurch zweieinhalbmal
+   so hoch wie auf dem Schreibtisch — ein mitgewachsenes Cover waere dort
+   96 auf 250 Pixel und das Bild darin bis zur Unkenntlichkeit beschnitten.
+   Deshalb erst ab `sm` mitwachsen, davor das feste Mass von 96 auf 144. #}
+{% set hoehe = "h-36 self-start sm:h-auto sm:min-h-36 sm:self-stretch" %}
+{% elif strecken %}
+{% set hoehe = "min-h-16 self-stretch" %}
 {% else %}
 {% set hoehe = "h-36" if gross else "h-16" %}
 {% endif %}
