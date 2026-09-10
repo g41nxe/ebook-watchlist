@@ -7,6 +7,7 @@ Methode — genau damit ein Stub genügt.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -186,6 +187,29 @@ def test_a_book_is_judged_once_not_every_run(store: Store) -> None:
 
     assert len(rater.calls) == 1
     assert second.reused == 1
+
+
+def test_the_gate_judges_the_whole_blurb_not_the_teaser(store: Store) -> None:
+    """Die Kachel einer Trefferliste traegt im Median 197 Zeichen und ist zu
+    85 % abgeschnitten; die Detailseite traegt das Zehnfache. Das Tor urteilte
+    bisher auf dem Anriss, waehrend der Rueckstands-Schritt den ganzen Text
+    nachlaedt — zwei Wege, dieselbe Frage, verschieden gut beantwortet."""
+    angeriss = discovery(blurb="Manche Menschen haben Geheimnisse. Heinz…")
+    ganz = replace(angeriss, blurb="Manche Menschen haben Geheimnisse. Heinz Brandt hat Regeln.")
+    rater = StubRater(rating(4))
+    geholt: list[str] = []
+
+    def voller_text(observations):
+        geholt.extend(o.key for o in observations)
+        return [ganz]
+
+    gate.apply(
+        [first_seen(angeriss)], store=store, rater=rater, profile_version=1,
+        threshold=3, budget=10, now=NOW, full_blurbs=voller_text,
+    )
+
+    assert geholt == [angeriss.key]
+    assert rater.calls[0].blurb == ganz.blurb
 
 
 def test_a_new_leseprofil_invalidates_the_judgement(store: Store) -> None:

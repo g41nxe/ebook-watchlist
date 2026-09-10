@@ -15,9 +15,19 @@ Nebenbei behält es deine Watchlist im Auge, in der Bibliothek und im Shop,
 jeden Tag, und meldet sich nur, wenn sich wirklich etwas ändert. Fokus:
 deutschsprachige Literatur.
 
+**Eine Seite für heute.** Die Startseite sagt, wann zuletzt geprüft wurde, was
+davon jetzt zu haben ist und worüber du entscheiden solltest — mehr nicht. Wie
+viele Zeilen dort stehen, entscheidest du. Der Zustand des Werkzeugs steht
+woanders und drängt sich nicht auf.
+
+<p align="center">
+  <img src="docs/bilder/startseite.jpg" width="800"
+       alt="Die Startseite: eine Statuszeile mit dem letzten Lauf, darunter was jetzt zu haben ist und was zu entscheiden ist">
+</p>
+
 <p align="center">
   <img src="docs/bilder/vorschlaege.png" width="800"
-       alt="Die Vorschlagsseite: Cover, Sterne und ein Satz, warum das Buch passt">
+       alt="Die Vorschlagsseite: Cover, Sterne, ein Satz warum das Buch passt, und drei Zeichen zum Entscheiden">
 </p>
 
 **Jeder Stern hat einen Grund.** Kein API-Schlüssel nötig, wenn
@@ -35,11 +45,12 @@ ohne den Kern anzufassen.
 </p>
 
 **Der ganze Verlauf, nicht nur der letzte Preis.** Jede Beobachtung wird
-angehängt, nie überschrieben.
+angehängt, nie überschrieben. Jede Liste zeigt ein Buch in derselben Zeile,
+und dasselbe Wort steht auf jedem Knopf, der dieselbe Entscheidung trifft.
 
 <p align="center">
   <img src="docs/bilder/buchseite.png" width="800"
-       alt="Die Buchseite: Klappentext, Bewertung und die Tabelle aller Beobachtungen">
+       alt="Die Buchseite: was du dazu sagst, wie gut es passt, und die letzten Beobachtungen">
 </p>
 
 **Läuft bei dir.** Kein Login, keine gespeicherten Zugangsdaten, keine

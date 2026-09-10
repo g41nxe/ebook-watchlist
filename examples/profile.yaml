@@ -19,6 +19,12 @@ rating_batch_size: 20
 rating_model:
 rating_budget: 40
 
+# Wie viele Zeilen die Startseite je Abschnitt zeigt: oben die Angebote aus
+# der Watchlist, darunter die offenen Entscheidungen. Der Rest haengt am
+# Verweis daneben. Das haengt an deinem Bildschirm, nicht am Werkzeug.
+home_offers: 5
+home_suggestions: 3
+
 # Either a plain list, or split into a list swept every run and a long tail
 # swept once a week.
 reference_authors:

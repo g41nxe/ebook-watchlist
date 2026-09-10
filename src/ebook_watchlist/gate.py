@@ -8,6 +8,7 @@ sehen bekommt, Verschwendung wäre.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -114,6 +115,7 @@ def apply(
     budget: int,
     now: datetime,
     batch_size: int = BATCH_SIZE,
+    full_blurbs: Callable[[list[Observation]], list[Observation]] | None = None,
 ) -> tuple[list[Delta], GateReport]:
     """Entdeckungen unter dem Schwellwert aussortieren.
 
@@ -126,6 +128,13 @@ def apply(
     Stück abzufeuern widerspräche derselben Zurückhaltung, die jede andere
     ausgehende Anfrage in diesem Projekt bindet (ADR 7). Ein gespeichertes
     Urteil kostet nichts und zählt deshalb nicht mit.
+
+    ``full_blurbs`` holt den ganzen Klappentext für genau die Bücher, die
+    gleich beurteilt werden — der Lauf reicht dafür seine Quellen herein, das
+    Tor kennt keine. Ohne das urteilte es auf dem Anriss der Trefferliste: im
+    Median 197 Zeichen und zu 85 % abgeschnitten, während die Detailseite rund
+    das Zehnfache trägt. Der Rückstands-Schritt lädt ihn längst nach; hier tat
+    es niemand, und dieselbe Frage bekam zwei verschieden gute Antworten.
     """
     report = GateReport()
     if rater is None:
@@ -143,8 +152,16 @@ def apply(
         if _is_discovery(delta)
         and _judgement(store, delta.current, subject_of(delta.current), profile_version) is None
     ][:budget]
-    fresh = rate_in_batches(rater, wanted, size=batch_size) if wanted else {}
+    # Der Schluessel bleibt der der Sichtung: nachgeladen wird der Text, nicht
+    # die Nummer. Zugeordnet wird trotzdem ueber den Schluessel statt ueber die
+    # Reihenfolge — ein Rueckruf, der filtert oder umsortiert, verschoebe sonst
+    # `attempted` gegen `fresh`, und das Tor zaehlte Buecher als gefragt, die
+    # nie beurteilt wurden.
     attempted = {observation.key for observation in wanted}
+    if wanted and full_blurbs is not None:
+        voller = {observation.key: observation for observation in full_blurbs(wanted)}
+        wanted = [voller.get(observation.key, observation) for observation in wanted]
+    fresh = rate_in_batches(rater, wanted, size=batch_size) if wanted else {}
 
     kept: list[Delta] = []
     for delta in deltas:

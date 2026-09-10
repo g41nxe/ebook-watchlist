@@ -37,7 +37,7 @@ from .render import render_html, render_text
 from .seed import seed
 from .sources import build_sources
 from .sources.base import RunContext
-from .store import Store
+from .store import ENTRY_TRIGGER, Store
 
 EXIT_OK = 0
 EXIT_ALREADY_RUNNING = 0
@@ -259,11 +259,17 @@ def _ask_the_library(store: Store, client: HttpClient, profile: Profile) -> None
     print(f"DNB: {len(offen)} gefragt, {gefunden} beantwortet")
 
 
-def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
+def _apply_gate(store: Store, deltas, profile: Profile, now: datetime, sources=()):
     """Entdeckungen gegen das Leseprofil pruefen (ADR 19).
 
     Ohne Schluessel gibt es kein Tor — dann bleibt alles unbewertet und wird
     gezeigt. Das ist der Zustand vor Ticket 12 und ausdruecklich erlaubt.
+
+    Die Quellen gehen mit, damit das Tor den ganzen Klappentext holen kann,
+    bevor es urteilt: die Kachel einer Trefferliste traegt im Median 197
+    Zeichen und ist zu 85 % abgeschnitten, die Detailseite rund das Zehnfache.
+    Es sind hoechstens so viele Anfragen wie das Budget Buecher zulaesst, und
+    es sind dieselben, die der Rueckstands-Schritt sonst spaeter stellt.
     """
     rater = build_rater(profile.rating_model)
     if rater is None:
@@ -283,6 +289,11 @@ def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
         budget=profile.rating_budget,
         batch_size=profile.rating_batch_size,
         now=now,
+        full_blurbs=(
+            lambda observations: _with_full_blurbs(store, profile, observations, sources)
+        )
+        if sources
+        else None,
     )
     if report.held_back or report.over_budget:
         # Fuer das Log. Was die Leserin sehen muss, steht im Digest — stderr
@@ -424,7 +435,13 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
 
     print(f"{len(offen)} Klappentexte nachladen …")
     now = datetime.now()
-    run_id = store.start_run(profile.slug, "cli", now, pid=os.getpid())
+    # Als Eintrag, nicht als Rundgang: die Beobachtungen brauchen eine Zeile
+    # im Journal, aber diese Zeile darf nicht als *der* letzte Lauf gelten.
+    # Seit das Tor die Klappentexte mitten im Lauf nachlaedt, waere sie sonst
+    # genau das — frueher fertig als der Rundgang, der sie angestossen hat,
+    # und die Startseite meldete "zuletzt geprueft … 0 Aenderungen"
+    # (dieselbe Unterscheidung wie beim engen Lauf, Ticket 51).
+    run_id = store.start_run(profile.slug, ENTRY_TRIGGER, now, pid=os.getpid())
     geholt: dict[tuple[str, str], Observation] = {}
     frisch: list[Observation] = []
     for observation in offen:
@@ -433,6 +450,13 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
             continue
         try:
             item = source.item(observation.source_item_id)
+        except RateLimited:
+            # 429 heisst Halt, und zwar fuer alles Weitere — dieselbe Regel wie
+            # bei den Titelbildern und bei der DNB (ADR 7). Seit das Tor die
+            # Texte mitten im Lauf nachlaedt, waeren es sonst vierzig
+            # abgelehnte Anfragen hintereinander an dieselbe Quelle.
+            print("Klappentexte: die Quelle drosselt — Rest übersprungen", file=sys.stderr)
+            break
         except Exception as exc:  # noqa: BLE001 - ein Buch, nicht der Stapel
             print(f"  {observation.title[:44]}: {type(exc).__name__}", file=sys.stderr)
             continue
@@ -894,7 +918,7 @@ def _run(
     # Das Tor sitzt hinter dem Snapshot: ein Ausfall kostet ein Urteil, nie
     # Geschichte. Und hinter der Preisregel: ein Buch zu bewerten, das ohnehin
     # niemand zu sehen bekommt, waere Verschwendung (ADR 19).
-    deltas, gate_report = _apply_gate(store, deltas, profile, started_at)
+    deltas, gate_report = _apply_gate(store, deltas, profile, started_at, sources)
 
     # Erst hinter dem Tor, denn erst dann steht fest, was im Stapel bleibt.
     # Bis hierher wurden Bilder fuer Funde nur beim Beurteilen des Rueckstands
