@@ -247,3 +247,87 @@ def test_an_entry_shows_the_last_price_it_was_seen_at(db: Store) -> None:
     schwarm = rows.get("Der Schwarm")
     if schwarm is not None and schwarm.latest is not None:
         assert schwarm.price is not None
+
+
+# --- zwei Bibliotheken, eine Zeile ------------------------------------------
+
+
+def test_one_library_lending_it_out_does_not_hide_the_other_one_having_it(
+    db: Store,
+) -> None:
+    """Die Zeile zeigte die Beobachtung mit der hoechsten id — also die der
+    zuletzt eingefuegten Quelle, und das ist die Reihenfolge in `profile.yaml`.
+    Mit zwei Bibliotheken entschied der Zufall, welche von beiden die Zeile
+    beschreibt: sagte die eine "ausleihbar" und die andere "verliehen", stand
+    dort die falsche von beiden.
+
+    "Ausleihbar" ist eine Aussage ueber das *Buch*: hat eine der Bibliotheken
+    es da, hat die Leserin es da."""
+    from ebook_watchlist.models import Availability, MatchReason, Observation
+
+    profile = load_profile()
+    buch = db.find_or_create_book(isbn=None, title="Dark Matter", author="Crouch", now=NOW)
+    db.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+
+    def sichtung(quelle: str, verfuegbarkeit: Availability) -> None:
+        run_id = db.start_run(profile.slug, "cli", NOW)
+        db.append(
+            run_id,
+            profile.slug,
+            [
+                Observation(
+                    source=quelle,
+                    source_item_id="1",
+                    title="Dark Matter",
+                    match_reason=MatchReason.WATCHLIST,
+                    book_id=buch.id,
+                    availability=verfuegbarkeit,
+                    observed_at=NOW,
+                )
+            ],
+            NOW,
+        )
+
+    sichtung("onleihe", Availability.AVAILABLE)
+    # Zuletzt eingefuegt, also frueher der Gewinner.
+    sichtung("overdrive", Availability.UNAVAILABLE)
+
+    zeile = next(e for e in view.entries(db, profile) if e.book_id == buch.id)
+
+    assert zeile.availability == "ausleihbar"
+    assert zeile.borrowable
+
+
+def test_a_library_without_a_price_does_not_erase_the_shop_price(db: Store) -> None:
+    """Eine Bibliothek nennt keinen Preis. War ihre Beobachtung die juengste,
+    stand in der Zeile nichts — obwohl der Shop einen genannt hatte."""
+    from ebook_watchlist.models import Availability, MatchReason, Observation
+
+    profile = load_profile()
+    buch = db.find_or_create_book(isbn=None, title="Ein Buch", author="Wer", now=NOW)
+    db.put_relation(profile.slug, buch.id, str(RelationKind.WATCHING), now=NOW)
+
+    quellen = (("beam", 499, None), ("overdrive", None, Availability.UNKNOWN))
+    for quelle, preis, verfuegbar in quellen:
+        run_id = db.start_run(profile.slug, "cli", NOW)
+        db.append(
+            run_id,
+            profile.slug,
+            [
+                Observation(
+                    source=quelle,
+                    source_item_id="1",
+                    title="Ein Buch",
+                    match_reason=MatchReason.WATCHLIST,
+                    book_id=buch.id,
+                    price_cents=preis,
+                    availability=verfuegbar,
+                    observed_at=NOW,
+                )
+            ],
+            NOW,
+        )
+
+    zeile = next(e for e in view.entries(db, profile) if e.book_id == buch.id)
+
+    assert zeile.price == "4,99 €"

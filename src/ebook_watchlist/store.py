@@ -598,8 +598,12 @@ class Store:
 
     def latest_by_book(
         self, profile_slug: str, book_ids: Iterable[int]
-    ) -> dict[int, Observation]:
-        """Die zuletzt gesehene Beobachtung je Buch — was die Watchlist zeigt.
+    ) -> dict[int, list[Observation]]:
+        """Die zuletzt gesehenen Beobachtungen je Buch — was die Watchlist zeigt.
+
+        Eine Liste, neueste zuerst, mit **einer Zeile je Quelle**: welche davon
+        einen Preis nennt und welche eine Verfuegbarkeit, entscheidet die
+        Watchlist-Zeile selbst.
 
         Dieselbe max-id-Unterabfrage wie :meth:`latest_observations`, nur ueber
         ``book_id`` statt ueber das Quellen-Paar: die Kosten haengen an der Zahl
@@ -614,14 +618,22 @@ class Store:
                 ObservationRow.profile_slug == profile_slug,
                 ObservationRow.book_id.in_(wanted),
             )
-            .group_by(ObservationRow.book_id)
+            # Je Buch **und Quelle**, nicht je Buch: eine einzige Beobachtung je
+            # Buch war die der zuletzt eingefuegten Quelle, also eine Frage der
+            # Reihenfolge in ``profile.yaml``. Mit zwei Bibliotheken entschied
+            # das darueber, welche von beiden die Zeile beschreibt — sagte die
+            # eine "ausleihbar" und die andere "verliehen", stand in der
+            # Watchlist die falsche von beiden.
+            .group_by(ObservationRow.book_id, ObservationRow.source)
         )
-        found: dict[int, Observation] = {}
+        found: dict[int, list[Observation]] = {}
         with self.session() as session:
-            stmt = select(ObservationRow).where(ObservationRow.id.in_(latest_ids))
+            stmt = select(ObservationRow).where(ObservationRow.id.in_(latest_ids)).order_by(
+                ObservationRow.id.desc()
+            )
             for row in session.scalars(stmt):
                 if row.book_id is not None:
-                    found[row.book_id] = _to_observation(row)
+                    found.setdefault(row.book_id, []).append(_to_observation(row))
         return found
 
     def observations_for_book(

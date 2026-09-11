@@ -92,7 +92,7 @@ def build(store: Store, profile: Profile, *, now: datetime) -> HomeView:
     offers.sort(
         key=lambda entry: (
             not entry.deal,
-            entry.latest.price_cents if entry.deal and entry.latest else 0,
+            entry.price_cents or 0 if entry.deal else 0,
             entry.title.casefold(),
         )
     )

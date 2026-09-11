@@ -116,6 +116,16 @@ The matcher compares normalised titles, but an exact **identifier** wins over
 any title score: `Dark Matter` and `Der Zeitenläufer (Dark Matter)` are the
 same book and score 26 out of 100, while their ISBN is identical.
 
+### Thunder
+*deutsch: die Schnittstelle von OverDrive*
+
+OverDrive's public JSON API (`thunder.api.overdrive.com`), and the only door
+the `overdrive` source knocks on. Its HTML site carries no result cards at all
+— JavaScript builds them — so there is no HTML to parse in the first place
+(ADR 31). No key, no login, and the field names live in
+`sources/overdrive/selectors.py`, exactly where the Onleihe keeps its CSS
+selectors.
+
 ### Snapshot
 *deutsch: Aufzeichnung*
 

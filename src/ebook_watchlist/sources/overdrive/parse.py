@@ -13,10 +13,17 @@ Antwort ohne ``items`` ist ein Umbau.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 
 from ...models import Availability
 from ..base import SourceStructureError
+
+#: Dieselbe Pruefung wie bei den beiden anderen Quellen: eine ISBN-13 beginnt
+#: mit 978 oder 979. Ungeprueft durchgereicht kostet sie zweierlei — der
+#: Matcher vergleicht Kennungen **zeichengenau**, und eine zweite Schreibweise
+#: derselben ISBN legt in ``books.find_book`` eine zweite Buchzeile an.
+_ISBN13 = re.compile(r"\b(97[89]\d{10})\b")
 
 
 def payload(text: str) -> dict:
@@ -68,6 +75,19 @@ def _int(item: dict, field: str) -> int:
     return wert
 
 
+def _text(item: dict, field: str) -> str | None:
+    """Ein Feld, das eine Zeichenkette sein *darf*, aber keine sein muss.
+
+    Ohne die Pruefung wurde aus einem Objekt die Zeichenkette
+    ``"{'text': 'hallo'}"`` — und die stand danach in der Datenbank, im
+    Tagesbericht und im Prompt des Bewertungstors.
+    """
+    wert = item.get(field)
+    if not isinstance(wert, str) or not wert.strip():
+        return None
+    return wert.strip()
+
+
 def _isbn(item: dict) -> str | None:
     """Die ISBN des Formats, das die Leserin wirklich oeffnen kann.
 
@@ -76,8 +96,10 @@ def _isbn(item: dict) -> str | None:
     gemessenen Titeln fuer alle Formate dieselbe.
     """
     for format_ in item.get("formats") or []:
-        if isinstance(format_, dict) and format_.get("isbn"):
-            return str(format_["isbn"])
+        if not isinstance(format_, dict) or not format_.get("isbn"):
+            continue
+        if treffer := _ISBN13.search(str(format_["isbn"]).replace("-", "")):
+            return treffer.group(1)
     return None
 
 
@@ -90,17 +112,20 @@ def parse_title(item: dict) -> Detail:
     titel = item.get("title")
     if not isinstance(titel, str) or not titel.strip():
         raise SourceStructureError(f"OverDrive: Titel {item.get('id')!r} hat keinen Titel")
-    autor = item.get("firstCreatorName")
-    bilder = item.get("covers") or {}
+    # ``covers`` ebenso gegen eine fremde Gestalt gesichert wie ``gross``
+    # darunter: eine Liste statt eines Objekts warf einen ``AttributeError``,
+    # und der steht im Tagesbericht als Panne statt als Auskunft (ADR 7).
+    bilder = item.get("covers")
+    bilder = bilder if isinstance(bilder, dict) else {}
     gross = bilder.get("cover510Wide") or bilder.get("cover300Wide") or {}
     return Detail(
         title=titel.strip(),
-        author=str(autor).strip() if autor else None,
+        author=_text(item, "firstCreatorName"),
         isbn=_isbn(item),
         owned_copies=_int(item, "ownedCopies"),
         available_copies=_int(item, "availableCopies"),
         holds=_int(item, "holdsCount"),
-        blurb=str(item["description"]).strip() if item.get("description") else None,
+        blurb=_text(item, "description"),
         cover_url=gross.get("href") if isinstance(gross, dict) else None,
     )
 
@@ -150,13 +175,21 @@ def parse_search(text: str) -> list[Candidate] | None:
     for item in items:
         if not isinstance(item, dict):
             raise SourceStructureError(f"OverDrive: ein Treffer ist kein Objekt: {item!r}")
-        detail = parse_title(item)
+        # Verlangt werden **Titel und Nummer**, sonst nichts. Eine Trefferliste
+        # ist voll von Buechern, die uns nicht gemeint sind; ginge jeder durch
+        # ``parse_title``, riss ein fremder Nachbar ohne ``holdsCount`` die
+        # ganze Quelle fuer den ganzen Lauf ab — auch fuer die vierzehn Titel,
+        # deren Zuordnung laengst steht. Die Onleihe verlangt je Karte genau
+        # dasselbe: Titel und Link.
+        titel = item.get("title")
+        if not isinstance(titel, str) or not titel.strip():
+            raise SourceStructureError(f"OverDrive: Treffer {item.get('id')!r} ohne Titel")
         gefunden.append(
             Candidate(
-                title=detail.title,
-                author=detail.author,
+                title=titel.strip(),
+                author=_text(item, "firstCreatorName"),
                 title_id=title_id(item),
-                isbn=detail.isbn,
+                isbn=_isbn(item),
             )
         )
     return gefunden

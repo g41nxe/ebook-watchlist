@@ -32,7 +32,7 @@ from . import paths
 from .config import Profile, WatchlistEntry, load_profile
 from .configuration import NotSeeded
 from .configuration import load as load_configuration
-from .http import HttpClient
+from .http import HttpClient, build_user_agent
 from .models import Observation
 from .sources import build_sources
 from .sources.base import RunContext
@@ -95,7 +95,10 @@ def check_one(book_id: int, *, now: datetime | None = None) -> Report:
     if not entry.active:
         return Report(trouble="der Eintrag ist pausiert")
 
-    client = HttpClient()
+    # Mit Kontaktadresse, wie im Rundgang (``run.py``): ein Betreiber, der
+    # wissen will, wer da fragt, soll es nicht davon abhaengig finden, ob die
+    # Leserin den Knopf gedrueckt oder der Wirt gerufen hat.
+    client = HttpClient(user_agent=build_user_agent(profile.contact))
     sources = build_sources(profile, client)
     enabled = [source for source in sources if store.is_enabled(source.name)]
     if not enabled:

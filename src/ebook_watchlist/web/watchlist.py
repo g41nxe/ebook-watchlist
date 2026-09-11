@@ -89,7 +89,10 @@ class Entry:
     note: str | None
     cover_file: str | None
     sources: tuple[SourceState, ...]
-    latest: Observation | None
+    #: Je Quelle die juengste Beobachtung, neueste zuerst. Frueher war es
+    #: **eine** je Buch, und welche, entschied die Reihenfolge der Quellen in
+    #: ``profile.yaml`` — mit zwei Bibliotheken also der Zufall.
+    latest: tuple[Observation, ...] = ()
     #: Unter der Schnaeppchen-Grenze. Faerbt den Preis und setzt das
     #: Abzeichen aufs Cover — dieselbe Farbe bedeutet ueberall dasselbe.
     deal: bool = False
@@ -106,30 +109,65 @@ class Entry:
         return any(state.is_question for state in self.sources)
 
     @property
+    def newest(self) -> Observation | None:
+        """Die juengste Beobachtung ueberhaupt — fuer alles, was keine Quelle meint."""
+        return self.latest[0] if self.latest else None
+
+    @property
+    def price_cents(self) -> int | None:
+        """Der Preis in Cent, aus derselben Quelle wie :attr:`price`.
+
+        Eigenes Feld, weil die Startseite nach ihm sortiert und eine Zeichenkette
+        mit Komma dafuer nicht taugt.
+        """
+        return next((o.price_cents for o in self.latest if o.price_cents is not None), None)
+
+    @property
     def price(self) -> str | None:
-        if self.latest is None or self.latest.price_cents is None:
+        """Der Preis der juengsten Quelle, die einen nennt.
+
+        Eine Bibliothek nennt keinen. Frueher stand hier nichts, sobald ihre
+        Beobachtung zufaellig die neueste war.
+        """
+        cents = self.price_cents
+        if cents is None:
             return None
-        return f"{self.latest.price_cents / 100:.2f} €".replace(".", ",")
+        return f"{cents / 100:.2f} €".replace(".", ",")
+
+    @property
+    def _availability(self) -> Availability | None:
+        """Die beste Auskunft, die *irgendeine* Bibliothek gibt.
+
+        "Ausleihbar" ist eine Aussage ueber das Buch, nicht ueber eine Quelle:
+        sagt eine der beiden Bibliotheken, sie hat es da, dann hat die Leserin
+        es da. Frueher zaehlte, welche Quelle zuletzt eingefuegt wurde — und
+        seit es zwei Bibliotheken gibt, schrieb das "verliehen" in die Zeile,
+        waehrend die andere es auslieh.
+        """
+        gesehen = [o.availability for o in self.latest if o.availability is not None]
+        for rang in (Availability.AVAILABLE, Availability.UNAVAILABLE, Availability.UNKNOWN):
+            if rang in gesehen:
+                return rang
+        return None
 
     @property
     def availability(self) -> str | None:
-        if self.latest is None or self.latest.availability is None:
-            return None
         return {
             Availability.AVAILABLE: "ausleihbar",
             Availability.UNAVAILABLE: "verliehen",
             Availability.UNKNOWN: "unklar",
-        }.get(self.latest.availability)
+        }.get(self._availability)
 
     @property
     def borrowable(self) -> bool:
-        return self.latest is not None and self.latest.availability is Availability.AVAILABLE
+        return self._availability is Availability.AVAILABLE
 
     @property
     def seen(self) -> str | None:
-        if self.latest is None or self.latest.observed_at is None:
+        neueste = self.newest
+        if neueste is None or neueste.observed_at is None:
             return None
-        return self.latest.observed_at.strftime("%d.%m. %H:%M")
+        return neueste.observed_at.strftime("%d.%m. %H:%M")
 
     @property
     def candidates(self) -> tuple:
@@ -304,10 +342,21 @@ def entries(
                 note=details.get("note"),
                 cover_file=book.cover_file,
                 sources=states,
-                latest=latest.get(book.id),
+                latest=tuple(latest.get(book.id, ())),
                 known_missing=details.get("known_missing"),
+                # Der Preis der juengsten Quelle, die einen nennt — nicht der
+                # der juengsten Beobachtung: eine Bibliothek nennt keinen, und
+                # seit es zwei gibt, war das oft die neueste.
                 deal=is_strong_deal(
-                    getattr(latest.get(book.id), "price_cents", None), profile
+                    next(
+                        (
+                            o.price_cents
+                            for o in latest.get(book.id, ())
+                            if o.price_cents is not None
+                        ),
+                        None,
+                    ),
+                    profile,
                 ),
             )
         )
