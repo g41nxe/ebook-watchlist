@@ -45,11 +45,19 @@ Was dabei zu wissen ist:
   keine Saatgutdatei, sondern wird bei jeder Anfrage gelesen (`CONTEXT.md`).
 - **Der Lauf taktet sich selbst**: das Einstiegsskript stößt beim Start einen
   Lauf an und dann alle 24 Stunden. Keine feste Uhrzeit — ein Lauf vergleicht
-  gegen die letzte Aufzeichnung, nie gegen „gestern". Beim Start allerdings
-  **nur, wenn der letzte Lauf über 20 Stunden her ist**: sonst kostet jedes
-  `docker compose up` einen vollen Lauf gegen die echten Quellen, und ein
-  Nachmittag mit fünf Neubauten steht bis heute in der Preisgeschichte jedes
-  Buchs. Enge Läufe zählen dabei nicht mit — sie sind kein Rundgang.
+  gegen die letzte Aufzeichnung, nie gegen „gestern".
+- **Ein Rundgang am Tag, und zwar durchgesetzt.** Ein Lauf mit
+  `--trigger cron` tut nichts, wenn der letzte keine **20 Stunden** her ist
+  (`run.MIN_RUN_GAP`); er sagt es und endet mit 0, denn zu eifrig ist kein
+  Fehler. Ohne das kostete jedes `docker compose up` einen vollen Lauf gegen
+  die echten Quellen — ein Nachmittag mit fünf Neubauten steht bis heute in
+  der Preisgeschichte jedes Buchs. Zwanzig statt vierundzwanzig, weil sich der
+  Lauf sonst mit jeder angebrochenen Minute nach hinten schöbe.
+
+  Die Grenze gilt der **Maschine**: der Knopf „Lauf jetzt starten" und ein
+  getipptes `ebw` laufen wie bisher. Verstellen mit `--fruehestens-nach N`,
+  abschalten mit `0`. Enge Läufe zählen ohnehin nicht mit — sie fragen eine
+  Adresse ab und machen keinen Rundgang.
 - **Das Bewertungstor braucht eine Anmeldung**, sonst erscheinen alle Funde
   unbewertet — kein Fehler, nur kein Tor. Zwei Wege, in dieser Reihenfolge:
   `ANTHROPIC_API_KEY` aus der Console (getrennt abgerechnet), sonst die im Bild

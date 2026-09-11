@@ -12,6 +12,7 @@ from ebook_watchlist import paths
 from ebook_watchlist.digest import build_digest
 from ebook_watchlist.models import SourceFailure
 from ebook_watchlist.run import EXIT_CONFIG_ERROR, EXIT_OK, EXIT_SOURCE_FAILURE, main
+from ebook_watchlist.store import Store
 
 
 def digest_files(data_dir: Path) -> list[Path]:
@@ -331,3 +332,45 @@ def test_rating_the_backlog_asks_only_about_what_has_no_judgement(
 
     assert main(["rate"]) == EXIT_OK
     assert [call.source_item_id for call in stub.calls] == ["neu"]
+
+
+# --- ein Rundgang am Tag reicht ---------------------------------------------
+
+
+def test_a_cron_run_right_after_another_is_skipped(
+    data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Der Ausloeser, der zu dicht taktet: das Einstiegsskript des Containers
+    ruft bei jedem Start. Fuenf Neubauten an einem Nachmittag ergaben fuenf
+    volle Laeufe gegen die echten Quellen in 25 Minuten."""
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    vorher = len(Store(paths.db_path()).recent_runs("test"))
+
+    assert main(["--trigger", "cron"]) == EXIT_OK
+
+    assert "übersprungen" in capsys.readouterr().out
+    # Kein zweiter Eintrag im Journal: ein uebersprungener Lauf ist keiner.
+    assert len(Store(paths.db_path()).recent_runs("test")) == vorher
+
+
+def test_the_reader_is_not_held_back(data_dir: Path) -> None:
+    """Die Grenze gilt der Maschine. Wer tippt oder drueckt, hat sich
+    entschieden — ein Knopf, der den ganzen Tag nichts tut, ist kaputt."""
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    vorher = len(Store(paths.db_path()).recent_runs("test"))
+
+    assert main(["--trigger", "ui"]) == EXIT_OK
+
+    assert len(Store(paths.db_path()).recent_runs("test")) > vorher
+
+
+def test_the_gap_can_be_named_and_switched_off(data_dir: Path) -> None:
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    vorher = len(Store(paths.db_path()).recent_runs("test"))
+
+    # Ausdruecklich gesetzt gewinnt die Zahl — in beide Richtungen.
+    assert main(["--trigger", "ui", "--fruehestens-nach", "20"]) == EXIT_OK
+    assert len(Store(paths.db_path()).recent_runs("test")) == vorher
+
+    assert main(["--trigger", "cron", "--fruehestens-nach", "0"]) == EXIT_OK
+    assert len(Store(paths.db_path()).recent_runs("test")) > vorher
