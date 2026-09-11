@@ -79,14 +79,31 @@ anders.
 
 ### Anschluss an einen vorhandenen Traefik
 
-Die Compose-Datei hängt sich an ein Netz, das ihr nicht gehört, und trägt
-deshalb ein Label, das zu einem fremden Projekt gehört — beides ist an Ort und
-Stelle kommentiert. Wer einen Traefik ohne projektgebundene Einschränkung
-fährt, streicht das Label und zeigt `networks.proxy.name` auf sein eigenes
-Netz. Der übliche Aufbau für mehrere Projekte an einem Proxy ist ein eigenes,
-außerhalb aller Projekte angelegtes Netz, dessen Mitgliedschaft die Anmeldung
-beim Proxy *ist*; `exposedbydefault=false` plus `traefik.enable=true` genügt
-dann als Absicherung.
+Buchfink hängt sich an ein Netz namens `proxy`, das **keinem Projekt gehört**
+und einmalig außerhalb aller Compose-Dateien angelegt wird:
+
+```bash
+docker network create proxy
+```
+
+Das ist der übliche Aufbau, wenn mehrere Projekte sich einen Proxy teilen, und
+er hat einen Zweck über die Ordnung hinaus: keine Compose-Datei muss den Namen
+einer anderen kennen. Die Anmeldung beim Proxy besteht aus zwei Teilen —
+Mitgliedschaft im Netz und `traefik.enable=true` —, und beides zusammen ist
+zugleich die Absicherung. Versehentlich passiert es nicht.
+
+Traefik selbst braucht dafür:
+
+```yaml
+- --providers.docker=true
+- --providers.docker.exposedbydefault=false
+- --providers.docker.network=proxy
+- --entrypoints.web.address=:80
+```
+
+Ausdrücklich **keine** `--providers.docker.constraints`-Zeile mit einem
+Projektnamen. Eine solche zwingt jeden, der mitfahren will, den Namen eines
+fremden Projekts zu tragen — und dann kennen sich die Projekte doch wieder.
 
 ## Windows — Aufgabenplanung
 
