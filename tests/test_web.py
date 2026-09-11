@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -267,3 +268,33 @@ def test_a_moment_is_written_the_same_way_everywhere(
     mit_jahr = [m for m in momente if re.match(r"\d{2}\.\d{2}\.\d{4}", m)]
     assert not mit_sekunden, f"Sekunden in {mit_sekunden}"
     assert not mit_jahr, f"Jahr in einem Zeitpunkt: {mit_jahr}"
+
+
+def test_the_interface_still_starts_without_a_usable_console(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Der Autostart laeuft unter ``pythonw.exe``, damit kein Konsolenfenster
+    stehenbleibt — und hat dann keine gueltige Ausgabe.
+
+    Vorher genuegten die zwei Startzeilen der Oberflaeche, um den Prozess mit
+    Rueckgabewert 1 zu beenden, ohne eine Spur: die Fehlermeldung nahm
+    denselben kaputten Weg. Gemessen an der Aufgabenplanung, nicht vermutet.
+    """
+    import importlib
+
+    class OhneHandle:
+        """Was ``pythonw.exe`` ohne Konsole liefert: da, aber unbeschreibbar."""
+
+        def write(self, _text: str) -> int:
+            raise OSError("kein gueltiges Handle")
+
+        def flush(self) -> None:
+            raise OSError("kein gueltiges Handle")
+
+    monkeypatch.setattr(sys, "stderr", OhneHandle())
+    monkeypatch.setattr(sys, "stdout", OhneHandle())
+
+    importlib.import_module("ebook_watchlist.web.__main__")._sichere_ausgabe()
+    print("eine Zeile, die sonst niemand liest", file=sys.stderr)
+
+    assert "eine Zeile" in (data_dir / "web.log").read_text(encoding="utf-8")
