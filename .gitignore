@@ -1,5 +1,10 @@
 # runtime data (ADR 12)
 data/
+# Sicherungen der Datenbank aus dem Container (docs/betrieb.md)
+data-sicherung/
+
+# Umgebung des Containers — traegt den API-Schluessel. Vorlage: .env.example
+.env
 
 # python
 __pycache__/

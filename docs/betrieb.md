@@ -11,6 +11,83 @@ der **tägliche Lauf** und die **Oberfläche**, die dauerhaft erreichbar sein
 soll. Ohne den Lauf zeigt die Oberfläche nie etwas Neues; ohne die Oberfläche
 läuft das Werkzeug trotzdem.
 
+Drei Wege stehen hier, und man nimmt genau einen: **Container** (fasst beides
+zusammen), **Windows-Aufgabenplanung** oder **systemd**. Wer den Container
+fährt, legt keine Aufgaben an — sonst streiten zwei Server um Port 8437.
+
+## Container
+
+Der Weg auf einem Rechner, auf dem schon andere Dienste in Containern laufen.
+Ein Container, nicht zwei: der Webprozess startet den Lauf als Kindprozess und
+verfolgt ihn über dessen pid, und der enge Lauf läuft als Thread in ihm.
+Getrennte Container hätten getrennte pid-Namensräume, und die Lauf-Liste zeigte
+„läuft" für längst beendete Läufe.
+
+```bash
+cp .env.example .env          # Zeitzone, optional der API-Schluessel
+docker volume create buchfink-data
+docker compose up -d
+```
+
+Erreichbar unter **`http://buchfink.localhost/`**. Browser lösen `*.localhost`
+selbst auf, ohne hosts-Eintrag; das Betriebssystem tut das übrigens *nicht*,
+weshalb `ping buchfink.localhost` scheitert, während der Browser funktioniert.
+
+Was dabei zu wissen ist:
+
+- **Die Daten liegen im Volume `buchfink-data`**, nicht in `data/`. Die
+  Datenbank fährt SQLite im WAL-Modus; über einen Bind-Mount von `D:\` liefe
+  sie durch die Virtualisierungsschicht von Docker Desktop, wo die Sperren
+  dokumentiert unzuverlässig sind. Das Volume ist bewusst `external`, damit ein
+  versehentliches `docker compose down -v` die Datenbank nicht mitnimmt.
+- **Die vier YAML-Dateien kommen weiterhin aus `data/`**, schreibgeschützt
+  eingebunden — du bearbeitest sie mit deinem Editor. `profile.yaml` ist dabei
+  keine Saatgutdatei, sondern wird bei jeder Anfrage gelesen (`CONTEXT.md`).
+- **Der Lauf taktet sich selbst**: das Einstiegsskript stößt beim Start einen
+  Lauf an und dann alle 24 Stunden. Keine feste Uhrzeit — ein Lauf vergleicht
+  gegen die letzte Aufzeichnung, nie gegen „gestern".
+- **Das Bewertungstor braucht einen API-Schlüssel.** Sein zweiter Weg, die
+  lokal angemeldete `claude`-CLI, existiert im Container nicht. Ohne Schlüssel
+  erscheinen alle Funde unbewertet — kein Fehler, nur kein Tor.
+
+Eine vorhandene Datenbank kommt so ins Volume (vorher den Lauf beenden, damit
+niemand schreibt):
+
+```bash
+docker compose down
+docker run --rm -v buchfink-data:/ziel -v "$PWD/data:/quelle:ro" alpine \
+  sh -c 'cp -a /quelle/. /ziel/ && rm -f /ziel/run.lock /ziel/*.log /ziel/secrets.env'
+```
+
+Und wieder heraus — als konsistente Sicherung, nicht als Dateikopie, weil eine
+laufende SQLite-Datenbank aus drei Dateien besteht und eine Kopie davon
+irgendein Zwischenzustand wäre:
+
+```bash
+docker compose exec buchfink /app/.venv/bin/python scripts/sicherung.py
+```
+
+Das schreibt `snapshots-JJJJ-MM-TT.db` nach `data-sicherung/`, prüft die Kopie
+und nennt die Zahl der Bücher darin — eine Sicherung, die niemand aufmacht, ist
+eine Behauptung. Das Skript liegt bewusst in einer Datei statt in einem
+`python -c`-Einzeiler: dessen Anführungszeichen zerfallen in jeder Shell
+anders.
+
+> **Git Bash unter Windows** übersetzt `/app/...` in einen Windows-Pfad, und
+> `docker compose exec` scheitert dann mit „no such file or directory".
+> Entweder `MSYS_NO_PATHCONV=1` davorsetzen oder PowerShell nehmen.
+
+### Anschluss an einen vorhandenen Traefik
+
+Die Compose-Datei hängt sich an ein Netz, das ihr nicht gehört, und trägt
+deshalb ein Label, das zu einem fremden Projekt gehört — beides ist an Ort und
+Stelle kommentiert. Wer einen Traefik ohne projektgebundene Einschränkung
+fährt, streicht das Label und zeigt `networks.proxy.name` auf sein eigenes
+Netz. Der übliche Aufbau für mehrere Projekte an einem Proxy ist ein eigenes,
+außerhalb aller Projekte angelegtes Netz, dessen Mitgliedschaft die Anmeldung
+beim Proxy *ist*; `exposedbydefault=false` plus `traefik.enable=true` genügt
+dann als Absicherung.
+
 ## Windows — Aufgabenplanung
 
 ### Der tägliche Lauf

@@ -1,0 +1,79 @@
+name: buchfink
+
+services:
+  buchfink:
+    build: .
+    image: buchfink:local
+    container_name: buchfink
+    restart: unless-stopped
+    # tini als PID 1. Das Einstiegsskript laesst die Laufschleife im
+    # Hintergrund laufen; ohne init blieben deren beendete Prozesse als
+    # Zombies stehen, weil die Oberflaeche als PID 1 niemanden einsammelt.
+    init: true
+    environment:
+      # Lokale Zeit, nicht UTC: der Dateiname des Tagesberichts ist das lokale
+      # Kalenderdatum (ADR 12).
+      TZ: ${TZ:-Europe/Berlin}
+      # Gesetzt heisst: das Bewertungstor urteilt. Leer heisst: alle Funde
+      # erscheinen unbewertet — kein Fehler, nur kein Tor (`run.py`). Der
+      # zweite Weg des Tors, die angemeldete `claude`-CLI, gibt es hier nicht.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      EBW_DATA_DIR: /data
+    volumes:
+      # Die Datenbank gehoert in ein benanntes Volume. Ueber einen Bind-Mount
+      # von D:\ liefe SQLite durch die Virtualisierungsschicht von Docker
+      # Desktop, und dort sind seine Sperren im WAL-Modus dokumentiert
+      # unzuverlaessig — bis zur beschaedigten Datei. Hier liegen auch
+      # `covers/`, `digests/`, Logs und die Lauf-Sperre.
+      - buchfink-data:/data
+
+      # Reiner Text, keine Sperren: diese vier duerfen von D:\ kommen, damit
+      # du sie mit deinem Editor bearbeitest.
+      #
+      # `profile.yaml` ist dabei **keine** Saatgutdatei, auch wenn die drei
+      # anderen es sind: `load_profile()` liest sie bei jeder Anfrage neu
+      # (CONTEXT.md, Eintrag "Seed file").
+      - ./data/profile.yaml:/data/profile.yaml:ro
+      - ./data/watchlist.yaml:/data/watchlist.yaml:ro
+      - ./data/owned.yaml:/data/owned.yaml:ro
+      - ./data/dismissed.yaml:/data/dismissed.yaml:ro
+
+      # Wohin `scripts/sicherung.py` schreibt. Eine Sicherung gehoert nach
+      # draussen, wo du sie siehst und mitnehmen kannst — die *laufende*
+      # Datenbank dagegen nicht, siehe oben.
+      - ./data-sicherung:/sicherung
+    networks:
+      - proxy
+    labels:
+      # Traefik im Nachbarprojekt routet nur, was dieses Label traegt
+      # (`--providers.docker.constraints`). Buchfink ist kein Calibre — das
+      # Label sagt hier die Unwahrheit und steht nur da, weil die Alternative
+      # gewesen waere, die Einschraenkung drueben zu lockern.
+      #
+      # Sauberer waere ein eigenes `proxy`-Netz als alleiniges Kriterium, wie
+      # es fuer geteilte Traefik-Instanzen ueblich ist. Dann fiele dieses Label
+      # weg und `external: true` unten zeigte auf ein Netz, das keinem Projekt
+      # gehoert. Drei Zeilen in `calibre-cwa/docker-compose.yml`.
+      - cwa.project=calibre-cwa
+      - traefik.enable=true
+      - traefik.http.routers.buchfink.rule=Host(`buchfink.localhost`)
+      - traefik.http.routers.buchfink.entrypoints=web
+      - traefik.http.services.buchfink.loadbalancer.server.port=8437
+
+volumes:
+  # Ausdruecklich extern, aus zwei Gruenden. Erstens haette Compose sonst ein
+  # eigenes, projektbenanntes Volume angelegt statt des befuellten. Zweitens,
+  # und wichtiger: `docker compose down -v` loescht projekteigene Volumes — bei
+  # einem externen greift es nicht. Die Datenbank soll ein Tippfehler nicht
+  # ausloeschen koennen.
+  #
+  # Einmalig anzulegen:  docker volume create buchfink-data
+  buchfink-data:
+    external: true
+
+networks:
+  # Gehoert dem Nachbarprojekt, nicht diesem. `docker compose down` dort nimmt
+  # das Netz mit, und Buchfink startet erst wieder, wenn es zurueck ist.
+  proxy:
+    external: true
+    name: calibre-cwa_default
