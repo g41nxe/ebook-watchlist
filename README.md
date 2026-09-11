@@ -34,10 +34,13 @@ woanders und drängt sich nicht auf.
 Claude Code schon bei dir angemeldet ist — dann urteilt die lokale
 Installation.
 
-**Zwei Quellen, eine Zeile.** [VÖBB Onleihe](https://www.voebb.de) und
+**Drei Quellen, eine Zeile.** [Onleihe](https://voebb.onleihe.de),
+[OverDrive](https://voebb.overdrive.com) und
 [beam-shop.de](https://www.beam-shop.de) für jeden Titel gleichzeitig im
-Blick, Preis hier, Verfügbarkeit dort. Weitere Quellen lassen sich ergänzen,
-ohne den Kern anzufassen.
+Blick, Preis hier, Verfügbarkeit dort. Die beiden Bibliotheken gehören
+demselben Verbund und führen trotzdem verschiedene Bestände — vier Titel der
+Beispiel-Watchlist stehen nur bei einer von beiden. Weitere Quellen lassen
+sich ergänzen, ohne den Kern anzufassen.
 
 <p align="center">
   <img src="docs/bilder/watchlist.png" width="800"

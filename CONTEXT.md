@@ -90,17 +90,31 @@ ordinary Delta, with history, rather than a mutable flag on an entry.
 ### Source
 *deutsch: Quelle*
 
-A place that is polled for data, behind a common interface. Two kinds in v1:
+A place that is polled for data, behind a common interface. Two kinds, three
+sources:
 
 - **Library Source** (*deutsch: Bibliothek*) — reports availability/borrowable
-  status for a title. First implementation: `onleihe` (VÖBB Onleihe, Berlin).
-  Note that one library service can run several platforms with separate
-  holdings: the VÖBB runs both the Onleihe and OverDrive, so a source is named
-  after the **platform**, never after the library.
+  status for a title. Two of them: `onleihe` and `overdrive`, both run by the
+  VÖBB in Berlin and each with its own holdings. A source is therefore named
+  after the **platform**, never after the library — and where the reader knows
+  that name, the interface shows it instead of the kind (`registry.DISPLAY`).
 - **Shop Source** — reports price and catalogue presence for a title.
   First implementation: beam-shop.de (DRM-free German ebook shop).
 
 More Sources of either kind can be added without changing the core.
+
+### Resolution
+*deutsch: Zuordnung*
+
+Deciding which entry in a Source's catalogue a watched book actually *is* —
+title and author in, one stable product number out (ADR 9). A Source searches,
+the shared matcher ranks, and a confidence gate decides: accept it, hand it to
+the reader to confirm, or call it not found. An accepted Resolution is pinned
+and reused every Run, so the search happens once, not daily.
+
+The matcher compares normalised titles, but an exact **identifier** wins over
+any title score: `Dark Matter` and `Der Zeitenläufer (Dark Matter)` are the
+same book and score 26 out of 100, while their ISBN is identical.
 
 ### Snapshot
 *deutsch: Aufzeichnung*
