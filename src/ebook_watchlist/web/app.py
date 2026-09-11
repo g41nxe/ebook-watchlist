@@ -571,7 +571,7 @@ def create_app() -> FastAPI:
     # --- Buchseite (Ticket 07) ---------------------------------------------
 
     @app.get("/book/{book_id}", response_class=HTMLResponse)
-    def book_page(request: Request, book_id: int) -> HTMLResponse:
+    def book_page(request: Request, book_id: int, trouble: str = "") -> HTMLResponse:
         try:
             profile = load_profile()
         except ConfigError as exc:
@@ -595,8 +595,28 @@ def create_app() -> FastAPI:
                 "icons": symbols.RELATION_ICONS,
                 "restrictions": watchlist.RESTRICTIONS,
                 "price_points": book.price_points(page.history),
+                # Warum das Bewerten nicht ging. Kommt aus der Adresse, weil
+                # die Route davor umleitet — ein Neuladen soll kein zweites
+                # Urteil holen.
+                "trouble": trouble,
             },
         )
+
+    @app.post("/book/{book_id}/bewerten")
+    def book_rate(book_id: int) -> RedirectResponse:
+        """Das Tor jetzt ueber dieses Buch urteilen lassen (Ticket 55).
+
+        Dauert Sekunden — die Seite wartet darauf, statt wie der enge Lauf
+        nachzufragen: danach hat sich nicht eine Zeile geaendert, sondern der
+        ganze Abschnitt.
+        """
+        trouble = book.rate(
+            _store_for(paths.db_path()), load_profile(), book_id, now=datetime.now()
+        )
+        ziel = f"/book/{book_id}"
+        if trouble:
+            ziel += "?" + urlencode({"trouble": trouble})
+        return RedirectResponse(ziel, status_code=303)
 
     @app.post("/book/{book_id}/bearbeiten")
     def book_edit(

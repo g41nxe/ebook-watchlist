@@ -9,13 +9,14 @@ lagen vorher über vier Dateien verstreut, die einander nicht kannten —
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
+from ..cleaning import is_truncated
 from ..config import Profile
 from ..deals import is_strong_deal
 from ..models import Availability, MatchReason
-from ..rating import RatingUnavailable, confidence_label, load_leseprofil
+from ..rating import RatingUnavailable, build_rater, confidence_label, load_leseprofil
 from ..ratings import (
     BY_CONVERSATION,
     BY_LIBRARY_READERS,
@@ -503,6 +504,63 @@ def price_points(history: tuple[Sighting, ...]) -> list[Sighting]:
         seen.append(sighting)
         last = sighting.price
     return seen
+
+
+def rate(store: Store, profile: Profile, book_id: int, *, now: datetime) -> str:
+    """Das Tor jetzt über dieses eine Buch urteilen lassen (Ticket 55).
+
+    Im Lauf sieht das Tor nur, was auch im Stapel landen würde. Ein
+    Watchlist-Titel ist gewollt und wird deshalb nie gefragt — über ihn
+    entscheidet das Tor nichts, und auf seiner Seite stand für immer „Noch
+    nicht bewertet". Eine Auskunft wäre das Urteil trotzdem, und hier holt es
+    sich die Leserin.
+
+    Kein eigener Faden wie beim engen Lauf: der wartet unter Umständen Minuten
+    auf die Dateisperre, das hier ist **ein** Aufruf. Eine ``def``-Route gibt
+    Starlette ohnehin an den Threadpool, der Server steht also nicht still.
+
+    Zurück kommt der Grund, warum es nicht ging — leer heißt: das Urteil steht.
+    """
+    rater = build_rater(profile.rating_model)
+    if rater is None:
+        return (
+            "Kein Bewerter eingerichtet: weder ein API-Schlüssel in der Umgebung "
+            "noch eine angemeldete Claude-Code-Installation."
+        )
+
+    seen = store.observations_for_book(profile.slug, book_id)
+    if not seen:
+        return "Noch kein Fund zu diesem Buch — es gibt nichts zu beurteilen."
+
+    # Das Urteil hängt am Fund, nicht am Buch (ADR 18): am jüngsten, denn er
+    # trägt den aktuellen Preis und die aktuelle Verfügbarkeit.
+    observation = seen[0]
+    book = store.book(book_id)
+    # Der ganze Klappentext steht meist schon am Buch. Anders als der Lauf
+    # (``_with_full_blurbs``) holt diese Seite deshalb keine Detailseite —
+    # ein Knopfdruck soll keine Quelle anfragen.
+    duenn = not observation.blurb or is_truncated(observation.blurb)
+    if duenn and book is not None and book.blurb:
+        observation = replace(observation, blurb=book.blurb)
+
+    try:
+        rating = rater.rate(observation)
+    except RatingUnavailable as exc:
+        # Das Tor scheitert nie zu (ADR 7): der Grund wird genannt, das Buch
+        # bleibt sichtbar und unbewertet.
+        return str(exc)
+
+    store.put_rating(
+        subject_of(observation),
+        stars=rating.stars,
+        confidence=rating.confidence,
+        reason=rating.reason,
+        profile_version=rating.profile_version,
+        now=now,
+        origin=BY_MODEL,
+        pitch=rating.pitch,
+    )
+    return ""
 
 
 def set_stars(store: Store, book_id: int, stars: int | None, *, now: datetime) -> None:

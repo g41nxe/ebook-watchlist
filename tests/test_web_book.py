@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from ebook_watchlist import paths
 from ebook_watchlist.config import load_profile
 from ebook_watchlist.models import Availability, LinkOutcome, MatchReason, Observation
+from ebook_watchlist.rating import Rating, RatingUnavailable
 from ebook_watchlist.ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject
 from ebook_watchlist.relations import RelationKind
 from ebook_watchlist.store import Store
@@ -645,3 +646,96 @@ def test_editing_the_title_leaves_the_note_alone(client: TestClient, db: Store) 
     client.post(f"/book/{buch.id}/bearbeiten", data={"title": "Anders", "author": "Wer"})
 
     assert view.build(db, profile, buch.id).note == 'Band 1, Originaltitel "Market Forces".'
+
+
+# --- ein Urteil nachholen (Ticket 55) ---------------------------------------
+
+
+class StubRater:
+    """Ein Bewerter, der nichts fragt. Merkt sich, worueber er urteilen sollte."""
+
+    def __init__(self, rating: Rating | Exception) -> None:
+        self.rating = rating
+        self.asked: list[Observation] = []
+
+    def rate(self, observation: Observation) -> Rating:
+        self.asked.append(observation)
+        if isinstance(self.rating, Exception):
+            raise self.rating
+        return self.rating
+
+
+def test_the_button_fetches_a_judgement_for_this_one_book(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Das Tor sieht im Lauf nur, was in den Stapel kaeme; ein Watchlist-Titel
+    ist gewollt und wird nie gefragt. Von seiner Seite aus schon."""
+    buch = db.books()[0]
+    sighting(db, buch.id, when=NOW, price=999)
+    rater = StubRater(Rating(stars=4, reason="Passt.", confidence="teils",
+                             profile_version=1, pitch="Eine Flucht."))
+    monkeypatch.setattr(view, "build_rater", lambda model: rater)
+
+    body = client.post(f"/book/{buch.id}/bewerten").text
+
+    assert [o.source_item_id for o in rater.asked] == ["1"]
+    # Am Fund geschluesselt, nicht am Buch (ADR 18) — und trotzdem auf der
+    # Seite zu sehen.
+    assert db.ratings_for(["item:beam:1"])[("item:beam:1", BY_MODEL)].stars == 4
+    assert "Passt." in body
+
+
+def test_without_a_rater_the_page_says_why(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Das Tor scheitert nie zu (ADR 7): kein Schluessel ist kein Fehler,
+    sondern eine Auskunft."""
+    buch = db.books()[0]
+    sighting(db, buch.id, when=NOW)
+    monkeypatch.setattr(view, "build_rater", lambda model: None)
+
+    body = client.post(f"/book/{buch.id}/bewerten").text
+
+    assert "Kein Bewerter eingerichtet" in body
+
+
+def test_a_refusal_from_the_model_is_named_not_swallowed(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    buch = db.books()[0]
+    sighting(db, buch.id, when=NOW)
+    monkeypatch.setattr(
+        view, "build_rater", lambda model: StubRater(RatingUnavailable("Modell antwortete 429"))
+    )
+
+    body = client.post(f"/book/{buch.id}/bewerten").text
+
+    assert "Modell antwortete 429" in body
+    assert db.ratings_for(["item:beam:1"]) == {}
+
+
+def test_a_book_nobody_has_seen_yet_cannot_be_judged(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Das Urteil haengt am Fund. Ohne Fund gibt es nichts, woran es haengen
+    koennte — und kein Modellaufruf wird verschwendet."""
+    buch = db.find_or_create_book(isbn=None, title="Nie gesehen", now=NOW)
+    rater = StubRater(Rating(stars=5, reason="Egal.", confidence="belegt", profile_version=1))
+    monkeypatch.setattr(view, "build_rater", lambda model: rater)
+
+    body = client.post(f"/book/{buch.id}/bewerten").text
+
+    assert rater.asked == []
+    assert "Noch kein Fund" in body
+
+
+def test_the_button_is_gone_once_a_judgement_stands(client: TestClient, db: Store) -> None:
+    """Ein zweites Urteil zur selben Profilfassung gaebe dieselbe Antwort und
+    kostete einen Aufruf (Ticket 25)."""
+    buch = db.books()[0]
+    assert f"/book/{buch.id}/bewerten" in client.get(f"/book/{buch.id}").text
+
+    db.put_rating(book_subject(buch.id), stars=3, confidence="teils", reason="Steht.",
+                  profile_version=1, now=NOW, origin=BY_MODEL)
+
+    assert f"/book/{buch.id}/bewerten" not in client.get(f"/book/{buch.id}").text

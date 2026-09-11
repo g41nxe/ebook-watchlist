@@ -182,7 +182,27 @@
 {{ klappentext(page.blurb) }}
 {% endif %}
 
-{{ abschnitt("Wie gut das passt", "ic-star") }}
+{# Der Knopf holt ein Urteil des Tors nach (Ticket 55). Im Lauf urteilt das Tor
+   nur ueber Funde, die in den Stapel kaemen — ein Watchlist-Titel ist gewollt
+   und wird nie gefragt, hier stand deshalb fuer immer nichts.
+
+   Kein htmx wie beim engen Lauf: das ist ein Aufruf und keine Wartezeit an der
+   Dateisperre, und danach aendert sich der ganze Abschnitt, nicht eine Zeile.
+   Nur, solange kein Urteil dasteht: ein zweites zur selben Profilfassung gaebe
+   dieselbe Antwort und kostete einen Aufruf (Ticket 25). #}
+{% call abschnitt("Wie gut das passt", "ic-star") %}
+  {% if not page.judgements | rejectattr("is_human") | rejectattr("is_foreign") | list %}
+  <form method="post" action="/book/{{ page.book_id }}/bewerten" class="ml-auto">
+    <button type="submit" title="jetzt bewerten lassen"
+            class="flex rounded p-1 text-soft hover:bg-hair hover:text-accent">
+      <svg class="i"><use href="#ic-refresh"/></svg></button>
+  </form>
+  {% endif %}
+{% endcall %}
+
+{% if trouble %}
+<p class="mb-3 text-sm text-danger">{{ trouble }}</p>
+{% endif %}
 
 {# Ohne eigene Sterne steht hier nur ein Satz. Vorher standen daneben fuenf
    leere Sterne und, kursiv dahinter, ein zweites Mal "noch nicht bewertet" —
