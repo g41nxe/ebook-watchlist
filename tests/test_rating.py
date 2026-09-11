@@ -1215,3 +1215,31 @@ def test_a_foreign_voice_survives_a_new_profile_version(store: Store) -> None:
     # Das Modellurteil gegen Profil 1 veraltet mit Profil 2 — die fremde nicht.
     assert store.rating("isbn:9780000000009", 2, origin=BY_MODEL) is None
     assert store.rating("isbn:9780000000009", 2, origin=BY_LIBRARY_READERS).stars == 4
+
+
+def test_an_apostrophe_escaped_the_wrong_way_does_not_cost_the_judgement() -> None:
+    """Gemessen an einem echten Urteil ueber "Das Knochenband": das Modell
+    schuetzte die Apostrophe um einen zitierten Achsennamen mit einem
+    Backslash. In JSON ist das kein Escape — fuenf tadellose Felder fielen
+    deshalb als "Antwort ist kein gueltiges JSON" aus."""
+    antwort = (
+        '{"stars": 2, "confidence": "vermutet", "reason": "ob die Figur die von '
+        # Rohzeichenkette: ``"\'"`` ist in Python nur ein Apostroph, und der
+        # Test pruefte dann gar nichts — genau so ist er beim ersten Versuch
+        # durchgerutscht und ueberlebte die Mutation.
+        + r"der Achse \'Die Figur traegt alles\' geforderte Bruchstelle traegt"
+        + '"}'
+    )
+    assert r"\'" in antwort
+
+    urteil = parse_answer(antwort, 1, load_rating_scheme())
+
+    assert urteil.stars == 2
+    assert "'Die Figur traegt alles'" in urteil.reason
+
+
+def test_genuinely_broken_json_still_fails(monkeypatch) -> None:
+    """Die Nachsicht gilt einer Lesart, nicht dem Raten: was auch danach kein
+    JSON ist, bleibt unbewertet (ADR 7)."""
+    with pytest.raises(RatingUnavailable, match="kein gültiges JSON"):
+        parse_answer('{"stars": 2, "confidence" "vermutet"}', 1, load_rating_scheme())

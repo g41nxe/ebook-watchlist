@@ -45,7 +45,11 @@ Was dabei zu wissen ist:
   keine Saatgutdatei, sondern wird bei jeder Anfrage gelesen (`CONTEXT.md`).
 - **Der Lauf taktet sich selbst**: das Einstiegsskript stößt beim Start einen
   Lauf an und dann alle 24 Stunden. Keine feste Uhrzeit — ein Lauf vergleicht
-  gegen die letzte Aufzeichnung, nie gegen „gestern".
+  gegen die letzte Aufzeichnung, nie gegen „gestern". Beim Start allerdings
+  **nur, wenn der letzte Lauf über 20 Stunden her ist**: sonst kostet jedes
+  `docker compose up` einen vollen Lauf gegen die echten Quellen, und ein
+  Nachmittag mit fünf Neubauten steht bis heute in der Preisgeschichte jedes
+  Buchs. Enge Läufe zählen dabei nicht mit — sie sind kein Rundgang.
 - **Das Bewertungstor braucht eine Anmeldung**, sonst erscheinen alle Funde
   unbewertet — kein Fehler, nur kein Tor. Zwei Wege, in dieser Reihenfolge:
   `ANTHROPIC_API_KEY` aus der Console (getrennt abgerechnet), sonst die im Bild
