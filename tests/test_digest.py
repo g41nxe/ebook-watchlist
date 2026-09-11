@@ -78,7 +78,7 @@ def test_empty_sections_are_omitted_and_order_is_fixed() -> None:
 
 
 def test_error_section_is_always_last_and_renders_on_its_own() -> None:
-    digest = build(failures=[SourceFailure("voebb", "structure changed")])
+    digest = build(failures=[SourceFailure("onleihe", "structure changed")])
     assert [section.title for section in digest.sections] == [SECTION_ERRORS]
     assert not digest.is_empty
     assert "structure changed" in render_text(digest)

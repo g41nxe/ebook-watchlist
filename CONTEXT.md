@@ -92,8 +92,11 @@ ordinary Delta, with history, rather than a mutable flag on an entry.
 
 A place that is polled for data, behind a common interface. Two kinds in v1:
 
-- **Library Source** — reports availability/borrowable status for a title.
-  First implementation: VÖBB Onleihe (Berlin).
+- **Library Source** (*deutsch: Bibliothek*) — reports availability/borrowable
+  status for a title. First implementation: `onleihe` (VÖBB Onleihe, Berlin).
+  Note that one library service can run several platforms with separate
+  holdings: the VÖBB runs both the Onleihe and OverDrive, so a source is named
+  after the **platform**, never after the library.
 - **Shop Source** — reports price and catalogue presence for a title.
   First implementation: beam-shop.de (DRM-free German ebook shop).
 

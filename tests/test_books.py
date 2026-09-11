@@ -126,10 +126,10 @@ def test_a_source_that_does_not_stock_it_is_an_answer_not_a_gap(store: Store) ->
     diese Zeile verhindert, dass täglich neu gesucht wird."""
     book = store.find_or_create_book(isbn=None, title="Providence", author="Max Barry", now=NOW)
     store.put_book_source(
-        book.id, "voebb", outcome=str(LinkOutcome.NOT_FOUND), resolved_at=NOW
+        book.id, "onleihe", outcome=str(LinkOutcome.NOT_FOUND), resolved_at=NOW
     )
 
-    row = store.get_book_source(book.id, "voebb")
+    row = store.get_book_source(book.id, "onleihe")
     assert row is not None
     assert row.url is None
     assert '"outcome": "not_found"' in row.details
@@ -141,10 +141,10 @@ def test_each_source_keeps_its_own_row(store: Store) -> None:
         book.id, "beam", outcome=str(LinkOutcome.LINKED), url="https://beam/1", resolved_at=NOW
     )
     store.put_book_source(
-        book.id, "voebb", outcome=str(LinkOutcome.NOT_FOUND), resolved_at=NOW
+        book.id, "onleihe", outcome=str(LinkOutcome.NOT_FOUND), resolved_at=NOW
     )
 
-    assert {row.source for row in store.book_sources(book.id)} == {"beam", "voebb"}
+    assert {row.source for row in store.book_sources(book.id)} == {"beam", "onleihe"}
 
 
 def test_an_unknown_outcome_fails_loudly(store: Store) -> None:

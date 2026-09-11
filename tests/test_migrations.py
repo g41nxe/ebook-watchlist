@@ -260,3 +260,75 @@ def test_a_doubled_blurb_is_cut_down_to_one(tmp_path: Path) -> None:
     assert texte[1] == "Der Anfang und der Rest."
     # Wer nie doppelt war, bleibt unberuehrt.
     assert texte[2] == "Ein kurzer Text."
+
+
+# --- voebb heisst onleihe ----------------------------------------------------
+
+
+def test_the_rename_keeps_every_row_that_carried_the_old_name(tmp_path: Path) -> None:
+    """Der VOEBB betreibt zwei Plattformen; "onleihe" meinte eine von beiden,
+    ohne zu sagen welche. Der Name steht aber in fuenf Spalten, und ueber zwei
+    davon ist geschluesselt — ohne diesen Schritt verloere jedes beobachtete
+    Buch seine Geschichte."""
+    from ebook_watchlist.migrations import _voebb_is_called_onleihe
+
+    path = tmp_path / "s.db"
+    Store(path)  # baut das fertige Schema
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "INSERT INTO observation (profile_slug, run_id, source, source_item_id, title,"
+            " match_reason, observed_at) VALUES ('t', 1, 'onleihe', '42', 'Ein Buch',"
+            " 'watchlist', '2026-09-11 12:00:00')"
+        )
+        connection.execute(
+            "INSERT INTO book_source (book_id, source, source_item_id, resolved_at, details)"
+            " VALUES (1, 'onleihe', '42', '2026-09-11 12:00:00', '{}')"
+        )
+        connection.execute(
+            "INSERT INTO source (name, enabled, consecutive_failures, updated_at)"
+            " VALUES ('onleihe', 1, 0, '2026-09-11 12:00:00')"
+        )
+        connection.execute(
+            "INSERT INTO rating (subject, origin, stars, confidence, reason, profile_version,"
+            " rated_at, pitch) VALUES ('item:voebb:42', 'library_readers', 4, 'belegt', 'gut', 1,"
+            " '2026-09-11 12:00:00', '')"
+        )
+
+    with create_engine(f"sqlite:///{path}").begin() as connection:
+        _voebb_is_called_onleihe(connection)
+
+    with sqlite3.connect(path) as connection:
+        fetch = connection.execute
+        assert fetch("SELECT source FROM observation").fetchone()[0] == "onleihe"
+        assert fetch("SELECT source FROM book_source").fetchone()[0] == "onleihe"
+        assert fetch("SELECT name FROM source").fetchone()[0] == "onleihe"
+        # Die Herkunft heisst generisch, nicht nach der einen Bibliothek: die
+        # zweite bringt eigene Stimmen mit, und fuer die Leserin hiess sie
+        # ohnehin immer "Leser:innen der Bibliothek".
+        assert fetch("SELECT origin FROM rating").fetchone()[0] == "library_readers"
+        # Ein Urteil ueber einen Fund ohne ISBN haengt am Quellnamen.
+        assert fetch("SELECT subject FROM rating").fetchone()[0] == "item:onleihe:42"
+
+
+def test_the_rename_leaves_other_sources_alone(tmp_path: Path) -> None:
+    from ebook_watchlist.migrations import _voebb_is_called_onleihe
+
+    path = tmp_path / "s.db"
+    Store(path)
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "INSERT INTO source (name, enabled, consecutive_failures, updated_at)"
+            " VALUES ('beam', 1, 0, '2026-09-11 12:00:00')"
+        )
+        connection.execute(
+            "INSERT INTO rating (subject, origin, stars, confidence, reason, profile_version,"
+            " rated_at, pitch) VALUES ('item:beam:7', 'model', 4, 'belegt', 'gut', 1,"
+            " '2026-09-11 12:00:00', '')"
+        )
+
+    with create_engine(f"sqlite:///{path}").begin() as connection:
+        _voebb_is_called_onleihe(connection)
+
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT name FROM source").fetchone()[0] == "beam"
+        assert connection.execute("SELECT subject FROM rating").fetchone()[0] == "item:beam:7"

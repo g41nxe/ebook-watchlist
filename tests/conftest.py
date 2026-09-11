@@ -88,8 +88,8 @@ def beam_fixture(name: str) -> str:
     return _read("beam", name)
 
 
-def voebb_fixture(name: str) -> str:
-    return _read("voebb", name)
+def onleihe_fixture(name: str) -> str:
+    return _read("onleihe", name)
 
 
 @functools.cache
@@ -101,10 +101,10 @@ def beam_detail(name: str):
 
 
 @functools.cache
-def voebb_detail(name: str):
-    from ebook_watchlist.sources.voebb import parse
+def onleihe_detail(name: str):
+    from ebook_watchlist.sources.onleihe import parse
 
-    return parse.parse_detail(_read("voebb", name))
+    return parse.parse_detail(_read("onleihe", name))
 
 
 def beam_tiles(name: str) -> list:

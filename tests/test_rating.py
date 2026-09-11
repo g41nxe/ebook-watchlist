@@ -281,7 +281,7 @@ def test_the_judgement_follows_the_isbn_across_sources(store: Store) -> None:
     rater = StubRater(rating(4))
     at_beam = first_seen(discovery(source="beam", source_item_id="1", isbn="9783104911854"))
     at_voebb = first_seen(
-        discovery(source="voebb", source_item_id="9", isbn="9783104911854",
+        discovery(source="onleihe", source_item_id="9", isbn="9783104911854",
                   match_reason=MatchReason.PROFILE_AUTHOR)
     )
 
@@ -1151,7 +1151,7 @@ def test_foreign_voices_stand_beside_the_tool_not_instead_of_it(store: Store) ->
     from ebook_watchlist.run import _record_foreign_ratings
 
     fund = Observation(
-        source="voebb", source_item_id="1", title="Die sieben Schwestern",
+        source="onleihe", source_item_id="1", title="Die sieben Schwestern",
         author="Riley, Lucinda", match_reason=MatchReason.WATCHLIST,
         isbn="9783641117009", rating=4, rating_votes=1641,
     )
@@ -1179,10 +1179,10 @@ def test_a_single_voice_is_not_evidence(store: Store) -> None:
     from ebook_watchlist.ratings import BY_LIBRARY_READERS, subject_of
     from ebook_watchlist.run import _record_foreign_ratings
 
-    knapp = Observation(source="voebb", source_item_id="2", title="Kaum Stimmen",
+    knapp = Observation(source="onleihe", source_item_id="2", title="Kaum Stimmen",
                         author="Wer", match_reason=MatchReason.WATCHLIST,
                         isbn="9780000000002", rating=5, rating_votes=3)
-    ohne = Observation(source="voebb", source_item_id="3", title="Gar keine",
+    ohne = Observation(source="onleihe", source_item_id="3", title="Gar keine",
                        author="Wer", match_reason=MatchReason.WATCHLIST,
                        isbn="9780000000003", rating=5, rating_votes=None)
 

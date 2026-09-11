@@ -206,7 +206,7 @@ def test_the_relation_suppresses_at_the_shop_and_at_every_other_source(
     dismissed = dismissed_books(store, "t")
 
     assert dismissed.covers("beam", PRODUCT_ID)
-    assert dismissed.covers("voebb", "eine-ganz-andere-nummer", "9783104911854")
+    assert dismissed.covers("onleihe", "eine-ganz-andere-nummer", "9783104911854")
 
 
 def test_a_withdrawn_dismissal_may_be_suggested_again(store: Store) -> None:
@@ -281,7 +281,7 @@ def test_the_lookup_does_not_grow_with_the_number_of_dismissals(tmp_path) -> Non
     assert len(found.items) == 50
     assert len(found.isbns) == 50
     assert found.covers("beam", "7")
-    assert found.covers("voebb", "irgendwas", isbn="9780000000007")
+    assert found.covers("onleihe", "irgendwas", isbn="9780000000007")
 
 
 def test_a_withdrawn_dismissal_is_suggested_again(tmp_path) -> None:

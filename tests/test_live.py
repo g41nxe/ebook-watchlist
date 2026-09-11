@@ -16,8 +16,8 @@ from urllib.parse import urljoin
 import pytest
 
 from ebook_watchlist.http import HttpClient
-from ebook_watchlist.sources.voebb import parse
-from ebook_watchlist.sources.voebb import selectors as sel
+from ebook_watchlist.sources.onleihe import parse
+from ebook_watchlist.sources.onleihe import selectors as sel
 
 pytestmark = pytest.mark.live
 
@@ -27,14 +27,14 @@ def client() -> HttpClient:
     return HttpClient()
 
 
-def test_voebb_detail_page_still_parses(client: HttpClient) -> None:
+def test_onleihe_detail_page_still_parses(client: HttpClient) -> None:
     detail = parse.parse_detail(client.get(urljoin(sel.BASE, sel.PROBE_DETAIL_PATH)))
     assert detail.copies >= 0
     assert detail.available_copies >= 0
     assert detail.title
 
 
-def test_voebb_search_still_parses(client: HttpClient) -> None:
+def test_onleihe_search_still_parses(client: HttpClient) -> None:
     html = client.get(
         urljoin(sel.BASE, sel.SEARCH_PATH),
         params=dict(sel.SEARCH_PARAMS, pText=sel.PROBE_QUERY),

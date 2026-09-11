@@ -150,7 +150,7 @@ def test_another_source_is_another_wallet(db: Store) -> None:
     kann."""
     gesehen(db, "9783644200418", preis=999)
 
-    assert db.prices_by_isbn(SLUG, "voebb") == {}
+    assert db.prices_by_isbn(SLUG, "onleihe") == {}
 
 
 # --- der Schritt im Lauf ----------------------------------------------------

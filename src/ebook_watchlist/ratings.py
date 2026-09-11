@@ -32,7 +32,7 @@ BY_READER = "reader"
 #: nicht in einer eigenen Tabelle, weil ``rating`` schon nach
 #: ``(subject, origin)`` geschluesselt ist: eine weitere Quelle ist eine
 #: weitere Herkunft (ADR 19).
-BY_LIBRARY_READERS = "voebb_readers"
+BY_LIBRARY_READERS = "library_readers"
 
 RATING_ORIGINS: frozenset[str] = frozenset(
     {BY_MODEL, BY_CONVERSATION, BY_READER, BY_LIBRARY_READERS}

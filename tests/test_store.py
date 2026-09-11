@@ -38,7 +38,7 @@ def test_latest_observations_does_not_cross_sources_or_profiles(tmp_path: Path) 
     store.append(
         run_id,
         "p",
-        [observation("beam", "1", 100), observation("voebb", "1", 200)],
+        [observation("beam", "1", 100), observation("onleihe", "1", 200)],
         NOW,
     )
     other = store.start_run("other", "cli", NOW)
@@ -71,7 +71,7 @@ def test_the_history_of_a_find_does_not_cross_sources_or_profiles(tmp_path: Path
     store = Store(tmp_path / "snapshots.db")
     run_id = store.start_run("p", "cli", NOW)
     store.append(
-        run_id, "p", [observation("beam", "1", 100), observation("voebb", "1", 200)], NOW
+        run_id, "p", [observation("beam", "1", 100), observation("onleihe", "1", 200)], NOW
     )
     other = store.start_run("other", "cli", NOW)
     store.append(other, "other", [observation("beam", "1", 999)], NOW)

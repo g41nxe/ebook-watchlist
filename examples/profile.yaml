@@ -54,7 +54,7 @@ disliked_books: []
 # contact: mailto:du@example.org
 
 sources:
-  voebb:
+  onleihe:
     # Which formats to watch. The Onleihe lists the ebook and the audiobook of a
     # novel as two separate titles, so without a preference neither can win.
     media: [ebook]

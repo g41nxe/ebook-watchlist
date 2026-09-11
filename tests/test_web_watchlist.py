@@ -197,7 +197,7 @@ def test_a_not_found_link_asks_nobody(client: TestClient, db: Store) -> None:
     """Nicht im Katalog ist eine Antwort, keine Frage — genau die Verwechslung,
     die die alte Aufmerksamkeitsliste unbrauchbar machte (Ticket 04)."""
     book = db.books()[0]
-    db.put_book_source(book.id, "voebb", outcome=str(LinkOutcome.NOT_FOUND), resolved_at=NOW)
+    db.put_book_source(book.id, "onleihe", outcome=str(LinkOutcome.NOT_FOUND), resolved_at=NOW)
 
     body = client.get("/watchlist").text
     assert "Das ist es" not in body

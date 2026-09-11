@@ -172,7 +172,7 @@ def test_dismissing_suppresses_the_book_at_every_source(client: TestClient, db: 
     zeigen" — dasselbe Buch bei der Onleihe wäre wiedergekommen (ADR 18)."""
     isbn = "9783104911854"
     found(db, item_id="7", title="Der Kannibalenhügel", isbn=isbn)
-    found(db, item_id="99", title="Der Kannibalenhügel", isbn=isbn, source="voebb")
+    found(db, item_id="99", title="Der Kannibalenhügel", isbn=isbn, source="onleihe")
 
     client.post("/vorschlaege/entscheiden", data={"kind": "dismissed", "keys": ["beam:7"]})
 

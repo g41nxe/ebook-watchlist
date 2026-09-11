@@ -17,7 +17,7 @@ from ..base import LibrarySource, SourceStructureError
 from . import parse
 from . import selectors as sel
 
-SOURCE_NAME = "voebb"
+SOURCE_NAME = "onleihe"
 
 #: Results paginate 20 to a page; resolution never needs to go deep.
 CARDS_PER_PAGE = 20
@@ -44,7 +44,7 @@ def require_title_id(url: str) -> str:
     return title_id
 
 
-class VoebbSource(LibrarySource):
+class OnleiheSource(LibrarySource):
     name = SOURCE_NAME
 
     def __init__(

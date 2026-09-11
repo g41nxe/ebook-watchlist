@@ -217,7 +217,7 @@ def test_the_table_shows_the_last_five_sightings_and_says_so(
 
 def test_availability_appears_for_a_library(client: TestClient, db: Store) -> None:
     book = db.books()[0]
-    sighting(db, book.id, when=NOW, availability=Availability.AVAILABLE, source="voebb")
+    sighting(db, book.id, when=NOW, availability=Availability.AVAILABLE, source="onleihe")
 
     assert "ausleihbar" in client.get(f"/book/{book.id}").text
 
@@ -243,15 +243,15 @@ def test_a_bargain_is_marked_in_the_history(db: Store) -> None:
 
 
 def test_the_reader_never_sees_an_internal_source_name(client: TestClient, db: Store) -> None:
-    """"voebb" war nie ein Wort für die Leserin — und welche Quelle eine
+    """"onleihe" war nie ein Wort für die Leserin — und welche Quelle eine
     Bibliothek ist, sagt die Registry, nicht eine Liste in der Vorlage."""
     book = db.books()[0]
-    db.put_book_source(book.id, "voebb", outcome=str(LinkOutcome.LINKED), resolved_at=NOW)
-    sighting(db, book.id, when=NOW, source="voebb", availability=Availability.AVAILABLE)
+    db.put_book_source(book.id, "onleihe", outcome=str(LinkOutcome.LINKED), resolved_at=NOW)
+    sighting(db, book.id, when=NOW, source="onleihe", availability=Availability.AVAILABLE)
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "voebb" not in body
+    assert "onleihe" not in body
     assert "beam" not in body
     assert "Bibliothek" in body
 
@@ -608,7 +608,7 @@ def test_two_houses_are_still_settled_by_length(db: Store) -> None:
         Observation(source="beam", source_item_id="1", title="Egal", author="Wer",
                     match_reason=MatchReason.WATCHLIST, book_id=buch.id,
                     blurb="Der Text des Shops."),
-        Observation(source="voebb", source_item_id="2", title="Egal", author="Wer",
+        Observation(source="onleihe", source_item_id="2", title="Egal", author="Wer",
                     match_reason=MatchReason.WATCHLIST, book_id=buch.id,
                     blurb="Der Text der Bibliothek, mit Pressestimmen davor."),
     ], NOW)
