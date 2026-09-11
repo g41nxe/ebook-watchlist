@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -361,6 +361,26 @@ def test_the_reader_is_not_held_back(data_dir: Path) -> None:
 
     assert main(["--trigger", "ui"]) == EXIT_OK
 
+    assert len(Store(paths.db_path()).recent_runs("test")) > vorher
+
+
+def test_the_cadence_from_the_profile_is_what_counts(data_dir: Path) -> None:
+    """Die Kadenz ist eine Einstellung, keine Konstante im Code — derselbe
+    Abstand entscheidet je nach Profil verschieden."""
+    store = Store(paths.db_path())
+    store.start_run("test", "cron", datetime.now() - timedelta(hours=2))
+    vorher = len(store.recent_runs("test"))
+
+    # Voreinstellung sind 20 Stunden; zwei sind zu wenig.
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    assert len(Store(paths.db_path()).recent_runs("test")) == vorher
+
+    profil = (data_dir / "profile.yaml").read_text(encoding="utf-8")
+    (data_dir / "profile.yaml").write_text(
+        profil + "\nrun_every_hours: 1\n", encoding="utf-8"
+    )
+
+    assert main(["--trigger", "cron"]) == EXIT_OK
     assert len(Store(paths.db_path()).recent_runs("test")) > vorher
 
 

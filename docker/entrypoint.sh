@@ -21,14 +21,19 @@ PYTHON=/app/.venv/bin/python
 # `|| true`: ein gescheiterter Lauf — ausgefallene Quelle, kaputte
 # Konfiguration — darf die Schleife nicht beenden. Der naechste versucht es neu,
 # und der Tagesbericht nennt den Fehler ohnehin.
-# Beim Start ruft die Schleife sofort — und der Lauf entscheidet selbst, ob er
-# faellig ist (`MIN_RUN_GAP`, 20 Stunden). Ohne das kostete jedes
-# `docker compose up` einen vollen Lauf gegen die echten Quellen; an einem
-# Nachmittag mit fuenf Neubauten waren das fuenf Laeufe in 25 Minuten, und in
-# der Preisgeschichte jedes Buchs stehen sie bis heute.
+# Einmal am Tag rufen. Die Schleife ist absichtlich dumm: sie kennt die Kadenz
+# nicht, sie ruft nur. Ob gelaufen wird, entscheidet der Lauf selbst — er weiss
+# aus dem Journal, wann zuletzt einer war, und die Kadenz steht im Profil
+# (`run_every_hours`, Voreinstellung 20 Stunden).
 #
-# Hier steht deshalb keine Zahl: die Regel gehoert dem Lauf und gilt fuer jeden
-# Weg — Oberflaeche und Kommandozeile eingeschlossen.
+# Deshalb kostet ein Neustart keinen Lauf mehr. Vorher stiess jeder einen an:
+# ein Nachmittag mit fuenf Neubauten ergab fuenf volle Laeufe gegen die echten
+# Quellen in 25 Minuten, und die stehen bis heute in der Preisgeschichte jedes
+# Buchs.
+#
+# Dass die Schwelle (20 h) unter dem Schlaf (24 h) liegt, ist kein Zufall: der
+# Ruf verrutscht um die Dauer jedes Laufs nach hinten, und die vier Stunden
+# Luft fangen das ab, damit nie ein Tag ausfaellt.
 (
   while true; do
     "$PYTHON" -m ebook_watchlist.run --trigger cron || true

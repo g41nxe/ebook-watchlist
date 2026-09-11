@@ -1,7 +1,10 @@
 # Betrieb: den Lauf täglich anstoßen, die Oberfläche dauerhaft halten
 
-Es gibt keinen eigenen Zeitplaner — der Lauf wird von außen getaktet, einmal
-am Tag reicht ([Kadenz](../README.md#konfiguration)). Eine Dateisperre
+Es gibt keinen eigenen Zeitplaner — der Lauf wird von außen angestoßen, einmal
+am Tag reicht. Wie oft er dann *wirklich* läuft, entscheidet er selbst: die
+Kadenz steht als `run_every_hours` im Profil, und das Journal weiß, wann
+zuletzt gelaufen wurde. Ein Wirt, der zu dicht taktet, kostet deshalb nichts.
+Eine Dateisperre
 serialisiert parallele Läufe: ein zweiter Start beendet sich sofort wieder.
 Ein Umzug auf einen anderen Rechner ist *Repository kopieren, `uv sync`,
 `data/` mitnehmen*.
@@ -46,18 +49,22 @@ Was dabei zu wissen ist:
 - **Der Lauf taktet sich selbst**: das Einstiegsskript stößt beim Start einen
   Lauf an und dann alle 24 Stunden. Keine feste Uhrzeit — ein Lauf vergleicht
   gegen die letzte Aufzeichnung, nie gegen „gestern".
-- **Ein Rundgang am Tag, und zwar durchgesetzt.** Ein Lauf mit
-  `--trigger cron` tut nichts, wenn der letzte keine **20 Stunden** her ist
-  (`run.MIN_RUN_GAP`); er sagt es und endet mit 0, denn zu eifrig ist kein
-  Fehler. Ohne das kostete jedes `docker compose up` einen vollen Lauf gegen
-  die echten Quellen — ein Nachmittag mit fünf Neubauten steht bis heute in
-  der Preisgeschichte jedes Buchs. Zwanzig statt vierundzwanzig, weil sich der
-  Lauf sonst mit jeder angebrochenen Minute nach hinten schöbe.
+- **Die Kadenz steht im Profil, nicht im Wirt.** Ein Lauf mit `--trigger cron`
+  schaut selbst ins Journal und tut nichts, wenn der letzte keine
+  `run_every_hours` Stunden her ist (Voreinstellung **20**); er sagt es und
+  endet mit 0, denn zu eifrig ist kein Fehler. Der Wirt darf deshalb dumm sein
+  und einfach täglich rufen. Ohne das kostete jedes `docker compose up` einen
+  vollen Lauf gegen die echten Quellen — ein Nachmittag mit fünf Neubauten
+  steht bis heute in der Preisgeschichte jedes Buchs.
+
+  Zwanzig statt vierundzwanzig, weil der tägliche Ruf um die Dauer jedes Laufs
+  nach hinten rutscht und sonst irgendwann ein Tag ausfiele.
 
   Die Grenze gilt der **Maschine**: der Knopf „Lauf jetzt starten" und ein
-  getipptes `ebw` laufen wie bisher. Verstellen mit `--fruehestens-nach N`,
-  abschalten mit `0`. Enge Läufe zählen ohnehin nicht mit — sie fragen eine
-  Adresse ab und machen keinen Rundgang.
+  getipptes `ebw` laufen sofort, immer. Von Hand erzwingen lässt sich ein Lauf
+  mit `--fruehestens-nach 0`, verstellen mit `--fruehestens-nach N`. Enge
+  Läufe zählen ohnehin nicht mit — sie fragen eine Adresse ab und machen
+  keinen Rundgang.
 - **Das Bewertungstor braucht eine Anmeldung**, sonst erscheinen alle Funde
   unbewertet — kein Fehler, nur kein Tor. Zwei Wege, in dieser Reihenfolge:
   `ANTHROPIC_API_KEY` aus der Console (getrennt abgerechnet), sonst die im Bild

@@ -47,6 +47,14 @@ class Profile:
     #: Werkzeug — der Rest hängt am Verweis darunter (Issue #5).
     home_offers: int = 5
     home_suggestions: int = 3
+    #: Die Kadenz: wie viele Stunden zwischen zwei Rundgängen mindestens
+    #: liegen. Ein Lauf, den eine Maschine anstößt, prüft sie gegen den letzten
+    #: Eintrag im Journal und tut sonst nichts — das ist die ganze Taktung, es
+    #: gibt keinen Zeitplaner (ADR 4). Die Leserin selbst hält sie nicht auf.
+    #:
+    #: Zwanzig und nicht vierundzwanzig: sonst schöbe sich der tägliche Lauf um
+    #: jede angebrochene Minute nach hinten, bis er einen Tag überspringt.
+    run_every_hours: int = 20
     #: Swept every Run.
     reference_authors: list[str] = field(default_factory=list)
     #: Swept once a week — the long tail, where a missed day costs nothing.
@@ -208,6 +216,7 @@ def load_profile(path: Path | None = None) -> Profile:
         rating_model=str(data["rating_model"]) if data.get("rating_model") else None,
         home_offers=_positive_int(data, "home_offers", 5, what),
         home_suggestions=_positive_int(data, "home_suggestions", 3, what),
+        run_every_hours=_positive_int(data, "run_every_hours", 20, what),
         reference_authors=core_authors,
         extended_authors=extended_authors,
         extended_sweep_weekday=weekday,

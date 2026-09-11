@@ -44,22 +44,6 @@ EXIT_ALREADY_RUNNING = 0
 EXIT_CONFIG_ERROR = 2
 EXIT_SOURCE_FAILURE = 1
 
-#: Der kuerzeste Abstand zwischen zwei Rundgaengen. Die Kadenz ist ein Lauf am
-#: Tag (README) — das hier ist keine zweite Taktung, sondern derselbe Satz,
-#: einmal durchgesetzt: gegen den Finger auf der Taste und gegen einen Wirt,
-#: der oefter ruft als gedacht. Gemessen an einem Nachmittag mit fuenf
-#: Neubauten des Containers: fuenf volle Laeufe gegen die echten Quellen in
-#: 25 Minuten, und sie stehen bis heute in der Preisgeschichte jedes Buchs.
-#:
-#: Zwanzig Stunden und nicht vierundzwanzig: ein taeglicher Wirt laeuft nie
-#: exakt im Takt, und bei 24 schoebe sich der Lauf mit jeder angebrochenen
-#: Minute weiter nach hinten, bis er einen Tag ueberspringt.
-#:
-#: Wer *dieses eine Buch* jetzt sehen will, nimmt den engen Lauf — der faellt
-#: nicht unter die Regel, weil er eine Adresse abfragt und keinen Rundgang
-#: macht (Ticket 51).
-MIN_RUN_GAP = timedelta(hours=20)
-
 EXTENDED_SWEEP_KEY = "last_extended_sweep"
 #: Past this, the weekly sweep happens on the next Run whatever day it is.
 EXTENDED_SWEEP_OVERDUE = timedelta(days=7)
@@ -117,8 +101,9 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         metavar="STUNDEN",
         help=(
             "nicht laufen, wenn der letzte Lauf weniger als so viele Stunden "
-            "her ist. Voreinstellung: 20 bei '--trigger cron', sonst keine "
-            "Grenze. 0 schaltet sie ab"
+            "her ist. Voreinstellung: die Kadenz aus dem Profil "
+            "('run_every_hours') bei '--trigger cron', sonst keine Grenze. "
+            "0 schaltet sie ab"
         ),
     )
     parser.add_argument(
@@ -384,7 +369,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _dismissals(profile, sources)
         if args.command == "rate":
             return _rate(profile, args.anzahl, sources, client)
-        if zu_frueh := _too_soon(profile, datetime.now(), _gap(args)):
+        if zu_frueh := _too_soon(profile, datetime.now(), _gap(args, profile)):
             print(zu_frueh)
             return EXIT_OK
         try:
@@ -405,21 +390,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         lock.release()
 
 
-def _gap(args) -> float:
+def _gap(args, profile) -> float:
     """Wie viele Stunden dieser Aufruf abwarten muss.
 
-    Die Grenze gilt der **Maschine**, nicht der Leserin: ein Wirt, der zu dicht
-    taktet, und ein Container, der neu startet, sollen keinen Rundgang
-    ausloesen. Wer dagegen `ebw` tippt oder auf der Startseite "Lauf jetzt
-    starten" drueckt, hat sich entschieden — ein Knopf, der den ganzen Tag
-    ueber nichts tut, ist kaputt, egal wie gut der Grund ist.
+    Die Taktung steckt nicht im Wirt, sondern hier: das Journal weiss, wann
+    zuletzt gelaufen wurde, und die Kadenz steht im Profil
+    (``run_every_hours``). Ein Wirt darf deshalb dumm sein und oft rufen — er
+    fragt, der Lauf entscheidet. Das ist zugleich der einzige Weg, auf dem
+    eine geaenderte Kadenz sofort gilt, ohne dass irgendwo ein Zeitplan
+    nachgezogen werden muss (ADR 4).
 
-    Deshalb haengt die Voreinstellung am Ausloeser. Ausdruecklich gesetzt
-    gewinnt die Zahl in jedem Fall.
+    Die Grenze gilt der **Maschine**, nicht der Leserin. Wer `ebw` tippt oder
+    auf der Startseite "Lauf jetzt starten" drueckt, hat sich entschieden —
+    ein Knopf, der den ganzen Tag ueber nichts tut, ist kaputt, egal wie gut
+    der Grund ist. Ausdruecklich gesetzt gewinnt die Zahl in jedem Fall.
     """
     if args.fruehestens_nach is not None:
         return args.fruehestens_nach
-    return MIN_RUN_GAP.total_seconds() / 3600 if args.trigger == "cron" else 0
+    return profile.run_every_hours if args.trigger == "cron" else 0
 
 
 def _too_soon(profile, now: datetime, stunden: float) -> str:
