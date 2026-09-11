@@ -316,6 +316,16 @@ the next Run reports the accumulated Deltas. A lock serialises concurrent Runs.
 ### Seed file
 *deutsch: Saatgutdatei*
 
-An optional YAML file used to import/bootstrap a Profile and its Watchlist into
-the database. Not the live store — once imported, the database is the source of
-truth and edits happen through the UI.
+A YAML file under the data directory. Which of them are seed and which are live
+is not uniform, and saying "the database is the source of truth" flatly was
+wrong:
+
+| File | Role |
+| --- | --- |
+| `watchlist.yaml` | **Seed.** Imported once into Book Relations of kind `watching`; the database is the truth afterwards and edits happen through the UI. |
+| `owned.yaml`, `dismissed.yaml` | **Seed.** Imported once into Relations and Ratings. |
+| `profile.yaml` | **Live configuration, not seed.** There is no profile table; `load_profile()` reads the file on every request. Thresholds, the rating model, the sweep weekday, Reference Authors and Genre Categories all come from it at runtime. Its Interests are *additionally* seeded into the `interest` table, so those two exist in both places. |
+
+Separate from all of these, and not in the data directory at all: the Reading
+Profile and the Rating Scheme live under `docs/` and are read relative to the
+package root. They are versioned with the code, not carried with the data.
