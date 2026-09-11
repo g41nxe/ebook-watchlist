@@ -45,16 +45,11 @@ services:
     networks:
       - proxy
     labels:
-      # Traefik im Nachbarprojekt routet nur, was dieses Label traegt
-      # (`--providers.docker.constraints`). Buchfink ist kein Calibre — das
-      # Label sagt hier die Unwahrheit und steht nur da, weil die Alternative
-      # gewesen waere, die Einschraenkung drueben zu lockern.
-      #
-      # Sauberer waere ein eigenes `proxy`-Netz als alleiniges Kriterium, wie
-      # es fuer geteilte Traefik-Instanzen ueblich ist. Dann fiele dieses Label
-      # weg und `external: true` unten zeigte auf ein Netz, das keinem Projekt
-      # gehoert. Drei Zeilen in `calibre-cwa/docker-compose.yml`.
-      - cwa.project=calibre-cwa
+      # Die Anmeldung beim Proxy besteht aus zwei Teilen, und die sind
+      # zugleich die Absicherung: dieses Label und die Mitgliedschaft im
+      # `proxy`-Netz unten. Beides passiert nicht versehentlich. Welcher
+      # Traefik das aufgreift, steht hier bewusst nicht — diese Datei nennt
+      # kein anderes Projekt.
       - traefik.enable=true
       - traefik.http.routers.buchfink.rule=Host(`buchfink.localhost`)
       - traefik.http.routers.buchfink.entrypoints=web
@@ -72,8 +67,9 @@ volumes:
     external: true
 
 networks:
-  # Gehoert dem Nachbarprojekt, nicht diesem. `docker compose down` dort nimmt
-  # das Netz mit, und Buchfink startet erst wieder, wenn es zurueck ist.
+  # Gehoert keinem Projekt. Einmalig ausserhalb aller Compose-Dateien anlegen:
+  #     docker network create proxy
+  # Dadurch ueberlebt es ein `docker compose down` in jedem einzelnen Projekt,
+  # und keine Datei muss den Namen einer anderen kennen.
   proxy:
     external: true
-    name: calibre-cwa_default
