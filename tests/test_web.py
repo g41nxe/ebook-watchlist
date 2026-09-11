@@ -298,3 +298,26 @@ def test_the_interface_still_starts_without_a_usable_console(
     print("eine Zeile, die sonst niemand liest", file=sys.stderr)
 
     assert "eine Zeile" in (data_dir / "web.log").read_text(encoding="utf-8")
+
+
+def test_the_cwa_link_appears_only_when_an_address_is_configured(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ein Verweis auf eine fremde Anwendung, die es nur hier gibt.
+
+    Fest verdrahtet waere `books.localhost` fuer jeden anderen ein toter Link
+    (ADR 12). Die Adresse steht deshalb in der Umgebung, und ohne sie bleibt
+    die Kopfzeile, wie sie war.
+    """
+    from ebook_watchlist.web.app import TEMPLATES
+
+    ohne = client.get("/watchlist").text
+    assert "CWA" not in ohne
+
+    monkeypatch.setitem(TEMPLATES.env.globals, "cwa_url", "http://books.example/")
+    mit = client.get("/watchlist").text
+
+    assert 'href="http://books.example/"' in mit
+    # Eine fremde Anwendung oeffnet in einem neuen Tab, und `noopener` gehoert
+    # dazu, damit sie kein `window.opener` auf Buchfink bekommt.
+    assert 'target="_blank" rel="noopener"' in mit

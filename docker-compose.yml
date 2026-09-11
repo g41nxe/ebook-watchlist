@@ -19,6 +19,9 @@ services:
       # zweite Weg des Tors, die angemeldete `claude`-CLI, gibt es hier nicht.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       EBW_DATA_DIR: /data
+      # Gesetzt: die Kopfzeile bekommt einen Punkt "CWA", der in einem neuen
+      # Tab zur eigenen Calibre-Web-Installation fuehrt. Leer: kein Punkt.
+      EBW_CWA_URL: ${EBW_CWA_URL:-}
     volumes:
       # Die Datenbank gehoert in ein benanntes Volume. Ueber einen Bind-Mount
       # von D:\ liefe SQLite durch die Virtualisierungsschicht von Docker

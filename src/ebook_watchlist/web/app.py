@@ -12,6 +12,7 @@ password in front of it before exposing it anywhere else.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -58,6 +59,16 @@ def asset_version() -> str:
     except OSError:  # pragma: no cover - fehlt nur ohne Build
         return "0"
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+#: Adresse einer Calibre-Web-Automated-Installation, falls daneben eine laeuft.
+#: Gesetzt erscheint der Punkt in der Kopfzeile, leer nicht — die Adresse gilt
+#: nur auf dem Rechner, auf dem beides laeuft, und fest verdrahtet waere sie
+#: fuer jeden anderen ein toter Link (ADR 12).
+#:
+#: Als Jinja-Global und nicht im Kontext jeder Route: der Wert ist auf jeder
+#: Seite derselbe, und ihn durch fuenfzehn Kontextwoerterbuecher zu reichen
+#: waere fuenfzehnmal dieselbe Zeile.
+TEMPLATES.env.globals["cwa_url"] = os.environ.get("EBW_CWA_URL", "").strip()
 
 
 def _sum_chars(text: str) -> int:
