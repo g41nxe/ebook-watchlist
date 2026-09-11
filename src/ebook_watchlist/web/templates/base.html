@@ -118,14 +118,25 @@
          abgesetzt durch einen Strich, umrandet statt flach, mit dem Pfeil, der
          "verlaesst die Seite" heisst, und in einem neuen Tab. Wer die Kopfzeile
          ueberfliegt, soll nicht erst beim Klicken merken, dass er woanders
-         landet. Ohne `EBW_CWA_URL` steht hier nichts. #}
+         landet. Ohne `EBW_CWA_URL` steht hier nichts.
+
+         **Auf dem Telefon nur das Symbol.** Die Rechnung oben schliesst mit
+         "wer einen fuenften Punkt hinzufuegt, muss neu rechnen" — dieser Punkt
+         ist der fuenfte, und mit dem Wort "CWA" mass die Navigation 301 px in
+         einem Container von 291: sie brach in zwei Zeilen um, und die
+         Kopfzeile war wieder 108 px hoch. Genau die Regression, die `4e2ea5e`
+         behoben hatte. Das Symbol allein sagt ohnehin, was der Punkt tut; den
+         Namen traegt `aria-label` fuer die Vorlesehilfe und `title` fuer die
+         Maus. #}
       {% if cwa_url %}
       <a href="{{ cwa_url }}" target="_blank" rel="noopener"
          title="Calibre-Web-Automated — die eigene Sammlung, in neuem Tab"
+         aria-label="Calibre-Web-Automated — die eigene Sammlung, in neuem Tab"
          class="tun ml-1 inline-flex h-7 items-center gap-1 rounded border
                 border-rule px-1.5 text-soft sm:ml-2 sm:px-2.5
                 hover:border-soft hover:text-ink">
-        CWA<svg class="i text-[0.85em] opacity-70"><use href="#ic-extern"/></svg></a>
+        <span class="hidden sm:inline">CWA</span>
+        <svg class="i text-[0.85em] opacity-70"><use href="#ic-extern"/></svg></a>
       {% endif %}
     </nav>
   </div>
