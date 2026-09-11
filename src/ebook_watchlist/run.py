@@ -568,7 +568,7 @@ def _record_foreign_ratings(store: Store, observations: Sequence[Observation]) -
     Anzahl fehlt, wird nichts geschrieben — ein Schnitt ohne sie ist keine
     Auskunft.
     """
-    from .ratings import BY_LIBRARY_READERS, subject_of
+    from .ratings import BY_ONLEIHE_READERS, subject_of
 
     now = datetime.now()
     for observation in observations:
@@ -588,7 +588,7 @@ def _record_foreign_ratings(store: Store, observations: Sequence[Observation]) -
             reason=f"Durchschnitt der Leser:innen aus {stimmen} Stimmen",
             profile_version=0,
             now=now,
-            origin=BY_LIBRARY_READERS,
+            origin=BY_ONLEIHE_READERS,
             votes=stimmen,
         )
 

@@ -1147,7 +1147,7 @@ def test_foreign_voices_stand_beside_the_tool_not_instead_of_it(store: Store) ->
     from datetime import datetime
 
     from ebook_watchlist.models import MatchReason, Observation
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL, subject_of
+    from ebook_watchlist.ratings import BY_MODEL, BY_ONLEIHE_READERS, subject_of
     from ebook_watchlist.run import _record_foreign_ratings
 
     fund = Observation(
@@ -1163,7 +1163,7 @@ def test_foreign_voices_stand_beside_the_tool_not_instead_of_it(store: Store) ->
     # Ausdruecklich mit der *aktuellen* Profilversion: eine fremde Stimme
     # veraltet nicht mit einer neuen Fassung, und die Abfrage darf sie
     # deshalb nicht wegfiltern (Befund aus dem Review zu Ticket 54).
-    fremd = store.rating(subject_of(fund), 2, origin=BY_LIBRARY_READERS)
+    fremd = store.rating(subject_of(fund), 2, origin=BY_ONLEIHE_READERS)
     assert fremd.stars == 4
     assert fremd.votes == 1641
     assert fremd.confidence == "belegt"
@@ -1176,7 +1176,7 @@ def test_a_single_voice_is_not_evidence(store: Store) -> None:
     einer einzigen Stimme. Der Wert wird festgehalten, gilt aber nicht als
     belegt — und ohne Anzahl wird gar nichts geschrieben."""
     from ebook_watchlist.models import MatchReason, Observation
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS, subject_of
+    from ebook_watchlist.ratings import BY_ONLEIHE_READERS, subject_of
     from ebook_watchlist.run import _record_foreign_ratings
 
     knapp = Observation(source="onleihe", source_item_id="2", title="Kaum Stimmen",
@@ -1191,10 +1191,10 @@ def test_a_single_voice_is_not_evidence(store: Store) -> None:
     # "belegt" heisst "aus geprueter Quelle" — nicht "statistisch belastbar".
     # Wie duenn die Stimmenlage ist, sagt die Zahl daneben, keine erfundene
     # Grenze (Befund aus dem Review zu Ticket 54).
-    knapp_row = store.rating(subject_of(knapp), 2, origin=BY_LIBRARY_READERS)
+    knapp_row = store.rating(subject_of(knapp), 2, origin=BY_ONLEIHE_READERS)
     assert knapp_row.confidence == "belegt"
     assert knapp_row.votes == 3
-    assert store.rating(subject_of(ohne), 2, origin=BY_LIBRARY_READERS) is None
+    assert store.rating(subject_of(ohne), 2, origin=BY_ONLEIHE_READERS) is None
 
 
 def test_a_foreign_voice_survives_a_new_profile_version(store: Store) -> None:
@@ -1204,17 +1204,17 @@ def test_a_foreign_voice_survives_a_new_profile_version(store: Store) -> None:
     schon richtig — im Store nicht."""
     from datetime import datetime
 
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL
+    from ebook_watchlist.ratings import BY_MODEL, BY_ONLEIHE_READERS
 
     store.put_rating("isbn:9780000000009", stars=4, confidence="belegt",
                      reason="1641 Stimmen", profile_version=0,
-                     now=datetime(2026, 9, 6), origin=BY_LIBRARY_READERS, votes=1641)
+                     now=datetime(2026, 9, 6), origin=BY_ONLEIHE_READERS, votes=1641)
     store.put_rating("isbn:9780000000009", stars=2, confidence="teils", reason="Modell",
                      profile_version=1, now=datetime(2026, 9, 6), origin=BY_MODEL)
 
     # Das Modellurteil gegen Profil 1 veraltet mit Profil 2 — die fremde nicht.
     assert store.rating("isbn:9780000000009", 2, origin=BY_MODEL) is None
-    assert store.rating("isbn:9780000000009", 2, origin=BY_LIBRARY_READERS).stars == 4
+    assert store.rating("isbn:9780000000009", 2, origin=BY_ONLEIHE_READERS).stars == 4
 
 
 def test_an_apostrophe_escaped_the_wrong_way_does_not_cost_the_judgement() -> None:

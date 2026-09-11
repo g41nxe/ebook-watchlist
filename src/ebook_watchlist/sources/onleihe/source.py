@@ -1,4 +1,4 @@
-"""The VÖBB Library Source.
+"""The Onleihe Library Source — the VÖBB runs it at voebb.onleihe.de.
 
 v1 is entirely login-free: copy counts and queue lengths are public. Personal
 holds need an authenticated scrape and are deferred to v2 (ADR 6).
@@ -39,7 +39,7 @@ def require_title_id(url: str) -> str:
     title_id = title_id_from_url(url)
     if title_id is None:
         raise SourceStructureError(
-            f"VÖBB: cannot read a title id out of {url!r} — expected a mediaInfo path"
+            f"Onleihe: cannot read a title id out of {url!r} — expected a mediaInfo path"
         )
     return title_id
 
@@ -153,5 +153,5 @@ class OnleiheSource(LibrarySource):
         candidates = parse.parse_search_results(self._search_page(sel.PROBE_QUERY, 0))
         if not candidates:
             raise SourceStructureError(
-                f"VÖBB: the probe query {sel.PROBE_QUERY!r} returned no parseable hits"
+                f"Onleihe: the probe query {sel.PROBE_QUERY!r} returned no parseable hits"
             )

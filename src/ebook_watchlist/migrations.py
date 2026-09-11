@@ -478,10 +478,21 @@ def _voebb_is_called_onleihe(connection: Connection) -> None:
         # zu scheitern.
         if not _has_table(connection, tabelle) or spalte not in _columns(connection, tabelle):
             continue
+        # ``OR IGNORE``, weil der Quellname bei ``book_source`` und
+        # ``interest_seeded`` im Primaerschluessel steht: wer vorher in
+        # ``profile.yaml`` schon ``onleihe: {kind: voebb}`` geschrieben hat,
+        # traegt beide Namen, und ein Konflikt liesse die ganze Migration
+        # zurueckrollen. Die Version bliebe dann auf dem alten Stand, und die
+        # Anwendung startete ueberhaupt nicht mehr — ein Preis, den eine
+        # Umbenennung nicht wert ist. Die Zeile bleibt dann unter dem alten
+        # Namen liegen und wird von niemandem mehr gefunden, was folgenlos ist:
+        # eine Quelle dieses Namens gibt es nicht mehr.
+        #
         # Tabellen- und Spaltennamen stehen als Literale in der Zeile darueber,
         # nur die Werte sind gebunden.
         connection.exec_driver_sql(
-            f"UPDATE {tabelle} SET {spalte} = ? WHERE {spalte} = ?", (neu, alt)  # noqa: S608
+            f"UPDATE OR IGNORE {tabelle} SET {spalte} = ? WHERE {spalte} = ?",  # noqa: S608
+            (neu, alt),
         )
 
     # Urteile ueber einen Fund ohne ISBN haengen am Quellnamen
@@ -492,6 +503,33 @@ def _voebb_is_called_onleihe(connection: Connection) -> None:
             "UPDATE rating SET subject = 'item:onleihe:' || substr(subject, 12) "
             "WHERE subject LIKE 'item:voebb:%'"
         )
+
+
+def _library_readers_are_named_per_library(connection: Connection) -> None:
+    """Die Leserstimmen heissen wieder nach ihrer Bibliothek.
+
+    Der Schritt davor machte aus ``voebb_readers`` ein generisches
+    ``library_readers`` — mit dem Gedanken, die Herkunft meine "irgendeine
+    Bibliothek". Das war falsch, und zwar auf eine Art, die erst mit der
+    zweiten Bibliothek weh getan haette:
+
+    Ein Urteil haengt an der ISBN, sobald es eine gibt (``ratings.subject_of``);
+    der Quellname faellt dann aus dem Schluessel. ``rating`` ist ueber
+    ``(subject, origin)`` eindeutig, also schrieben zwei Bibliotheken fuer
+    dieselbe ISBN in **dieselbe Zeile** — die zweite ueberschriebe die erste bei
+    jedem Lauf, stumm und je nach Reihenfolge der Quellen. Alle fuenf Zeilen im
+    echten Bestand sind ISBN-Zeilen; es waere nicht der Randfall gewesen,
+    sondern der Normalfall.
+
+    Ein eigener Schritt statt einer Korrektur am vorigen: eine Installation ist
+    bereits auf Version 22 gelaufen, und eine nachtraeglich geaenderte Migration
+    haette sie nie erreicht.
+    """
+    if not _has_table(connection, "rating") or "origin" not in _columns(connection, "rating"):
+        return
+    connection.exec_driver_sql(
+        "UPDATE OR IGNORE rating SET origin = 'onleihe_readers' WHERE origin = 'library_readers'"
+    )
 
 
 MIGRATIONS: tuple[Migration, ...] = (
@@ -520,6 +558,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     _blurb_without_the_collapse_button,
     _book_carries_its_blurb,
     _voebb_is_called_onleihe,
+    _library_readers_are_named_per_library,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

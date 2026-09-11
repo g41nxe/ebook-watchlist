@@ -19,8 +19,8 @@ from ..models import Availability, MatchReason
 from ..rating import RatingUnavailable, build_rater, confidence_label, load_leseprofil
 from ..ratings import (
     BY_CONVERSATION,
-    BY_LIBRARY_READERS,
     BY_MODEL,
+    BY_ONLEIHE_READERS,
     BY_READER,
     FOREIGN_ORIGINS,
     HUMAN_ORIGINS,
@@ -38,7 +38,7 @@ from .watchlist import SourceState
 #: hat, zuerst.
 #: Zuletzt die fremden Stimmen: sie sind Auskunft ueber das Buch, nicht ueber
 #: die Passung zum Profil (Ticket 54).
-ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL, BY_LIBRARY_READERS)
+ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL, BY_ONLEIHE_READERS)
 
 #: Was die Leserin über ein Buch sagen kann, in der Reihenfolge, in der es auf
 #: der Seite steht. Mehrere gelten gleichzeitig — das ist der Normalfall.

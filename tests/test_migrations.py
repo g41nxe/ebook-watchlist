@@ -277,20 +277,20 @@ def test_the_rename_keeps_every_row_that_carried_the_old_name(tmp_path: Path) ->
     with sqlite3.connect(path) as connection:
         connection.execute(
             "INSERT INTO observation (profile_slug, run_id, source, source_item_id, title,"
-            " match_reason, observed_at) VALUES ('t', 1, 'onleihe', '42', 'Ein Buch',"
+            " match_reason, observed_at) VALUES ('t', 1, 'voebb', '42', 'Ein Buch',"
             " 'watchlist', '2026-09-11 12:00:00')"
         )
         connection.execute(
             "INSERT INTO book_source (book_id, source, source_item_id, resolved_at, details)"
-            " VALUES (1, 'onleihe', '42', '2026-09-11 12:00:00', '{}')"
+            " VALUES (1, 'voebb', '42', '2026-09-11 12:00:00', '{}')"
         )
         connection.execute(
             "INSERT INTO source (name, enabled, consecutive_failures, updated_at)"
-            " VALUES ('onleihe', 1, 0, '2026-09-11 12:00:00')"
+            " VALUES ('voebb', 1, 0, '2026-09-11 12:00:00')"
         )
         connection.execute(
             "INSERT INTO rating (subject, origin, stars, confidence, reason, profile_version,"
-            " rated_at, pitch) VALUES ('item:voebb:42', 'library_readers', 4, 'belegt', 'gut', 1,"
+            " rated_at, pitch) VALUES ('item:voebb:42', 'voebb_readers', 4, 'belegt', 'gut', 1,"
             " '2026-09-11 12:00:00', '')"
         )
 
@@ -302,9 +302,8 @@ def test_the_rename_keeps_every_row_that_carried_the_old_name(tmp_path: Path) ->
         assert fetch("SELECT source FROM observation").fetchone()[0] == "onleihe"
         assert fetch("SELECT source FROM book_source").fetchone()[0] == "onleihe"
         assert fetch("SELECT name FROM source").fetchone()[0] == "onleihe"
-        # Die Herkunft heisst generisch, nicht nach der einen Bibliothek: die
-        # zweite bringt eigene Stimmen mit, und fuer die Leserin hiess sie
-        # ohnehin immer "Leser:innen der Bibliothek".
+        # Schritt 22 machte daraus zunaechst ein generisches
+        # ``library_readers``; Schritt 23 nimmt das zurueck (siehe dort).
         assert fetch("SELECT origin FROM rating").fetchone()[0] == "library_readers"
         # Ein Urteil ueber einen Fund ohne ISBN haengt am Quellnamen.
         assert fetch("SELECT subject FROM rating").fetchone()[0] == "item:onleihe:42"
@@ -332,3 +331,91 @@ def test_the_rename_leaves_other_sources_alone(tmp_path: Path) -> None:
     with sqlite3.connect(path) as connection:
         assert connection.execute("SELECT name FROM source").fetchone()[0] == "beam"
         assert connection.execute("SELECT subject FROM rating").fetchone()[0] == "item:beam:7"
+
+
+def test_running_the_rename_twice_changes_nothing(tmp_path: Path) -> None:
+    """Eine Migration laeuft im Normalfall einmal — aber sie darf beim zweiten
+    Mal nicht etwas kaputt machen, und niemand hat das bisher nachgesehen."""
+    from ebook_watchlist.migrations import _voebb_is_called_onleihe
+
+    path = tmp_path / "s.db"
+    Store(path)
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "INSERT INTO source (name, enabled, consecutive_failures, updated_at)"
+            " VALUES ('voebb', 1, 0, '2026-09-11 12:00:00')"
+        )
+
+    engine = create_engine(f"sqlite:///{path}")
+    for _ in range(2):
+        with engine.begin() as connection:
+            _voebb_is_called_onleihe(connection)
+
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT name FROM source").fetchall() == [("onleihe",)]
+
+
+def test_a_seeded_interest_moves_too(tmp_path: Path) -> None:
+    """Die sechste Spalte mit einem Quellnamen. Im echten Bestand leer, in
+    einer anderen Installation nicht — und sie steht im Primaerschluessel."""
+    from ebook_watchlist.migrations import _voebb_is_called_onleihe
+
+    path = tmp_path / "s.db"
+    Store(path)
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "INSERT INTO interest_seeded (interest_id, source, seeded_at)"
+            " VALUES (1, 'voebb', '2026-09-11 12:00:00')"
+        )
+
+    with create_engine(f"sqlite:///{path}").begin() as connection:
+        _voebb_is_called_onleihe(connection)
+
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT source FROM interest_seeded").fetchone()[0] == "onleihe"
+
+
+def test_a_name_collision_does_not_take_the_database_down(tmp_path: Path) -> None:
+    """Wer vorher ``onleihe: {kind: voebb}`` konfiguriert hat, traegt beide
+    Namen — und der Quellname steht bei ``book_source`` im Primaerschluessel.
+    Ohne ``OR IGNORE`` rollte die ganze Migration zurueck, die Version bliebe
+    alt, und die Anwendung startete nicht mehr."""
+    from ebook_watchlist.migrations import _voebb_is_called_onleihe
+
+    path = tmp_path / "s.db"
+    Store(path)
+    with sqlite3.connect(path) as connection:
+        for name in ("voebb", "onleihe"):
+            connection.execute(
+                "INSERT INTO book_source (book_id, source, source_item_id, resolved_at, details)"
+                f" VALUES (1, '{name}', '42', '2026-09-11 12:00:00', '{{}}')"
+            )
+
+    with create_engine(f"sqlite:///{path}").begin() as connection:
+        _voebb_is_called_onleihe(connection)
+
+    with sqlite3.connect(path) as connection:
+        # Die neue Zeile steht; die alte bleibt liegen und findet niemand mehr.
+        assert ("onleihe",) in connection.execute("SELECT source FROM book_source").fetchall()
+
+
+def test_the_readers_are_named_after_their_library_again(tmp_path: Path) -> None:
+    """Generisch waere falsch: ein Urteil haengt an der ISBN, sobald es eine
+    gibt, und dann faellt der Quellname aus dem Schluessel. Zwei Bibliotheken
+    schrieben fuer dieselbe ISBN in dieselbe Zeile."""
+    from ebook_watchlist.migrations import _library_readers_are_named_per_library
+
+    path = tmp_path / "s.db"
+    Store(path)
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "INSERT INTO rating (subject, origin, stars, confidence, reason, profile_version,"
+            " rated_at, pitch) VALUES ('isbn:9783641130008', 'library_readers', 4, 'belegt',"
+            " '1641 Stimmen', 1, '2026-09-11 12:00:00', '')"
+        )
+
+    with create_engine(f"sqlite:///{path}").begin() as connection:
+        _library_readers_are_named_per_library(connection)
+
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT origin FROM rating").fetchone()[0] == "onleihe_readers"

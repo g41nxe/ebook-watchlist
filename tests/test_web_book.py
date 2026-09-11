@@ -468,7 +468,7 @@ def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:
     """Eine 4 vom Modell ist ein Vorschlag, eine 4 aus 1641 fremden Stimmen ist
     etwas ganz anderes. Sie dürfen nicht im selben Kasten stehen (ADR 19,
     Ticket 54)."""
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL
+    from ebook_watchlist.ratings import BY_MODEL, BY_ONLEIHE_READERS
 
     buch = db.find_or_create_book(
         isbn="9783641117009", title="Die sieben Schwestern", author="Riley", now=NOW
@@ -477,7 +477,7 @@ def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:
                   profile_version=2, now=NOW, origin=BY_MODEL)
     db.put_rating(f"book:{buch.id}", stars=4, confidence="belegt",
                   reason="Durchschnitt der Leser:innen aus 1641 Stimmen",
-                  profile_version=0, now=NOW, origin=BY_LIBRARY_READERS, votes=1641)
+                  profile_version=0, now=NOW, origin=BY_ONLEIHE_READERS, votes=1641)
 
     body = client.get(f"/book/{buch.id}").text
 
@@ -491,10 +491,10 @@ def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:
 def test_a_foreign_voice_never_goes_stale(db) -> None:
     """Sie ist kein Urteil gegen das Leseprofil und verfällt deshalb nicht,
     wenn die Leserin ihr Profil schärft."""
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS
+    from ebook_watchlist.ratings import BY_ONLEIHE_READERS
     from ebook_watchlist.web.book import Judgement
 
-    stimme = Judgement(origin=BY_LIBRARY_READERS, label="Leser:innen", stars=4.0,
+    stimme = Judgement(origin=BY_ONLEIHE_READERS, label="Leser:innen", stars=4.0,
                        reason="", confidence="belegt", profile_version=0,
                        when=None, votes=1641)
 
