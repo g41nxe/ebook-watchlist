@@ -25,6 +25,7 @@ from .beam import BeamSource
 from .fake import FakeSource
 from .onleihe import OnleiheSource
 from .onleihe import selectors as onleihe_selectors
+from .overdrive import OverdriveSource
 
 
 def _build_fake(name: str, options: dict, client: HttpClient) -> Source:
@@ -56,6 +57,14 @@ def _build_onleihe(name: str, options: dict, client: HttpClient) -> Source:
     return OnleiheSource(client=client, name=name, media=media)
 
 
+def _build_overdrive(name: str, options: dict, client: HttpClient) -> Source:
+    # Keine Optionen: nur deutsche EPUB-E-Books, und die Einrichtung steht in
+    # `selectors.py`. Wer eine andere OverDrive-Bibliothek braucht, gibt ihr
+    # dort einen Schluessel — eine Einstellung, die noch niemand gebraucht hat,
+    # waere nur eine Zeile, die niemand liest.
+    return OverdriveSource(client=client, name=name)
+
+
 def _build_beam(name: str, options: dict, client: HttpClient) -> Source:
     return BeamSource(client=client, name=name)
 
@@ -66,10 +75,26 @@ def _build_beam(name: str, options: dict, client: HttpClient) -> Source:
 #:
 #: Hier und nicht in einer Vorlage, weil die Registry ohnehin die Stelle ist,
 #: die weiss, *was* eine Quelle ist.
-KINDS: dict[str, str] = {"onleihe": "library", "beam": "shop", "fake": "shop"}
+KINDS: dict[str, str] = {
+    "onleihe": "library",
+    "overdrive": "library",
+    "beam": "shop",
+    "fake": "shop",
+}
 
 LIBRARY = "Bibliothek"
 SHOP = "Shop"
+
+#: Wo die Art als Beschriftung nicht mehr reicht. Ticket 14 zeigte die *Art*
+#: statt des Namens, und das war richtig: "voebb" war nie ein Wort fuer die
+#: Leserin. Mit zwei Bibliotheken trug die Regel nicht mehr — die Buchseite
+#: zeigte zwei Kacheln "BIBLIOTHEK", die eine "verliehen", die andere "nicht im
+#: Katalog", und welche welche war, stand nirgends.
+#:
+#: "Onleihe" und "OverDrive" sind dagegen sehr wohl Woerter fuer die Leserin:
+#: das sind die beiden Stellen, an denen sie ausleiht. Was hier fehlt, faellt
+#: weiterhin auf die Art zurueck — ein einzelner Shop bleibt "Shop".
+DISPLAY: dict[str, str] = {"onleihe": "Onleihe", "overdrive": "OverDrive"}
 
 
 def category(profile: Profile, name: str) -> str:
@@ -80,7 +105,14 @@ def category(profile: Profile, name: str) -> str:
 
 
 def label(profile: Profile, name: str) -> str:
-    """Wie die Quelle der Leserin gegenueber heisst."""
+    """Wie die Quelle der Leserin gegenueber heisst.
+
+    Ihr eigener Name, wo sie einen hat, den die Leserin kennt — sonst die Art.
+    """
+    options = profile.sources.get(name) or {}
+    kind = options.get("kind", name) if isinstance(options, dict) else name
+    if eigener := DISPLAY.get(kind):
+        return eigener
     return LIBRARY if category(profile, name) == "library" else SHOP
 
 
@@ -98,6 +130,7 @@ def shops(profile: Profile) -> list[str]:
 _BUILDERS: dict[str, Callable[[str, dict, HttpClient], Source]] = {
     "fake": _build_fake,
     "onleihe": _build_onleihe,
+    "overdrive": _build_overdrive,
     "beam": _build_beam,
 }
 

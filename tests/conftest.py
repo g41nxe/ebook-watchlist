@@ -92,6 +92,12 @@ def onleihe_fixture(name: str) -> str:
     return _read("onleihe", name)
 
 
+def overdrive_fixture(name: str) -> str:
+    """Ganze Antworten von Thunder, aufgezeichnet am 2026-09-11. Neu aufnehmen
+    statt von Hand nachbessern, wenn sich die Schnittstelle aendert (ADR 14)."""
+    return _read("overdrive", name)
+
+
 @functools.cache
 def beam_detail(name: str):
     """Die geparste beam-Detailseite. 720 KB, und mehrere Tests brauchen sie."""

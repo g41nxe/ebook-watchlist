@@ -43,3 +43,30 @@ def test_onleihe_search_still_parses(client: HttpClient) -> None:
     assert candidates, "the probe query must keep returning hits"
     assert candidates[0].title
     assert candidates[0].url.startswith("http")
+
+
+# --- OverDrive ---------------------------------------------------------------
+
+
+def test_overdrive_probe_still_parses(client: HttpClient) -> None:
+    """Der Selbsttest der Quelle gegen das echte Thunder. Er prueft, dass die
+    Felder noch da sind — nie, welche Werte sie tragen: Lizenzen, Vormerkungen
+    und Wartezeiten aendern sich stuendlich."""
+    from ebook_watchlist.sources.overdrive import OverdriveSource
+
+    OverdriveSource(client=client).probe()
+
+
+def test_overdrive_finds_the_german_edition_of_dark_matter(client: HttpClient) -> None:
+    """Der Titel, an dem die zweite Bibliothek haengt. Faellt dieser Test, hat
+    OverDrive den Titel abgegeben oder umbenannt — beides ist eine Nachricht."""
+    from ebook_watchlist.config import WatchlistEntry
+    from ebook_watchlist.matching import Confidence
+    from ebook_watchlist.sources.overdrive import OverdriveSource
+
+    resolution = OverdriveSource(client=client).resolve(
+        WatchlistEntry(title="Dark Matter", author="Blake Crouch", isbn="9783641171421")
+    )
+
+    assert resolution is not None
+    assert resolution.confidence is Confidence.AUTO_ACCEPT
