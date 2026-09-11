@@ -46,9 +46,17 @@ Was dabei zu wissen ist:
 - **Der Lauf taktet sich selbst**: das Einstiegsskript stößt beim Start einen
   Lauf an und dann alle 24 Stunden. Keine feste Uhrzeit — ein Lauf vergleicht
   gegen die letzte Aufzeichnung, nie gegen „gestern".
-- **Das Bewertungstor braucht einen API-Schlüssel.** Sein zweiter Weg, die
-  lokal angemeldete `claude`-CLI, existiert im Container nicht. Ohne Schlüssel
-  erscheinen alle Funde unbewertet — kein Fehler, nur kein Tor.
+- **Das Bewertungstor braucht eine Anmeldung**, sonst erscheinen alle Funde
+  unbewertet — kein Fehler, nur kein Tor. Zwei Wege, in dieser Reihenfolge:
+  `ANTHROPIC_API_KEY` aus der Console (getrennt abgerechnet), sonst die im Bild
+  mitgebaute `claude`-CLI. Die braucht einen langlebigen Token, den du auf
+  deinem Rechner mit `claude setup-token` erzeugst und als
+  `CLAUDE_CODE_OAUTH_TOKEN` in die `.env` schreibst; er hängt am Abonnement und
+  kostet kein zusätzliches Guthaben. Die CLI-Fassung steht als
+  `CLAUDE_CODE_VERSION` fest im [`Dockerfile`](../Dockerfile) und aktualisiert
+  sich nicht selbst — ein Bild soll sich nicht unter der Hand ändern.
+  Sie kostet allerdings 320 MB im Bild und rund 34 Sekunden je Aufruf; wer
+  einen Rückstand zügig abarbeiten will, nimmt den Schlüssel.
 
 Eine vorhandene Datenbank kommt so ins Volume (vorher den Lauf beenden, damit
 niemand schreibt):

@@ -1106,6 +1106,32 @@ def test_an_error_envelope_is_not_mistaken_for_an_answer() -> None:
         _cli_text(huelle)
 
 
+def test_a_failing_call_names_what_the_envelope_says(monkeypatch) -> None:
+    """Gemessen an einem Container ohne Anmeldung: Rueckgabewert 1, stderr
+    leer, und der einzige Hinweis — "Not logged in · Please run /login" —
+    stand in der Huelle auf stdout. Uebrig blieb "claude endete mit 1"."""
+    monkeypatch.setattr(
+        "ebook_watchlist.rating.subprocess.run",
+        lambda *a, **k: _completed(
+            stdout=json.dumps({"is_error": True, "result": "Not logged in · Please run /login"}),
+            returncode=1,
+        ),
+    )
+
+    with pytest.raises(RatingUnavailable, match="Not logged in"):
+        ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate(discovery())
+
+
+def test_a_failure_without_an_envelope_still_names_the_return_code(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "ebook_watchlist.rating.subprocess.run",
+        lambda *a, **k: _completed(stdout="", stderr="Killed", returncode=137),
+    )
+
+    with pytest.raises(RatingUnavailable, match="endete mit 137: Killed"):
+        ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate(discovery())
+
+
 def test_a_good_envelope_still_yields_its_result() -> None:
     from ebook_watchlist.rating import _cli_text
 

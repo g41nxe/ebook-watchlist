@@ -632,6 +632,12 @@ class ClaudeCodeRater:
                 f"{self.executable} antwortete nicht in {self.timeout}s"
             ) from exc
         if completed.returncode != 0:
+            # Die Huelle nennt den Grund auch dann noch, wenn der Rueckgabewert
+            # schon Alarm schlaegt — und sie ist die einzige, die ihn nennt:
+            # "Not logged in · Please run /login" stand in stdout, stderr blieb
+            # leer, und uebrig blieb die nichtssagende Zeile "claude endete mit
+            # 1". Wirft sie nicht, faellt es auf die Zeile darunter zurueck.
+            _cli_text(completed.stdout)
             detail = (completed.stderr or "").strip().splitlines()
             raise RatingUnavailable(
                 f"{self.executable} endete mit {completed.returncode}"
