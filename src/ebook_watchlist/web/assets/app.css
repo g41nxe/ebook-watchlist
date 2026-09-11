@@ -243,14 +243,18 @@
      um welche Quelle es geht, ohne den Wert zu stoeren. Rechts auf halber
      Hoehe und vollstaendig sichtbar — angeschnitten in der Ecke lief es dem
      Wert in die Zeile, und ein halbes Symbol liest sich als Fehler. Der
-     Inhalt haelt den Platz frei (`pr-16`). */
+     Inhalt haelt den Platz frei (`pr-12`).
+
+     40 statt 48 Pixel, seit es drei Kacheln sein koennen: die dritte Quelle
+     nimmt jeder Kachel 27 Pixel Breite, und die holt das Symbol zurueck,
+     ohne dass "nicht im Katalog" umbricht. */
   .kachelbild {
     position: absolute;
-    right: 12px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     opacity: 0.09;
     stroke: currentColor;
     fill: none;

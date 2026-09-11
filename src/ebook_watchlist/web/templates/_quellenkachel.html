@@ -10,7 +10,8 @@
    erbte ein Preis von 9,99 das Bernstein und sähe aus wie ein Schnäppchen.
 
    Eine Stelle für Buch- und Fundseite (Issue #9): ein Fund kennt genau eine
-   Quelle, ein Buch bis zu zwei — die Kachel ist dieselbe.
+   Quelle, ein Buch seit der zweiten Bibliothek bis zu drei — die Kachel ist
+   dieselbe.
 #}
 {% macro kachel(display, library=false, url=none, preis=none, verfuegbarkeit=none,
                 ersatz=none, deal=false, wann=none, pille=none) %}
@@ -20,10 +21,16 @@
    title="{{ display }} öffnen" class="kachel-klickbar cursor-pointer {% else %}
    {# `max-w-xs`: bei einer einzigen Kachel zog `flex-1` sie ueber die ganze
       Breite, und ein Preis in einem 720 Pixel breiten Kasten sieht aus wie
-      ein Fehler. Zwei Kacheln teilen sich denselben Deckel. #}
-   class="{% endif %}{{ ton }} relative flex min-w-52 max-w-xs flex-1 flex-col
+      ein Fehler.
+
+      `min-w-44` statt `min-w-52`: der Kopf ist 604 Pixel breit, drei Kacheln
+      mit ihren zwei Zwischenraeumen bekommen davon je 193 — bei einer
+      Mindestbreite von 208 brach die dritte um, und `flex-1` zog die beiden
+      oberen auf die volle Breite. Drei verschieden lange Kacheln in zwei
+      Reihen, wo drei gleiche in einer stehen koennen. #}
+   class="{% endif %}{{ ton }} relative flex min-w-44 max-w-xs flex-1 flex-col
           justify-between overflow-hidden rounded-lg border border-rule bg-card
-          px-3 pt-2 pr-14 pb-2.5">
+          px-3 pt-2 pr-12 pb-2.5">
   <svg class="kachelbild {{ ton }}" aria-hidden="true">
     <use href="#{{ 'ic-lib' if library else 'ic-shop' }}"/></svg>
   <div class="relative mb-2 flex flex-wrap items-center gap-1.5 text-xs

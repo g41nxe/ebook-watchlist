@@ -28,7 +28,7 @@
 
 {% set kacheln %}
 {% for state in page.sources %}
-{% set sichtung = page.latest_at(state.display) %}
+{% set sichtung = page.latest_at(state.name) %}
 {{ kachel(
      state.display,
      library=state.category == "library",

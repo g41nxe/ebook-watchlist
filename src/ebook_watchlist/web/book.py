@@ -101,8 +101,14 @@ class Sighting:
     """Eine Zeile der Geschichte."""
 
     when: datetime | None
-    #: Die *Art* der Quelle, nicht ihr interner Name: "voebb" war nie ein Wort
-    #: fuer die Leserin (Ticket 14).
+    #: Der Quellname — die **Identitaet**, nicht die Beschriftung. Beides war
+    #: hier dasselbe Feld, solange es eine Bibliothek gab; mit zweien suchte
+    #: die Onleihe-Kachel ihre Sichtung unter "Bibliothek" und fand die von
+    #: OverDrive. Die Seite behauptete dann "verliehen" fuer einen Titel, den
+    #: die Onleihe gar nicht fuehrt.
+    name: str
+    #: Die *Art* der Quelle, wie sie der Leserin gezeigt wird: "voebb" war nie
+    #: ein Wort fuer sie (Ticket 14).
     source: str
     price: str | None
     availability: str | None
@@ -237,10 +243,15 @@ class Page:
     def borrowable(self) -> bool:
         return any(sichtung.availability == "ausleihbar" for sichtung in self.latest)
 
-    def latest_at(self, source: str) -> Sighting | None:
-        """Die juengste Sichtung dieser Quelle, oder ``None``."""
+    def latest_at(self, name: str) -> Sighting | None:
+        """Die juengste Sichtung dieser Quelle, oder ``None``.
+
+        Gefragt wird nach dem Quellnamen. Nach der Beschriftung zu fragen war
+        richtig, solange keine zwei Quellen dieselbe trugen — seit es zwei
+        Bibliotheken gibt, beantwortete es die Frage einer anderen Quelle.
+        """
         for sichtung in self.latest:
-            if sichtung.source == source:
+            if sichtung.name == name:
                 return sichtung
         return None
 
@@ -389,9 +400,11 @@ def _latest_per_source(history: tuple[Sighting, ...]) -> tuple[Sighting, ...]:
     """
     neueste: dict[str, Sighting] = {}
     for sichtung in history:
-        vorher = neueste.get(sichtung.source)
+        # Nach dem Namen, nicht nach der Beschriftung: zwei Bibliotheken tragen
+        # dieselbe, und die eine verschwand still hinter der anderen.
+        vorher = neueste.get(sichtung.name)
         if vorher is None or (sichtung.when or datetime.min) > (vorher.when or datetime.min):
-            neueste[sichtung.source] = sichtung
+            neueste[sichtung.name] = sichtung
     return tuple(neueste.values())
 
 
@@ -432,6 +445,7 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
     history = tuple(
         Sighting(
             when=observation.observed_at,
+            name=observation.source,
             source=registry.label(profile, observation.source),
             price=_price(observation.price_cents),
             availability=_AVAILABILITY.get(observation.availability)

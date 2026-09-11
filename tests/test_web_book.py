@@ -739,3 +739,50 @@ def test_the_button_is_gone_once_a_judgement_stands(client: TestClient, db: Stor
                   profile_version=1, now=NOW, origin=BY_MODEL)
 
     assert f"/book/{buch.id}/bewerten" not in client.get(f"/book/{buch.id}").text
+
+
+# --- zwei Bibliotheken, zwei Kacheln ----------------------------------------
+
+
+def sichtung(name: str, *, label: str, availability: str, when: datetime) -> view.Sighting:
+    return view.Sighting(
+        when=when, name=name, source=label, price=None,
+        availability=availability, other_title=None, deal=False,
+    )
+
+
+def test_two_libraries_do_not_share_one_tile() -> None:
+    """Die Kachel suchte ihre Sichtung ueber die *Beschriftung*. Mit einer
+    Bibliothek ging das gut; mit zweien fand die Onleihe-Kachel die Sichtung
+    von OverDrive und behauptete "verliehen" fuer einen Titel, den die Onleihe
+    gar nicht fuehrt."""
+    frueher, spaeter = datetime(2026, 9, 11, 12), datetime(2026, 9, 11, 21)
+    verlauf = (
+        sichtung("overdrive", label="Bibliothek", availability="verliehen", when=spaeter),
+        sichtung("onleihe", label="Bibliothek", availability="unklar", when=frueher),
+    )
+
+    neueste = view._latest_per_source(verlauf)
+
+    # Zwei Quellen, zwei Eintraege — nicht einer, der den anderen verdeckt.
+    assert {s.name for s in neueste} == {"onleihe", "overdrive"}
+
+
+def test_a_tile_asks_for_its_own_source_not_for_its_label() -> None:
+    frueher, spaeter = datetime(2026, 9, 11, 12), datetime(2026, 9, 11, 21)
+    seite = view.Page(
+        book_id=1, title="Dark Matter", author=None, series=None, isbn=None,
+        cover_file=None, relations=(), sources=(), judgements=(), profile_version=None,
+        origin=None,
+        history=(
+            sichtung("overdrive", label="Bibliothek", availability="verliehen", when=spaeter),
+            sichtung("onleihe", label="Bibliothek", availability="unklar", when=frueher),
+        ),
+        latest=(
+            sichtung("overdrive", label="Bibliothek", availability="verliehen", when=spaeter),
+            sichtung("onleihe", label="Bibliothek", availability="unklar", when=frueher),
+        ),
+    )
+
+    assert seite.latest_at("overdrive").availability == "verliehen"
+    assert seite.latest_at("onleihe").availability == "unklar"

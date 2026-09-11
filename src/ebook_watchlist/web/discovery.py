@@ -98,6 +98,7 @@ def build(store: Store, profile: Profile, source: str, item_id: str) -> Page | N
     history = tuple(
         Sighting(
             when=observation.observed_at,
+            name=observation.source,
             source=registry.label(profile, observation.source),
             price=_price(observation.price_cents),
             availability=_AVAILABILITY.get(observation.availability)
