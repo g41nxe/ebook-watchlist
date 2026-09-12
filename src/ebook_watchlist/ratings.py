@@ -27,20 +27,26 @@ BY_MODEL = "model"
 BY_CONVERSATION = "conversation"
 #: Die Leserin selbst.
 BY_READER = "reader"
-#: Die Leserschaft der Bibliothek — ein Durchschnitt aus vielen fremden
-#: Stimmen, keine Aussage ueber das Leseprofil (Ticket 54). Steht hier und
-#: nicht in einer eigenen Tabelle, weil ``rating`` schon nach
-#: ``(subject, origin)`` geschluesselt ist: eine weitere Quelle ist eine
-#: weitere Herkunft (ADR 19).
-BY_LIBRARY_READERS = "voebb_readers"
+#: Die Leserschaft der Onleihe — ein Durchschnitt aus vielen fremden Stimmen,
+#: keine Aussage ueber das Leseprofil (Ticket 54). Steht hier und nicht in
+#: einer eigenen Tabelle, weil ``rating`` schon nach ``(subject, origin)``
+#: geschluesselt ist: eine weitere Quelle ist eine weitere Herkunft (ADR 19).
+#:
+#: **Je Bibliothek, nicht generisch.** Ein Urteil des Tors haengt an der ISBN,
+#: sobald es eine gibt (``subject_of``) — der Quellname faellt dann aus dem
+#: Schluessel. Eine Herkunft "library_readers" liesse deshalb zwei Bibliotheken
+#: fuer dieselbe ISBN in *dieselbe* Zeile schreiben, und die zweite ueberschriebe
+#: die erste bei jedem Lauf, stumm und je nach Reihenfolge der Quellen. Alle
+#: fuenf Zeilen im echten Bestand sind ISBN-Zeilen; es waere der Normalfall.
+BY_ONLEIHE_READERS = "onleihe_readers"
 
 RATING_ORIGINS: frozenset[str] = frozenset(
-    {BY_MODEL, BY_CONVERSATION, BY_READER, BY_LIBRARY_READERS}
+    {BY_MODEL, BY_CONVERSATION, BY_READER, BY_ONLEIHE_READERS}
 )
 
 #: Fremde Stimmen: kein Urteil gegen das Leseprofil, also auch nicht an eine
 #: Profilversion gebunden und von keiner neuen Fassung entwertet.
-FOREIGN_ORIGINS: frozenset[str] = frozenset({BY_LIBRARY_READERS})
+FOREIGN_ORIGINS: frozenset[str] = frozenset({BY_ONLEIHE_READERS})
 
 #: Wessen Urteil ueberhaupt gegen das Leseprofil faellt — und deshalb mit einer
 #: neuen Fassung veraltet. Weder was ein Mensch sagt noch was fremde Leser:innen
@@ -53,10 +59,19 @@ PROFILE_BOUND: frozenset[str] = frozenset({BY_MODEL, BY_CONVERSATION})
 HUMAN_ORIGINS: frozenset[str] = frozenset({BY_READER})
 
 LABELS: dict[str, str] = {
-    BY_MODEL: "vom Werkzeug bewertet",
-    BY_CONVERSATION: "im Gespräch bewertet",
+    # Nicht "vom Werkzeug bewertet": *wer* gemessen hat, ist die kleinere
+    # Auskunft — die groessere ist, *woran* gemessen wurde. Und ein Wort statt
+    # dreien: neben den Sternen steht ohnehin, worauf das Urteil ruht.
+    BY_MODEL: "Leseprofil",
+    # Dieselbe Beschriftung wie bei den eigenen Sternen: die dreizehn Urteile
+    # aus ``owned.yaml`` sind im Gespraech der Leserin ueber ihre eigenen
+    # Buecher entstanden, und fuer sie ist das ihre Bewertung. Getrennt
+    # bleiben die beiden trotzdem, denn sie verhalten sich verschieden: ein
+    # Urteil aus dem Gespraech faellt gegen eine Profilversion und veraltet
+    # mit ihr (PROFILE_BOUND), die selbst vergebenen Sterne nie.
+    BY_CONVERSATION: "deine Bewertung",
     BY_READER: "deine Bewertung",
-    BY_LIBRARY_READERS: "Leser:innen der Bibliothek",
+    BY_ONLEIHE_READERS: "Leser:innen der Onleihe",
 }
 
 

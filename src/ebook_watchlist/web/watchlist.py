@@ -14,7 +14,7 @@ from ..config import Profile
 from ..deals import is_strong_deal
 from ..matching.bundles import looks_like_bundle
 from ..models import Availability, LinkOutcome, Observation
-from ..relations import RelationKind, labelled
+from ..relations import RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
 
@@ -25,7 +25,9 @@ RESTRICTIONS = ("library", "shop")
 #: Womit ein Eintrag die Watchlist verlässt. Dieselben zwei Arten, nach denen
 #: :func:`entries` filtert — und die Namen aus der einen Tabelle statt aus der
 #: Vorlage, in der sie bis hierher zum zweiten Mal standen.
-ABSCHLUSS: tuple[tuple[str, str], ...] = labelled(RelationKind.OWNED, RelationKind.DISMISSED)
+ABSCHLUSS: tuple[tuple[str, str], ...] = labelled_actions(
+    RelationKind.OWNED, RelationKind.DISMISSED
+)
 
 
 def _details(row) -> dict:
@@ -87,7 +89,10 @@ class Entry:
     note: str | None
     cover_file: str | None
     sources: tuple[SourceState, ...]
-    latest: Observation | None
+    #: Je Quelle die juengste Beobachtung, neueste zuerst. Frueher war es
+    #: **eine** je Buch, und welche, entschied die Reihenfolge der Quellen in
+    #: ``profile.yaml`` — mit zwei Bibliotheken also der Zufall.
+    latest: tuple[Observation, ...] = ()
     #: Unter der Schnaeppchen-Grenze. Faerbt den Preis und setzt das
     #: Abzeichen aufs Cover — dieselbe Farbe bedeutet ueberall dasselbe.
     deal: bool = False
@@ -104,30 +109,65 @@ class Entry:
         return any(state.is_question for state in self.sources)
 
     @property
+    def newest(self) -> Observation | None:
+        """Die juengste Beobachtung ueberhaupt — fuer alles, was keine Quelle meint."""
+        return self.latest[0] if self.latest else None
+
+    @property
+    def price_cents(self) -> int | None:
+        """Der Preis in Cent, aus derselben Quelle wie :attr:`price`.
+
+        Eigenes Feld, weil die Startseite nach ihm sortiert und eine Zeichenkette
+        mit Komma dafuer nicht taugt.
+        """
+        return next((o.price_cents for o in self.latest if o.price_cents is not None), None)
+
+    @property
     def price(self) -> str | None:
-        if self.latest is None or self.latest.price_cents is None:
+        """Der Preis der juengsten Quelle, die einen nennt.
+
+        Eine Bibliothek nennt keinen. Frueher stand hier nichts, sobald ihre
+        Beobachtung zufaellig die neueste war.
+        """
+        cents = self.price_cents
+        if cents is None:
             return None
-        return f"{self.latest.price_cents / 100:.2f} €".replace(".", ",")
+        return f"{cents / 100:.2f} €".replace(".", ",")
+
+    @property
+    def _availability(self) -> Availability | None:
+        """Die beste Auskunft, die *irgendeine* Bibliothek gibt.
+
+        "Ausleihbar" ist eine Aussage ueber das Buch, nicht ueber eine Quelle:
+        sagt eine der beiden Bibliotheken, sie hat es da, dann hat die Leserin
+        es da. Frueher zaehlte, welche Quelle zuletzt eingefuegt wurde — und
+        seit es zwei Bibliotheken gibt, schrieb das "verliehen" in die Zeile,
+        waehrend die andere es auslieh.
+        """
+        gesehen = [o.availability for o in self.latest if o.availability is not None]
+        for rang in (Availability.AVAILABLE, Availability.UNAVAILABLE, Availability.UNKNOWN):
+            if rang in gesehen:
+                return rang
+        return None
 
     @property
     def availability(self) -> str | None:
-        if self.latest is None or self.latest.availability is None:
-            return None
         return {
             Availability.AVAILABLE: "ausleihbar",
             Availability.UNAVAILABLE: "verliehen",
             Availability.UNKNOWN: "unklar",
-        }.get(self.latest.availability)
+        }.get(self._availability)
 
     @property
     def borrowable(self) -> bool:
-        return self.latest is not None and self.latest.availability is Availability.AVAILABLE
+        return self._availability is Availability.AVAILABLE
 
     @property
     def seen(self) -> str | None:
-        if self.latest is None or self.latest.observed_at is None:
+        neueste = self.newest
+        if neueste is None or neueste.observed_at is None:
             return None
-        return self.latest.observed_at.strftime("%d.%m. %H:%M")
+        return neueste.observed_at.strftime("%d.%m. %H:%M")
 
     @property
     def candidates(self) -> tuple:
@@ -266,10 +306,14 @@ def entries(
     relations = [row for row in relations if row.book_id not in abgeschlossen]
     book_ids = [relation.book_id for relation in relations]
     latest = store.latest_by_book(profile_slug, book_ids)
+    # Drei Abfragen fuer die ganze Liste statt zwei je Zeile: neunzehn
+    # Eintraege kosteten so 9 der 25 ms, die diese Funktion braucht.
+    buecher = store.books_by_id(book_ids)
+    quellen = store.book_sources_of(book_ids)
 
     rows = []
     for relation in relations:
-        book = store.book(relation.book_id)
+        book = buecher.get(relation.book_id)
         if book is None:  # pragma: no cover - nur bei geloeschtem Buch
             continue
         details = _details(relation)
@@ -286,7 +330,7 @@ def entries(
                 candidates=_candidates(_details(link), link.url, abgelehnt=False),
                 rejected=_candidates(_details(link), link.url, abgelehnt=True),
             )
-            for link in store.book_sources(book.id)
+            for link in quellen.get(book.id, ())
         )
         rows.append(
             Entry(
@@ -298,10 +342,21 @@ def entries(
                 note=details.get("note"),
                 cover_file=book.cover_file,
                 sources=states,
-                latest=latest.get(book.id),
+                latest=tuple(latest.get(book.id, ())),
                 known_missing=details.get("known_missing"),
+                # Der Preis der juengsten Quelle, die einen nennt — nicht der
+                # der juengsten Beobachtung: eine Bibliothek nennt keinen, und
+                # seit es zwei gibt, war das oft die neueste.
                 deal=is_strong_deal(
-                    getattr(latest.get(book.id), "price_cents", None), profile
+                    next(
+                        (
+                            o.price_cents
+                            for o in latest.get(book.id, ())
+                            if o.price_cents is not None
+                        ),
+                        None,
+                    ),
+                    profile,
                 ),
             )
         )

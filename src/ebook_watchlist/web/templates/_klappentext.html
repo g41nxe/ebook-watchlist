@@ -1,0 +1,34 @@
+{# Der Klappentext, auf Buch- und Fundseite derselbe (Issue #9).
+
+   Verkürzt, aufklappbar — dasselbe Muster, das der Shop selbst benutzt, nur
+   ohne dass sein Knopf im gespeicherten Text landet (Ticket 40). `details`
+   ohne Skript: zugeklappt zeigt es nur das `summary`, und darin steht der Text
+   mit einer Zeilenbegrenzung.
+
+   `max-w-prose`: über die vollen 720 px liefen rund 95 Zeichen je Zeile, und
+   ab etwa 75 verliert das Auge den Zeilenanfang.
+#}
+{% macro klappentext(text) %}
+{% if text %}
+{# "mehr anzeigen" nur, wenn es mehr zu sehen gibt: ob der Text ueberhaupt an
+   die fuenf Zeilen stoesst, weiss erst der Browser — er haengt an Schriftgroesse
+   und Fensterbreite. Genau die Haelfte der Arbeitsteilung aus ADR 20, die
+   Alpine gehoert. Ohne Alpine bleibt der Verweis stehen und tut, was er
+   heute tut. #}
+<details class="klappentext mt-6"
+         x-data="{ gekuerzt: true }"
+         x-init="$nextTick(() => {
+           gekuerzt = $refs.text.scrollHeight > $refs.text.clientHeight + 1
+         })">
+  <summary class="list-none">
+    <p x-ref="text" class="max-w-prose text-sm leading-relaxed text-ink">{{ text }}</p>
+    {# `x-show` und nicht `:class="hidden"`: beides sind Klassen derselben
+       Staerke, und `inline-block` steht im Stylesheet weiter unten — der
+       Verweis blieb sichtbar. `x-show` schreibt `display` direkt ans Element. #}
+    <span x-show="gekuerzt"
+          class="mehr mt-1 inline-block cursor-pointer text-xs text-accent underline
+                 decoration-accent/30 underline-offset-2 hover:decoration-accent"></span>
+  </summary>
+</details>
+{% endif %}
+{% endmacro %}

@@ -12,11 +12,13 @@ password in front of it before exposing it anywhere else.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -29,7 +31,16 @@ from ..models import LinkOutcome
 from ..relations import RelationKind
 from ..sources import registry
 from ..store import RunRow, Store
-from . import assignments, book, profile_page, triage, watchlist
+from . import (
+    assignments,
+    book,
+    discovery,
+    home,
+    profile_page,
+    symbols,
+    triage,
+    watchlist,
+)
 from .recheck import Rechecker
 from .runs import RunLauncher, journal_status
 
@@ -48,6 +59,16 @@ def asset_version() -> str:
     except OSError:  # pragma: no cover - fehlt nur ohne Build
         return "0"
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+#: Adresse einer Calibre-Web-Automated-Installation, falls daneben eine laeuft.
+#: Gesetzt erscheint der Punkt in der Kopfzeile, leer nicht — die Adresse gilt
+#: nur auf dem Rechner, auf dem beides laeuft, und fest verdrahtet waere sie
+#: fuer jeden anderen ein toter Link (ADR 12).
+#:
+#: Als Jinja-Global und nicht im Kontext jeder Route: der Wert ist auf jeder
+#: Seite derselbe, und ihn durch fuenfzehn Kontextwoerterbuecher zu reichen
+#: waere fuenfzehnmal dieselbe Zeile.
+TEMPLATES.env.globals["cwa_url"] = os.environ.get("EBW_CWA_URL", "").strip()
 
 
 def _sum_chars(text: str) -> int:
@@ -230,6 +251,31 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/", response_class=HTMLResponse)
+    def start_page(request: Request, rueckgaengig: str = "", art: str = "") -> HTMLResponse:
+        """Was heute zählt — nicht der Zustand des Werkzeugs, der steht auf
+        der Übersicht (Issue #5). ``rueckgaengig`` und ``art`` nennen die
+        gerade getroffene Entscheidung, die die Seite zurückzunehmen anbietet."""
+        profile = load_profile()
+        store = _store_for(paths.db_path())
+        return TEMPLATES.TemplateResponse(
+            request,
+            "home.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "view": home.build(store, profile, now=datetime.now()),
+                "undo": home.undo_for(store, rueckgaengig, art) if rueckgaengig else None,
+                # Der juengste Tagesbericht ist der Weg hinter "N Aenderungen";
+                # der Lauf-Knopf ist derselbe wie auf der Uebersicht.
+                "digest": next(iter(digest_files(limit=1)), None),
+                "run_state": launcher.state(store, profile.slug),
+                "actions": triage.ACTIONS,
+                "icons": symbols.RELATION_ICONS,
+                "arguments": home.ARGUMENTS,
+            },
+        )
+
+    @app.get("/uebersicht", response_class=HTMLResponse)
     def dashboard(request: Request) -> HTMLResponse:
         try:
             profile = load_profile()
@@ -525,7 +571,7 @@ def create_app() -> FastAPI:
     # --- Buchseite (Ticket 07) ---------------------------------------------
 
     @app.get("/book/{book_id}", response_class=HTMLResponse)
-    def book_page(request: Request, book_id: int) -> HTMLResponse:
+    def book_page(request: Request, book_id: int, trouble: str = "") -> HTMLResponse:
         try:
             profile = load_profile()
         except ConfigError as exc:
@@ -546,10 +592,31 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "page": page,
                 "kinds": book.KINDS,
+                "icons": symbols.RELATION_ICONS,
                 "restrictions": watchlist.RESTRICTIONS,
                 "price_points": book.price_points(page.history),
+                # Warum das Bewerten nicht ging. Kommt aus der Adresse, weil
+                # die Route davor umleitet — ein Neuladen soll kein zweites
+                # Urteil holen.
+                "trouble": trouble,
             },
         )
+
+    @app.post("/book/{book_id}/bewerten")
+    def book_rate(book_id: int) -> RedirectResponse:
+        """Das Tor jetzt ueber dieses Buch urteilen lassen (Ticket 55).
+
+        Dauert Sekunden — die Seite wartet darauf, statt wie der enge Lauf
+        nachzufragen: danach hat sich nicht eine Zeile geaendert, sondern der
+        ganze Abschnitt.
+        """
+        trouble = book.rate(
+            _store_for(paths.db_path()), load_profile(), book_id, now=datetime.now()
+        )
+        ziel = f"/book/{book_id}"
+        if trouble:
+            ziel += "?" + urlencode({"trouble": trouble})
+        return RedirectResponse(ziel, status_code=303)
 
     @app.post("/book/{book_id}/bearbeiten")
     def book_edit(
@@ -642,6 +709,46 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return RedirectResponse(f"/book/{book_id}", status_code=303)
 
+    # --- Die Seite zu einem Fund (Issue #9) ---------------------------------
+
+    @app.get("/discovery/{source}/{item_id}", response_class=HTMLResponse)
+    def discovery_page(request: Request, source: str, item_id: str) -> HTMLResponse:
+        """Die Buchseite ohne das, was es vor einer Entscheidung nicht gibt.
+
+        Sobald der Fund eine Buch-Zeile mit einer *geltenden* Beziehung hat,
+        ist die Buchseite die reichere Ansicht — dann fuehrt diese Adresse
+        dorthin, statt eine aermere Fassung desselben Buchs zu zeigen.
+
+        Auf die Beziehung kommt es an, nicht auf die Zeile: eine
+        zurueckgenommene Entscheidung legt sie stumm und laesst Buch und
+        Verknuepfung stehen (ADR 18). Der Fund steht danach wieder im Stapel,
+        und sein Titel muss dorthin fuehren, wo ueber ihn entschieden wird —
+        nicht auf eine Buchseite, auf der nichts mehr gilt. Die Frage nach der
+        Beziehung bindet die Weiterleitung ausserdem ans Profil; die
+        Nummernsuche allein tut das nicht.
+        """
+        profile = load_profile()
+        store = _store_for(paths.db_path())
+        book_id = store.book_by_source_item(source, item_id)
+        if book_id is not None and any(
+            row.active for row in store.relations_of(profile.slug, book_id)
+        ):
+            return RedirectResponse(f"/book/{book_id}", status_code=303)
+        page = discovery.build(store, profile, source, item_id)
+        if page is None:
+            raise HTTPException(status_code=404, detail="kein solcher Fund")
+        return TEMPLATES.TemplateResponse(
+            request,
+            "discovery.html",
+            {
+                "profile": profile,
+                "asset_version": asset_version(),
+                "page": page,
+                "actions": triage.ACTIONS,
+                "icons": symbols.RELATION_ICONS,
+            },
+        )
+
     # --- Triage (Ticket 08) -------------------------------------------------
 
     @app.get("/vorschlaege", response_class=HTMLResponse)
@@ -666,29 +773,87 @@ def create_app() -> FastAPI:
                 "asset_version": asset_version(),
                 "pile": pile,
                 "actions": triage.ACTIONS,
+                "icons": symbols.RELATION_ICONS,
                 "anlass": anlass,
             },
         )
 
     @app.post("/vorschlaege/entscheiden")
     def triage_decide(
-        kind: str = Form(...), keys: list[str] = _SELECTED, anlass: str = Form("")
+        kind: str = Form(...),
+        keys: list[str] = _SELECTED,
+        anlass: str = Form(""),
+        zurueck: str = Form("/vorschlaege"),
     ) -> RedirectResponse:
         """Eine Entscheidung auf die Auswahl anwenden.
 
         Alle drei schreiben eine Beziehung auf Buchebene — "verworfen" ist
         keine Loeschung, sondern eine Aussage ueber das Buch, und sie gilt
         dadurch bei *jeder* Quelle statt nur fuer eine Produktnummer (ADR 18).
+
+        Zurueck dorthin, wo entschieden wurde: von der Startseite aus auf die
+        Startseite, mit dem Angebot, es rueckgaengig zu machen — ein Klick
+        ohne Nachfrage braucht einen Weg zurueck (ADR 30). Von der Fundseite
+        aus auf die Buchseite: der Fund *ist* jetzt ein Buch (ADR 18), und in
+        den Stapel zurueckzuspringen hiesse, die eigene Entscheidung dort zu
+        suchen, wo sie gerade verschwunden ist. Ein Formularfeld ist kein Ziel;
+        was nicht zu diesen beiden Faellen passt, fuehrt in den Stapel.
         """
-        triage.decide(
-            _store_for(paths.db_path()),
-            load_profile(),
-            keys,
-            kind,
-            now=datetime.now(),
-        )
+        store = _store_for(paths.db_path())
+        try:
+            triage.decide(store, load_profile(), keys, kind, now=datetime.now())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if zurueck == "buch" and len(keys) == 1:
+            source, _, item_id = keys[0].partition(":")
+            book_id = store.book_by_source_item(source, item_id)
+            if book_id is not None:
+                return RedirectResponse(f"/book/{book_id}", status_code=303)
+        if zurueck == "/":
+            if len(keys) == 1:
+                return RedirectResponse(
+                    "/?" + urlencode({"rueckgaengig": keys[0], "art": kind}), status_code=303
+                )
+            return RedirectResponse("/", status_code=303)
         target = f"/vorschlaege?anlass={anlass}" if anlass else "/vorschlaege"
         return RedirectResponse(target, status_code=303)
+
+    @app.post("/vorschlaege/{source}/{item_id}/entscheiden", response_class=HTMLResponse)
+    def triage_decide_one(source: str, item_id: str, kind: str = Form(...)) -> HTMLResponse:
+        """Genau diesen einen Fund entscheiden (Issue #9).
+
+        Eine eigene Route statt eines Knopfes im grossen Formular: die Seite
+        ist *ein* Formular, ein Absende-Knopf darin schickte die angehakte
+        Auswahl statt seiner Zeile — und ein Knopf kann nicht gleichzeitig
+        `kind` und `keys` senden. Also htmx, wie beim Lauf-Panel.
+
+        Die Antwort ist leer: htmx tauscht die Zeile dagegen aus, und damit
+        ist sie weg. Die Auswahl der uebrigen Zeilen bleibt unberuehrt.
+        """
+        try:
+            decided = triage.decide(
+                _store_for(paths.db_path()),
+                load_profile(),
+                [f"{source}:{item_id}"],
+                kind,
+                now=datetime.now(),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not decided:
+            raise HTTPException(status_code=404, detail="kein solcher Fund")
+        return HTMLResponse("")
+
+    @app.post("/vorschlaege/zuruecknehmen")
+    def triage_undo(
+        key: str = Form(...), kind: str = Form(...), zurueck: str = Form("/")
+    ) -> RedirectResponse:
+        """Eine Entscheidung zuruecknehmen: die Beziehung wird stillgelegt,
+        nicht geloescht (ADR 18) — und der Fund steht wieder im Stapel."""
+        home.undo(
+            _store_for(paths.db_path()), load_profile(), key, kind, now=datetime.now()
+        )
+        return RedirectResponse("/" if zurueck == "/" else "/vorschlaege", status_code=303)
 
     # --- Profiluebersicht (Ticket 09) ---------------------------------------
 

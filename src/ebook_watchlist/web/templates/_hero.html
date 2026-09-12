@@ -1,0 +1,29 @@
+{# Das Titelbild der Startseite, im Leerzustand wie am gewöhnlichen Tag.
+
+   Ganz, nicht beschnitten: das Bild erzählt von links nach rechts — Regal,
+   Sessel, Tisch mit der Watchlist, Fink — und ein Band durch die Mitte nimmt
+   ihm den Anfang und das Ende. Die Höhe ergibt sich aus der Breite (1440 zu
+   610, also gut 2,3 zu 1): 304 Pixel auf dem Schreibtisch, 138 auf dem
+   Telefon.
+
+   Die Datei unter `assets/` ist die verkleinerte Fassung des Originals aus
+   `docs/bilder/`: 1440 Pixel breit, also das Doppelte der 720, die die Spalte
+   je zeigt, und damit auch auf einem dichten Bildschirm scharf. Aus 620 KB
+   werden so 124. Wer das Bild tauscht, verkleinert es dabei:
+   `uv run --with pillow python -c "…"` — eine Abhängigkeit dafür trägt das
+   Projekt nicht.
+
+   `width` und `height` stehen an der Datei, damit die Seite beim Laden nicht
+   springt.
+
+   Aufrufen mit `{% raw %}{% from "_hero.html" import hero with context %}{% endraw %}`:
+   `url_for` ist in Starlette an die Anfrage gebunden und kein gewöhnliches
+   Global — ohne den Kontext ist es im Element schlicht nicht da, und die
+   Seite endet mit 500.
+#}
+{% macro hero() %}
+<div class="overflow-hidden rounded-lg border border-hair">
+  <img src="{{ url_for('static', path='hero-lesezimmer.jpg') }}?v={{ asset_version }}" alt=""
+       width="1440" height="610" class="block w-full">
+</div>
+{% endmacro %}

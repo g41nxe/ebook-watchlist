@@ -191,7 +191,7 @@ ungenutzt in `cleaning.py`.
   war schon billig.
 - **Streng an der Vordertür, offen an der Hintertür**: die Erstsichtung
   brauchte einen Deal, ein Preissturz nicht.
-- **`beam` und `voebb` sind dreimal in die Oberfläche gerutscht** — Watchlist,
+- **`beam` und `onleihe` sind dreimal in die Oberfläche gerutscht** — Watchlist,
   Buchseite, Übersicht. Dreimal dieselbe Entscheidung, dreimal eine übersehen.
   Jetzt beantwortet die Registry sie.
 - **Der Import erfand Quellennamen** aus `check_library` / `check_shop`.

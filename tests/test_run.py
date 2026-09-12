@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -12,6 +12,7 @@ from ebook_watchlist import paths
 from ebook_watchlist.digest import build_digest
 from ebook_watchlist.models import SourceFailure
 from ebook_watchlist.run import EXIT_CONFIG_ERROR, EXIT_OK, EXIT_SOURCE_FAILURE, main
+from ebook_watchlist.store import Store
 
 
 def digest_files(data_dir: Path) -> list[Path]:
@@ -149,6 +150,27 @@ def test_output_survives_a_console_that_cannot_render_the_digest(
     assert narrow.kwargs == {"errors": "replace"}
 
 
+def test_a_run_fetches_the_images_of_its_own_pile(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Die Bilder des Stapels wurden nur beim Beurteilen des Rueckstands
+    geholt. Das Tor im Lauf beurteilt aber selbst — was es durchliess, stand
+    danach ohne Bild da, bis zufaellig jemand den Rueckstand beurteilte. Im
+    echten Stapel hatten deshalb neun von sechsundzwanzig Funden keins, und
+    alle neun stammten aus demselben Lauf."""
+    from ebook_watchlist import run as run_modul
+
+    gerufen: list[str] = []
+    monkeypatch.setattr(
+        run_modul,
+        "_fetch_suggestion_covers",
+        lambda store, profile, client: gerufen.append(profile.slug),
+    )
+
+    assert main([]) == EXIT_OK
+    assert gerufen == ["test"]
+
+
 def test_run_journal_records_every_run(data_dir: Path) -> None:
     main([])
     main([])
@@ -161,6 +183,69 @@ def test_run_journal_records_every_run(data_dir: Path) -> None:
         assert [run.status for run in runs] == ["ok", "ok"]
         assert all(run.finished_at is not None for run in runs)
         assert all(run.trigger == "cli" for run in runs)
+
+
+def test_the_gate_gets_the_sources_from_the_run(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Beide Enden sind geprueft — das Tor ruft den Rueckruf, das Nachladen
+    legt keinen Rundgang an. Dazwischen liegt die Weitergabe der Quellen, und
+    faellt sie beim naechsten Umbau weg, urteilt das Tor stillschweigend
+    wieder auf dem Anriss."""
+    from ebook_watchlist import gate
+    from ebook_watchlist import run as run_modul
+
+    gereicht: list[bool] = []
+    echtes_tor = gate.apply
+
+    def beobachtet(deltas, **kwargs):
+        gereicht.append(kwargs.get("full_blurbs") is not None)
+        return echtes_tor(deltas, **kwargs)
+
+    monkeypatch.setattr(run_modul.gate, "apply", beobachtet)
+    # Ohne Bewerter kommt `_apply_gate` gar nicht bis zum Tor.
+    monkeypatch.setattr(run_modul, "build_rater", lambda modell: object())
+
+    assert main([]) == EXIT_OK
+    assert gereicht == [True]
+
+
+def test_reloading_a_blurb_does_not_look_like_a_run(data_dir: Path) -> None:
+    """Der Klappentext wird jetzt mitten im Lauf nachgeladen, und dabei
+    entsteht eine eigene Zeile im Journal — die Beobachtung muss ja an einem
+    Lauf haengen. Sie darf aber nicht als *der* letzte Lauf gelten: sie ist
+    frueher fertig als der Rundgang, der sie angestossen hat, und die
+    Startseite haette danach "zuletzt geprueft … 0 Aenderungen" gemeldet.
+
+    Dieselbe Unterscheidung wie beim engen Lauf aus Ticket 51: ein Eintrag ist
+    kein Rundgang."""
+    from datetime import datetime
+
+    from ebook_watchlist import paths
+    from ebook_watchlist.config import load_profile
+    from ebook_watchlist.models import MatchReason, Observation
+    from ebook_watchlist.run import _with_full_blurbs
+    from ebook_watchlist.sources.fake import FakeSource
+    from ebook_watchlist.store import ENTRY_TRIGGER, Store
+
+    store, profile = Store(paths.db_path()), load_profile()
+    rundgang = store.start_run(profile.slug, "cli", datetime.now())
+    store.finish_run(rundgang, status="ok", delta_count=3, finished_at=datetime.now())
+    angerissen = Observation(
+        source="fake",
+        source_item_id="fake-2",
+        title="Der Schwarm",
+        match_reason=MatchReason.GENRE_CATEGORY,
+        price_cents=1299,
+        blurb="Manche Menschen haben Geheimnisse…",
+    )
+
+    quelle = FakeSource(data_dir / "fake-source.yaml")
+    _with_full_blurbs(store, profile, [angerissen], [quelle])
+
+    laeufe = store.recent_runs(profile.slug)
+    assert laeufe[0].id == rundgang, "das Nachladen gilt als letzter Lauf"
+    assert all(lauf.trigger != ENTRY_TRIGGER for lauf in laeufe)
 
 
 def test_a_second_digest_on_the_same_day_does_not_erase_the_first(data_dir: Path) -> None:
@@ -247,3 +332,65 @@ def test_rating_the_backlog_asks_only_about_what_has_no_judgement(
 
     assert main(["rate"]) == EXIT_OK
     assert [call.source_item_id for call in stub.calls] == ["neu"]
+
+
+# --- ein Rundgang am Tag reicht ---------------------------------------------
+
+
+def test_a_cron_run_right_after_another_is_skipped(
+    data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Der Ausloeser, der zu dicht taktet: das Einstiegsskript des Containers
+    ruft bei jedem Start. Fuenf Neubauten an einem Nachmittag ergaben fuenf
+    volle Laeufe gegen die echten Quellen in 25 Minuten."""
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    vorher = len(Store(paths.db_path()).recent_runs("test"))
+
+    assert main(["--trigger", "cron"]) == EXIT_OK
+
+    assert "übersprungen" in capsys.readouterr().out
+    # Kein zweiter Eintrag im Journal: ein uebersprungener Lauf ist keiner.
+    assert len(Store(paths.db_path()).recent_runs("test")) == vorher
+
+
+def test_the_reader_is_not_held_back(data_dir: Path) -> None:
+    """Die Grenze gilt der Maschine. Wer tippt oder drueckt, hat sich
+    entschieden — ein Knopf, der den ganzen Tag nichts tut, ist kaputt."""
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    vorher = len(Store(paths.db_path()).recent_runs("test"))
+
+    assert main(["--trigger", "ui"]) == EXIT_OK
+
+    assert len(Store(paths.db_path()).recent_runs("test")) > vorher
+
+
+def test_the_cadence_from_the_profile_is_what_counts(data_dir: Path) -> None:
+    """Die Kadenz ist eine Einstellung, keine Konstante im Code — derselbe
+    Abstand entscheidet je nach Profil verschieden."""
+    store = Store(paths.db_path())
+    store.start_run("test", "cron", datetime.now() - timedelta(hours=2))
+    vorher = len(store.recent_runs("test"))
+
+    # Voreinstellung sind 20 Stunden; zwei sind zu wenig.
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    assert len(Store(paths.db_path()).recent_runs("test")) == vorher
+
+    profil = (data_dir / "profile.yaml").read_text(encoding="utf-8")
+    (data_dir / "profile.yaml").write_text(
+        profil + "\nrun_every_hours: 1\n", encoding="utf-8"
+    )
+
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    assert len(Store(paths.db_path()).recent_runs("test")) > vorher
+
+
+def test_the_gap_can_be_named_and_switched_off(data_dir: Path) -> None:
+    assert main(["--trigger", "cron"]) == EXIT_OK
+    vorher = len(Store(paths.db_path()).recent_runs("test"))
+
+    # Ausdruecklich gesetzt gewinnt die Zahl — in beide Richtungen.
+    assert main(["--trigger", "ui", "--fruehestens-nach", "20"]) == EXIT_OK
+    assert len(Store(paths.db_path()).recent_runs("test")) == vorher
+
+    assert main(["--trigger", "cron", "--fruehestens-nach", "0"]) == EXIT_OK
+    assert len(Store(paths.db_path()).recent_runs("test")) > vorher

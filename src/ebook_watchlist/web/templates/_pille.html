@@ -1,0 +1,31 @@
+{# Eine Pille: eine Wahl aus wenigen, von denen eine gilt.
+
+   Zwei Stellen benutzen sie — die Filter über dem Stapel und „Prüfen bei" auf
+   der Buchseite. Beide beantworten dieselbe Frage („welche davon?"), also
+   sehen sie gleich aus; ob dahinter ein Verweis oder ein Formular steckt, ist
+   der Unterschied zwischen einer Ansicht und einer Einstellung, nicht einer
+   des Aussehens.
+
+   Auf dem Telefon eckig und flacher: drei runde Pillen mit der Mindesthöhe
+   von 44 px sahen aus wie ein Block statt wie eine Reihe. Ab `sm` sind sie
+   wieder rund, dort gibt es kein Fingermaß.
+#}
+{% macro pille(text, url=none, aktiv=false, ton="accent") %}
+{%- set klasse -%}
+pille tun inline-flex h-7 items-center rounded border px-3 text-xs transition
+sm:rounded-full
+{% if aktiv and ton == "amber" %}border-amber bg-amber/10 text-amber
+{% elif aktiv %}border-accent bg-accent/10 text-accent
+{% elif ton == "amber" %}border-rule text-soft hover:border-amber hover:text-amber
+{% else %}border-rule text-soft hover:border-accent hover:text-accent{% endif %}
+{%- endset -%}
+{% if url %}
+{# `aria-current="true"`, nicht `"page"`: die Pille ist die geltende Wahl,
+   nicht die geoeffnete Seite — die steht schon in der Navigation, und zwei
+   "aktuelle Seiten" auf einer Seite sind fuer eine Vorlesehilfe eine zu viel. #}
+<a href="{{ url }}"{% if aktiv %} aria-current="true"{% endif %}
+   class="{{ klasse }}">{{ text }}</a>
+{% else %}
+<button type="submit" class="{{ klasse }}">{{ text }}</button>
+{% endif %}
+{% endmacro %}

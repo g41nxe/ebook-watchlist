@@ -1,0 +1,17 @@
+# Zeilenenden festnageln, wo sie eine Rolle spielen.
+#
+# Auf Windows steht `core.autocrlf` haeufig auf `true`, und dann bekommt ein
+# frischer Klon CRLF — auch in Dateien, die das nicht vertragen. Ein
+# Shell-Skript mit CRLF scheitert im Linux-Container an seiner eigenen ersten
+# Zeile: der Kernel sucht einen Interpreter namens "/bin/sh\r" und findet
+# keinen. Die Fehlermeldung ("no such file or directory") zeigt dabei auf das
+# Skript, nicht auf die Ursache.
+*.sh text eol=lf
+
+# Dockerfile: eine fortgesetzte Zeile endet auf "\", und ein CR dahinter
+# gehoert dann zum Befehl.
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+
+# Wird von der Shell im Container gelesen, nicht von Windows.
+.env.example text eol=lf

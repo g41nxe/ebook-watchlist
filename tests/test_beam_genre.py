@@ -192,8 +192,8 @@ def test_a_dismissed_suggestion_never_comes_back(tmp_path: Path) -> None:
 def test_a_product_number_only_speaks_for_its_own_shop(tmp_path: Path) -> None:
     """Die Nummer ist die Sprache eines Shops. Sie auf eine andere Quelle zu
     übertragen hiesse, zwei fremde Nummernkreise gleichzusetzen."""
-    ctx = context(tmp_path, dismissed=Dismissed(items=frozenset({("voebb", "123")})))
-    assert ctx.is_dismissed(discovery("voebb", "123"))
+    ctx = context(tmp_path, dismissed=Dismissed(items=frozenset({("onleihe", "123")})))
+    assert ctx.is_dismissed(discovery("onleihe", "123"))
     assert not ctx.is_dismissed(discovery("beam", "123"))
 
 
@@ -202,10 +202,10 @@ def test_the_isbn_carries_a_dismissal_to_every_source(tmp_path: Path) -> None:
     Buch, nicht dem Regal eines Shops (ADR 18)."""
     ctx = context(tmp_path, dismissed=Dismissed(isbns=frozenset({"9783641117009"})))
 
-    assert ctx.is_dismissed(discovery("voebb", "irgendwas", isbn="9783641117009"))
-    assert not ctx.is_dismissed(discovery("voebb", "irgendwas", isbn="9783641130008"))
+    assert ctx.is_dismissed(discovery("onleihe", "irgendwas", isbn="9783641117009"))
+    assert not ctx.is_dismissed(discovery("onleihe", "irgendwas", isbn="9783641130008"))
     # Ohne ISBN bleibt nur die Nummer, und die kennt diese Ablehnung nicht.
-    assert not ctx.is_dismissed(discovery("voebb", "irgendwas"))
+    assert not ctx.is_dismissed(discovery("onleihe", "irgendwas"))
 
 
 def test_an_absent_dismissal_file_simply_means_nothing_is_dismissed(

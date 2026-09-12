@@ -19,6 +19,21 @@ rating_batch_size: 20
 rating_model:
 rating_budget: 40
 
+# Wie viele Stunden zwischen zwei Rundgängen mindestens liegen. Geprüft wird
+# gegen das Journal, nicht gegen eine Uhr: ein Wirt darf öfter rufen, der Lauf
+# entscheidet. Die Grenze gilt nur automatischen Auslösern — der Knopf „Lauf
+# jetzt starten" und ein getipptes `ebw` laufen sofort.
+#
+# Zwanzig und nicht vierundzwanzig, damit sich der tägliche Lauf nicht um die
+# eigene Dauer nach hinten schiebt, bis ein Tag ausfällt.
+run_every_hours: 20
+
+# Wie viele Zeilen die Startseite je Abschnitt zeigt: oben die Angebote aus
+# der Watchlist, darunter die offenen Entscheidungen. Der Rest haengt am
+# Verweis daneben. Das haengt an deinem Bildschirm, nicht am Werkzeug.
+home_offers: 5
+home_suggestions: 3
+
 # Either a plain list, or split into a list swept every run and a long tail
 # swept once a week.
 reference_authors:
@@ -39,10 +54,14 @@ disliked_books: []
 # contact: mailto:du@example.org
 
 sources:
-  voebb:
+  onleihe:
     # Which formats to watch. The Onleihe lists the ebook and the audiobook of a
     # novel as two separate titles, so without a preference neither can win.
     media: [ebook]
+  # Die zweite Plattform desselben Verbunds, mit eigenem Bestand: was die
+  # Onleihe nicht führt, steht hier mitunter sehr wohl. Nur deutsche
+  # EPUB-E-Books, keine Optionen.
+  overdrive:
   beam:
   # A canned source for trying the pipeline out without touching the network.
   # fake:

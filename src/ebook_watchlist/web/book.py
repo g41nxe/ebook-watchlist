@@ -9,17 +9,18 @@ lagen vorher über vier Dateien verstreut, die einander nicht kannten —
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
+from ..cleaning import is_truncated
 from ..config import Profile
 from ..deals import is_strong_deal
 from ..models import Availability, MatchReason
-from ..rating import RatingUnavailable, load_leseprofil
+from ..rating import RatingUnavailable, build_rater, confidence_label, load_leseprofil
 from ..ratings import (
     BY_CONVERSATION,
-    BY_LIBRARY_READERS,
     BY_MODEL,
+    BY_ONLEIHE_READERS,
     BY_READER,
     FOREIGN_ORIGINS,
     HUMAN_ORIGINS,
@@ -28,7 +29,7 @@ from ..ratings import (
     subject_of,
 )
 from ..reasons import short_why, why_shown
-from ..relations import RELATION_KINDS, RelationKind, labelled
+from ..relations import RELATION_KINDS, RelationKind, labelled_actions
 from ..sources import registry
 from ..store import Store
 from .watchlist import SourceState
@@ -37,16 +38,23 @@ from .watchlist import SourceState
 #: hat, zuerst.
 #: Zuletzt die fremden Stimmen: sie sind Auskunft ueber das Buch, nicht ueber
 #: die Passung zum Profil (Ticket 54).
-ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL, BY_LIBRARY_READERS)
+ORIGIN_ORDER: tuple[str, ...] = (BY_READER, BY_CONVERSATION, BY_MODEL, BY_ONLEIHE_READERS)
 
 #: Was die Leserin über ein Buch sagen kann, in der Reihenfolge, in der es auf
 #: der Seite steht. Mehrere gelten gleichzeitig — das ist der Normalfall.
-KINDS: tuple[tuple[str, str], ...] = labelled(
+#:
+#: Knopfwörter, nicht Zustandsnamen: hier stehen Knöpfe, und derselbe Knopf
+#: heißt im Stapel und auf der Fundseite genauso (ADR 29 mit Nachtrag). Was
+#: gerade gilt, sagt die Farbe des Knopfs, nicht sein Wort.
+#: Vorn die drei, die es auch im Stapel gibt, in derselben Reihenfolge;
+#: hinten die beiden Urteile nach dem Lesen. Sie beantworten eine andere
+#: Frage — nicht "was tue ich damit?", sondern "wie war es?".
+KINDS: tuple[tuple[str, str], ...] = labelled_actions(
     RelationKind.WATCHING,
     RelationKind.OWNED,
+    RelationKind.DISMISSED,
     RelationKind.LIKED,
     RelationKind.DISLIKED,
-    RelationKind.DISMISSED,
 )
 
 #: Herkuenfte, deren Urteil an einer *Ausgabe* haengt statt am Buch der
@@ -93,8 +101,14 @@ class Sighting:
     """Eine Zeile der Geschichte."""
 
     when: datetime | None
-    #: Die *Art* der Quelle, nicht ihr interner Name: "voebb" war nie ein Wort
-    #: fuer die Leserin (Ticket 14).
+    #: Der Quellname — die **Identitaet**, nicht die Beschriftung. Beides war
+    #: hier dasselbe Feld, solange es eine Bibliothek gab; mit zweien suchte
+    #: die Onleihe-Kachel ihre Sichtung unter "Bibliothek" und fand die von
+    #: OverDrive. Die Seite behauptete dann "verliehen" fuer einen Titel, den
+    #: die Onleihe gar nicht fuehrt.
+    name: str
+    #: Die *Art* der Quelle, wie sie der Leserin gezeigt wird: "voebb" war nie
+    #: ein Wort fuer sie (Ticket 14).
     source: str
     price: str | None
     availability: str | None
@@ -142,6 +156,11 @@ class Judgement:
     votes: int | None = None
 
     @property
+    def confidence_label(self) -> str:
+        """Worauf das Urteil ruht, in einem Wort, das fuer sich steht."""
+        return confidence_label(self.confidence)
+
+    @property
     def is_human(self) -> bool:
         return self.origin in HUMAN_ORIGINS
 
@@ -167,6 +186,11 @@ class Judgement:
             # worden sein.
             return False
         return current is not None and self.profile_version != current
+
+
+#: Wie viele Zeilen die Tabelle "Was beobachtet wurde" zeigt. Der Snapshot ist
+#: anhaengend (ADR 5) und wird nie kuerzer — die Seite muss es sein.
+HISTORY_ROWS = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,10 +243,15 @@ class Page:
     def borrowable(self) -> bool:
         return any(sichtung.availability == "ausleihbar" for sichtung in self.latest)
 
-    def latest_at(self, source: str) -> Sighting | None:
-        """Die juengste Sichtung dieser Quelle, oder ``None``."""
+    def latest_at(self, name: str) -> Sighting | None:
+        """Die juengste Sichtung dieser Quelle, oder ``None``.
+
+        Gefragt wird nach dem Quellnamen. Nach der Beschriftung zu fragen war
+        richtig, solange keine zwei Quellen dieselbe trugen — seit es zwei
+        Bibliotheken gibt, beantwortete es die Frage einer anderen Quelle.
+        """
         for sichtung in self.latest:
-            if sichtung.source == source:
+            if sichtung.name == name:
                 return sichtung
         return None
 
@@ -246,6 +275,22 @@ class Page:
     @property
     def has_history(self) -> bool:
         return bool(self.history)
+
+    @property
+    def recent_history(self) -> tuple[Sighting, ...]:
+        """Die letzten Sichtungen — mehr zeigt die Tabelle nicht.
+
+        Ein Buch, das seit elf Laeufen dasselbe kostet, hatte elf Zeilen mit
+        elfmal demselben Betrag, und alles darunter rutschte aus dem Bild. Was
+        sich geaendert hat, steht ohnehin darueber in der Preisliste; hier geht
+        es um den letzten Stand, nicht um ein Archiv.
+        """
+        return self.history[:HISTORY_ROWS]
+
+    @property
+    def hidden_history(self) -> int:
+        """Wie viele aeltere Sichtungen die Tabelle nicht zeigt."""
+        return max(0, len(self.history) - HISTORY_ROWS)
 
     @property
     def mismatch(self) -> tuple[SourceState, ...]:
@@ -297,7 +342,9 @@ def _origin(seen) -> Origin | None:
     return None
 
 
-def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
+def _judgements(
+    store: Store, book, seen, *, isbn: str | None = None
+) -> tuple[Judgement, ...]:
     """Alle Urteile, die zu diesem Buch gehören — an drei Sorten Schlüssel.
 
     Was ein Mensch gesagt hat, hängt am Buch. Das Tor schlüsselt dagegen am
@@ -305,11 +352,15 @@ def _judgements(store: Store, book, seen) -> tuple[Judgement, ...]:
     Buchzeile bekommen (ADR 18) — sein Urteil ist deshalb über die ISBN oder
     über die Produktnummern der Quellen zu finden, unter denen dieses Buch
     gesichtet wurde.
+
+    ``book`` darf ``None`` sein: die Discovery-Seite zeigt einen Fund, zu dem
+    es noch keine Buch-Zeile gibt. Dann bleibt genau das übrig, was am Fund
+    hängt — das Urteil des Tors und fremde Leserstimmen zur ISBN.
     """
-    of_book = book_subject(book.id)
-    subjects = {of_book}
-    if book.isbn:
-        subjects.add(f"isbn:{book.isbn}")
+    of_book = book_subject(book.id) if book is not None else None
+    subjects = {of_book} if of_book else set()
+    if isbn := (book.isbn if book is not None else isbn):
+        subjects.add(f"isbn:{isbn}")
     subjects.update(subject_of(observation) for observation in seen)
 
     rows = store.ratings_for(subjects)
@@ -349,9 +400,11 @@ def _latest_per_source(history: tuple[Sighting, ...]) -> tuple[Sighting, ...]:
     """
     neueste: dict[str, Sighting] = {}
     for sichtung in history:
-        vorher = neueste.get(sichtung.source)
+        # Nach dem Namen, nicht nach der Beschriftung: zwei Bibliotheken tragen
+        # dieselbe, und die eine verschwand still hinter der anderen.
+        vorher = neueste.get(sichtung.name)
         if vorher is None or (sichtung.when or datetime.min) > (vorher.when or datetime.min):
-            neueste[sichtung.source] = sichtung
+            neueste[sichtung.name] = sichtung
     return tuple(neueste.values())
 
 
@@ -392,6 +445,7 @@ def build(store: Store, profile: Profile, book_id: int) -> Page | None:
     history = tuple(
         Sighting(
             when=observation.observed_at,
+            name=observation.source,
             source=registry.label(profile, observation.source),
             price=_price(observation.price_cents),
             availability=_AVAILABILITY.get(observation.availability)
@@ -464,6 +518,63 @@ def price_points(history: tuple[Sighting, ...]) -> list[Sighting]:
         seen.append(sighting)
         last = sighting.price
     return seen
+
+
+def rate(store: Store, profile: Profile, book_id: int, *, now: datetime) -> str:
+    """Das Tor jetzt über dieses eine Buch urteilen lassen (Ticket 55).
+
+    Im Lauf sieht das Tor nur, was auch im Stapel landen würde. Ein
+    Watchlist-Titel ist gewollt und wird deshalb nie gefragt — über ihn
+    entscheidet das Tor nichts, und auf seiner Seite stand für immer „Noch
+    nicht bewertet". Eine Auskunft wäre das Urteil trotzdem, und hier holt es
+    sich die Leserin.
+
+    Kein eigener Faden wie beim engen Lauf: der wartet unter Umständen Minuten
+    auf die Dateisperre, das hier ist **ein** Aufruf. Eine ``def``-Route gibt
+    Starlette ohnehin an den Threadpool, der Server steht also nicht still.
+
+    Zurück kommt der Grund, warum es nicht ging — leer heißt: das Urteil steht.
+    """
+    rater = build_rater(profile.rating_model)
+    if rater is None:
+        return (
+            "Kein Bewerter eingerichtet: weder ein API-Schlüssel in der Umgebung "
+            "noch eine angemeldete Claude-Code-Installation."
+        )
+
+    seen = store.observations_for_book(profile.slug, book_id)
+    if not seen:
+        return "Noch kein Fund zu diesem Buch — es gibt nichts zu beurteilen."
+
+    # Das Urteil hängt am Fund, nicht am Buch (ADR 18): am jüngsten, denn er
+    # trägt den aktuellen Preis und die aktuelle Verfügbarkeit.
+    observation = seen[0]
+    book = store.book(book_id)
+    # Der ganze Klappentext steht meist schon am Buch. Anders als der Lauf
+    # (``_with_full_blurbs``) holt diese Seite deshalb keine Detailseite —
+    # ein Knopfdruck soll keine Quelle anfragen.
+    duenn = not observation.blurb or is_truncated(observation.blurb)
+    if duenn and book is not None and book.blurb:
+        observation = replace(observation, blurb=book.blurb)
+
+    try:
+        rating = rater.rate(observation)
+    except RatingUnavailable as exc:
+        # Das Tor scheitert nie zu (ADR 7): der Grund wird genannt, das Buch
+        # bleibt sichtbar und unbewertet.
+        return str(exc)
+
+    store.put_rating(
+        subject_of(observation),
+        stars=rating.stars,
+        confidence=rating.confidence,
+        reason=rating.reason,
+        profile_version=rating.profile_version,
+        now=now,
+        origin=BY_MODEL,
+        pitch=rating.pitch,
+    )
+    return ""
 
 
 def set_stars(store: Store, book_id: int, stars: int | None, *, now: datetime) -> None:

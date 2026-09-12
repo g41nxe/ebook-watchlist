@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from ebook_watchlist import paths
 from ebook_watchlist.config import load_profile
 from ebook_watchlist.models import Availability, LinkOutcome, MatchReason, Observation
+from ebook_watchlist.rating import Rating, RatingUnavailable
 from ebook_watchlist.ratings import BY_CONVERSATION, BY_MODEL, BY_READER, book_subject
 from ebook_watchlist.relations import RelationKind
 from ebook_watchlist.store import Store
@@ -98,15 +99,15 @@ def test_several_relations_hold_at_once(client: TestClient, db: Store) -> None:
 
 
 def test_switching_a_relation_off_keeps_it_as_history(client: TestClient, db: Store) -> None:
-    """Dass ein Buch einmal beobachtet wurde, ist selbst eine Auskunft."""
+    """Dass ein Buch einmal beobachtet wurde, ist selbst eine Auskunft (ADR 18)
+    — die Beziehung wird stillgelegt, nicht geloescht. Die Seite zeigt sie
+    nicht mehr: was gerade *nicht* gilt, beantwortet keine Frage."""
     book = db.books()[0]
 
     client.post(f"/book/{book.id}/relation", data={"kind": "watching", "active": "0"})
 
-    body = client.get(f"/book/{book.id}").text
     kept = [r for r in db.relations_of("test", book.id) if r.kind == "watching"]
     assert kept and kept[0].active is False
-    assert "Früher" in body
 
 
 def test_an_unknown_relation_is_refused(client: TestClient, db: Store) -> None:
@@ -186,7 +187,7 @@ def test_unchanged_prices_do_not_fill_the_list(db: Store) -> None:
 
 
 def test_the_full_history_is_still_there(db: Store) -> None:
-    """Zusammengefasst wird nur die Preisliste; die Tabelle zeigt jede Sichtung."""
+    """Zusammengefasst wird nur die Preisliste; gespeichert bleibt jede Sichtung."""
     book = db.books()[0]
     for day in range(3):
         sighting(db, book.id, when=NOW + timedelta(days=day), price=999)
@@ -195,9 +196,28 @@ def test_the_full_history_is_still_there(db: Store) -> None:
     assert len(page.history) >= 3
 
 
+def test_the_table_shows_the_last_five_sightings_and_says_so(
+    client: TestClient, db: Store
+) -> None:
+    """Elf Zeilen mit elfmal demselben Betrag sind kein Verlauf, sondern
+    Rauschen — und sie schoben alles darunter aus dem Bild. Was sich geaendert
+    hat, steht ohnehin darueber in der Preisliste."""
+    book = db.books()[0]
+    for day in range(8):
+        sighting(db, book.id, when=NOW + timedelta(days=day), price=900 + day)
+
+    page = view.build(db, load_profile(), book.id)
+    assert len(page.recent_history) == 5
+    assert page.hidden_history == 3
+    # Die neuesten fuenf, nicht die aeltesten.
+    assert page.recent_history[0].price == "9,07 €"
+
+    assert "3 ältere" in client.get(f"/book/{book.id}").text
+
+
 def test_availability_appears_for_a_library(client: TestClient, db: Store) -> None:
     book = db.books()[0]
-    sighting(db, book.id, when=NOW, availability=Availability.AVAILABLE, source="voebb")
+    sighting(db, book.id, when=NOW, availability=Availability.AVAILABLE, source="onleihe")
 
     assert "ausleihbar" in client.get(f"/book/{book.id}").text
 
@@ -223,15 +243,15 @@ def test_a_bargain_is_marked_in_the_history(db: Store) -> None:
 
 
 def test_the_reader_never_sees_an_internal_source_name(client: TestClient, db: Store) -> None:
-    """"voebb" war nie ein Wort für die Leserin — und welche Quelle eine
+    """"onleihe" war nie ein Wort für die Leserin — und welche Quelle eine
     Bibliothek ist, sagt die Registry, nicht eine Liste in der Vorlage."""
     book = db.books()[0]
-    db.put_book_source(book.id, "voebb", outcome=str(LinkOutcome.LINKED), resolved_at=NOW)
-    sighting(db, book.id, when=NOW, source="voebb", availability=Availability.AVAILABLE)
+    db.put_book_source(book.id, "onleihe", outcome=str(LinkOutcome.LINKED), resolved_at=NOW)
+    sighting(db, book.id, when=NOW, source="onleihe", availability=Availability.AVAILABLE)
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "voebb" not in body
+    assert "onleihe" not in body
     assert "beam" not in body
     assert "Bibliothek" in body
 
@@ -283,7 +303,7 @@ def test_a_book_without_a_judgement_shows_nothing_rather_than_zero_stars(
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "noch nicht bewertet" in body
+    assert "Noch nicht bewertet" in body
     assert "zurücknehmen" not in body
 
 
@@ -304,7 +324,7 @@ def test_taking_them_back_writes_no_zero(client: TestClient, db: Store) -> None:
     client.post(f"/book/{book.id}/sterne", data={"stars": ""})
 
     assert db.rating(book_subject(book.id), 1, origin=BY_READER) is None
-    assert "noch nicht bewertet" in client.get(f"/book/{book.id}").text
+    assert "Noch nicht bewertet" in client.get(f"/book/{book.id}").text
 
 
 def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> None:
@@ -316,9 +336,9 @@ def test_a_machine_judgement_says_who_made_it(client: TestClient, db: Store) -> 
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "im Gespräch bewertet" in body
+    assert "deine Bewertung" in body
     assert "Reihe und Stimme." in body
-    assert "noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
+    assert "Noch nicht bewertet" in body  # ihre eigenen stehen weiterhin aus
 
 
 def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: Store) -> None:
@@ -330,7 +350,7 @@ def test_the_gates_judgement_is_found_through_the_isbn(client: TestClient, db: S
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "vom Werkzeug bewertet" in body
+    assert "Leseprofil" in body
     assert "Zu weich." in body
 
 
@@ -439,16 +459,16 @@ def test_the_gates_verdict_on_a_discovery_without_an_isbn_is_found_too(
 
     body = client.get(f"/book/{book.id}").text
 
-    assert "vom Werkzeug bewertet" in body
+    assert "Leseprofil" in body
     assert "Achse D: isoliert." in body
-    assert "noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
+    assert "Noch nicht bewertet" in body  # ihre eigenen Sterne bleiben getrennt
 
 
 def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:
     """Eine 4 vom Modell ist ein Vorschlag, eine 4 aus 1641 fremden Stimmen ist
     etwas ganz anderes. Sie dürfen nicht im selben Kasten stehen (ADR 19,
     Ticket 54)."""
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL
+    from ebook_watchlist.ratings import BY_MODEL, BY_ONLEIHE_READERS
 
     buch = db.find_or_create_book(
         isbn="9783641117009", title="Die sieben Schwestern", author="Riley", now=NOW
@@ -457,7 +477,7 @@ def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:
                   profile_version=2, now=NOW, origin=BY_MODEL)
     db.put_rating(f"book:{buch.id}", stars=4, confidence="belegt",
                   reason="Durchschnitt der Leser:innen aus 1641 Stimmen",
-                  profile_version=0, now=NOW, origin=BY_LIBRARY_READERS, votes=1641)
+                  profile_version=0, now=NOW, origin=BY_ONLEIHE_READERS, votes=1641)
 
     body = client.get(f"/book/{buch.id}").text
 
@@ -471,10 +491,10 @@ def test_foreign_voices_do_not_look_like_the_tools_verdict(client, db) -> None:
 def test_a_foreign_voice_never_goes_stale(db) -> None:
     """Sie ist kein Urteil gegen das Leseprofil und verfällt deshalb nicht,
     wenn die Leserin ihr Profil schärft."""
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS
+    from ebook_watchlist.ratings import BY_ONLEIHE_READERS
     from ebook_watchlist.web.book import Judgement
 
-    stimme = Judgement(origin=BY_LIBRARY_READERS, label="Leser:innen", stars=4.0,
+    stimme = Judgement(origin=BY_ONLEIHE_READERS, label="Leser:innen", stars=4.0,
                        reason="", confidence="belegt", profile_version=0,
                        when=None, votes=1641)
 
@@ -588,7 +608,7 @@ def test_two_houses_are_still_settled_by_length(db: Store) -> None:
         Observation(source="beam", source_item_id="1", title="Egal", author="Wer",
                     match_reason=MatchReason.WATCHLIST, book_id=buch.id,
                     blurb="Der Text des Shops."),
-        Observation(source="voebb", source_item_id="2", title="Egal", author="Wer",
+        Observation(source="onleihe", source_item_id="2", title="Egal", author="Wer",
                     match_reason=MatchReason.WATCHLIST, book_id=buch.id,
                     blurb="Der Text der Bibliothek, mit Pressestimmen davor."),
     ], NOW)
@@ -626,3 +646,143 @@ def test_editing_the_title_leaves_the_note_alone(client: TestClient, db: Store) 
     client.post(f"/book/{buch.id}/bearbeiten", data={"title": "Anders", "author": "Wer"})
 
     assert view.build(db, profile, buch.id).note == 'Band 1, Originaltitel "Market Forces".'
+
+
+# --- ein Urteil nachholen (Ticket 55) ---------------------------------------
+
+
+class StubRater:
+    """Ein Bewerter, der nichts fragt. Merkt sich, worueber er urteilen sollte."""
+
+    def __init__(self, rating: Rating | Exception) -> None:
+        self.rating = rating
+        self.asked: list[Observation] = []
+
+    def rate(self, observation: Observation) -> Rating:
+        self.asked.append(observation)
+        if isinstance(self.rating, Exception):
+            raise self.rating
+        return self.rating
+
+
+def test_the_button_fetches_a_judgement_for_this_one_book(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Das Tor sieht im Lauf nur, was in den Stapel kaeme; ein Watchlist-Titel
+    ist gewollt und wird nie gefragt. Von seiner Seite aus schon."""
+    buch = db.books()[0]
+    sighting(db, buch.id, when=NOW, price=999)
+    rater = StubRater(Rating(stars=4, reason="Passt.", confidence="teils",
+                             profile_version=1, pitch="Eine Flucht."))
+    monkeypatch.setattr(view, "build_rater", lambda model: rater)
+
+    body = client.post(f"/book/{buch.id}/bewerten").text
+
+    assert [o.source_item_id for o in rater.asked] == ["1"]
+    # Am Fund geschluesselt, nicht am Buch (ADR 18) — und trotzdem auf der
+    # Seite zu sehen.
+    assert db.ratings_for(["item:beam:1"])[("item:beam:1", BY_MODEL)].stars == 4
+    assert "Passt." in body
+
+
+def test_without_a_rater_the_page_says_why(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Das Tor scheitert nie zu (ADR 7): kein Schluessel ist kein Fehler,
+    sondern eine Auskunft."""
+    buch = db.books()[0]
+    sighting(db, buch.id, when=NOW)
+    monkeypatch.setattr(view, "build_rater", lambda model: None)
+
+    body = client.post(f"/book/{buch.id}/bewerten").text
+
+    assert "Kein Bewerter eingerichtet" in body
+
+
+def test_a_refusal_from_the_model_is_named_not_swallowed(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    buch = db.books()[0]
+    sighting(db, buch.id, when=NOW)
+    monkeypatch.setattr(
+        view, "build_rater", lambda model: StubRater(RatingUnavailable("Modell antwortete 429"))
+    )
+
+    body = client.post(f"/book/{buch.id}/bewerten").text
+
+    assert "Modell antwortete 429" in body
+    assert db.ratings_for(["item:beam:1"]) == {}
+
+
+def test_a_book_nobody_has_seen_yet_cannot_be_judged(
+    client: TestClient, db: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Das Urteil haengt am Fund. Ohne Fund gibt es nichts, woran es haengen
+    koennte — und kein Modellaufruf wird verschwendet."""
+    buch = db.find_or_create_book(isbn=None, title="Nie gesehen", now=NOW)
+    rater = StubRater(Rating(stars=5, reason="Egal.", confidence="belegt", profile_version=1))
+    monkeypatch.setattr(view, "build_rater", lambda model: rater)
+
+    body = client.post(f"/book/{buch.id}/bewerten").text
+
+    assert rater.asked == []
+    assert "Noch kein Fund" in body
+
+
+def test_the_button_is_gone_once_a_judgement_stands(client: TestClient, db: Store) -> None:
+    """Ein zweites Urteil zur selben Profilfassung gaebe dieselbe Antwort und
+    kostete einen Aufruf (Ticket 25)."""
+    buch = db.books()[0]
+    assert f"/book/{buch.id}/bewerten" in client.get(f"/book/{buch.id}").text
+
+    db.put_rating(book_subject(buch.id), stars=3, confidence="teils", reason="Steht.",
+                  profile_version=1, now=NOW, origin=BY_MODEL)
+
+    assert f"/book/{buch.id}/bewerten" not in client.get(f"/book/{buch.id}").text
+
+
+# --- zwei Bibliotheken, zwei Kacheln ----------------------------------------
+
+
+def sichtung(name: str, *, label: str, availability: str, when: datetime) -> view.Sighting:
+    return view.Sighting(
+        when=when, name=name, source=label, price=None,
+        availability=availability, other_title=None, deal=False,
+    )
+
+
+def test_two_libraries_do_not_share_one_tile() -> None:
+    """Die Kachel suchte ihre Sichtung ueber die *Beschriftung*. Mit einer
+    Bibliothek ging das gut; mit zweien fand die Onleihe-Kachel die Sichtung
+    von OverDrive und behauptete "verliehen" fuer einen Titel, den die Onleihe
+    gar nicht fuehrt."""
+    frueher, spaeter = datetime(2026, 9, 11, 12), datetime(2026, 9, 11, 21)
+    verlauf = (
+        sichtung("overdrive", label="Bibliothek", availability="verliehen", when=spaeter),
+        sichtung("onleihe", label="Bibliothek", availability="unklar", when=frueher),
+    )
+
+    neueste = view._latest_per_source(verlauf)
+
+    # Zwei Quellen, zwei Eintraege — nicht einer, der den anderen verdeckt.
+    assert {s.name for s in neueste} == {"onleihe", "overdrive"}
+
+
+def test_a_tile_asks_for_its_own_source_not_for_its_label() -> None:
+    frueher, spaeter = datetime(2026, 9, 11, 12), datetime(2026, 9, 11, 21)
+    seite = view.Page(
+        book_id=1, title="Dark Matter", author=None, series=None, isbn=None,
+        cover_file=None, relations=(), sources=(), judgements=(), profile_version=None,
+        origin=None,
+        history=(
+            sichtung("overdrive", label="Bibliothek", availability="verliehen", when=spaeter),
+            sichtung("onleihe", label="Bibliothek", availability="unklar", when=frueher),
+        ),
+        latest=(
+            sichtung("overdrive", label="Bibliothek", availability="verliehen", when=spaeter),
+            sichtung("onleihe", label="Bibliothek", availability="unklar", when=frueher),
+        ),
+    )
+
+    assert seite.latest_at("overdrive").availability == "verliehen"
+    assert seite.latest_at("onleihe").availability == "unklar"

@@ -7,6 +7,7 @@ Methode — genau damit ein Stub genügt.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -188,6 +189,29 @@ def test_a_book_is_judged_once_not_every_run(store: Store) -> None:
     assert second.reused == 1
 
 
+def test_the_gate_judges_the_whole_blurb_not_the_teaser(store: Store) -> None:
+    """Die Kachel einer Trefferliste traegt im Median 197 Zeichen und ist zu
+    85 % abgeschnitten; die Detailseite traegt das Zehnfache. Das Tor urteilte
+    bisher auf dem Anriss, waehrend der Rueckstands-Schritt den ganzen Text
+    nachlaedt — zwei Wege, dieselbe Frage, verschieden gut beantwortet."""
+    angeriss = discovery(blurb="Manche Menschen haben Geheimnisse. Heinz…")
+    ganz = replace(angeriss, blurb="Manche Menschen haben Geheimnisse. Heinz Brandt hat Regeln.")
+    rater = StubRater(rating(4))
+    geholt: list[str] = []
+
+    def voller_text(observations):
+        geholt.extend(o.key for o in observations)
+        return [ganz]
+
+    gate.apply(
+        [first_seen(angeriss)], store=store, rater=rater, profile_version=1,
+        threshold=3, budget=10, now=NOW, full_blurbs=voller_text,
+    )
+
+    assert geholt == [angeriss.key]
+    assert rater.calls[0].blurb == ganz.blurb
+
+
 def test_a_new_leseprofil_invalidates_the_judgement(store: Store) -> None:
     """Die eine Änderung, bei der ein erneuter Aufruf richtig ist."""
     rater = StubRater(rating(4))
@@ -257,7 +281,7 @@ def test_the_judgement_follows_the_isbn_across_sources(store: Store) -> None:
     rater = StubRater(rating(4))
     at_beam = first_seen(discovery(source="beam", source_item_id="1", isbn="9783104911854"))
     at_voebb = first_seen(
-        discovery(source="voebb", source_item_id="9", isbn="9783104911854",
+        discovery(source="onleihe", source_item_id="9", isbn="9783104911854",
                   match_reason=MatchReason.PROFILE_AUTHOR)
     )
 
@@ -1082,6 +1106,32 @@ def test_an_error_envelope_is_not_mistaken_for_an_answer() -> None:
         _cli_text(huelle)
 
 
+def test_a_failing_call_names_what_the_envelope_says(monkeypatch) -> None:
+    """Gemessen an einem Container ohne Anmeldung: Rueckgabewert 1, stderr
+    leer, und der einzige Hinweis — "Not logged in · Please run /login" —
+    stand in der Huelle auf stdout. Uebrig blieb "claude endete mit 1"."""
+    monkeypatch.setattr(
+        "ebook_watchlist.rating.subprocess.run",
+        lambda *a, **k: _completed(
+            stdout=json.dumps({"is_error": True, "result": "Not logged in · Please run /login"}),
+            returncode=1,
+        ),
+    )
+
+    with pytest.raises(RatingUnavailable, match="Not logged in"):
+        ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate(discovery())
+
+
+def test_a_failure_without_an_envelope_still_names_the_return_code(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "ebook_watchlist.rating.subprocess.run",
+        lambda *a, **k: _completed(stdout="", stderr="Killed", returncode=137),
+    )
+
+    with pytest.raises(RatingUnavailable, match="endete mit 137: Killed"):
+        ClaudeCodeRater(leseprofil=LESEPROFIL, version=1).rate(discovery())
+
+
 def test_a_good_envelope_still_yields_its_result() -> None:
     from ebook_watchlist.rating import _cli_text
 
@@ -1097,11 +1147,11 @@ def test_foreign_voices_stand_beside_the_tool_not_instead_of_it(store: Store) ->
     from datetime import datetime
 
     from ebook_watchlist.models import MatchReason, Observation
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL, subject_of
+    from ebook_watchlist.ratings import BY_MODEL, BY_ONLEIHE_READERS, subject_of
     from ebook_watchlist.run import _record_foreign_ratings
 
     fund = Observation(
-        source="voebb", source_item_id="1", title="Die sieben Schwestern",
+        source="onleihe", source_item_id="1", title="Die sieben Schwestern",
         author="Riley, Lucinda", match_reason=MatchReason.WATCHLIST,
         isbn="9783641117009", rating=4, rating_votes=1641,
     )
@@ -1113,7 +1163,7 @@ def test_foreign_voices_stand_beside_the_tool_not_instead_of_it(store: Store) ->
     # Ausdruecklich mit der *aktuellen* Profilversion: eine fremde Stimme
     # veraltet nicht mit einer neuen Fassung, und die Abfrage darf sie
     # deshalb nicht wegfiltern (Befund aus dem Review zu Ticket 54).
-    fremd = store.rating(subject_of(fund), 2, origin=BY_LIBRARY_READERS)
+    fremd = store.rating(subject_of(fund), 2, origin=BY_ONLEIHE_READERS)
     assert fremd.stars == 4
     assert fremd.votes == 1641
     assert fremd.confidence == "belegt"
@@ -1126,13 +1176,13 @@ def test_a_single_voice_is_not_evidence(store: Store) -> None:
     einer einzigen Stimme. Der Wert wird festgehalten, gilt aber nicht als
     belegt — und ohne Anzahl wird gar nichts geschrieben."""
     from ebook_watchlist.models import MatchReason, Observation
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS, subject_of
+    from ebook_watchlist.ratings import BY_ONLEIHE_READERS, subject_of
     from ebook_watchlist.run import _record_foreign_ratings
 
-    knapp = Observation(source="voebb", source_item_id="2", title="Kaum Stimmen",
+    knapp = Observation(source="onleihe", source_item_id="2", title="Kaum Stimmen",
                         author="Wer", match_reason=MatchReason.WATCHLIST,
                         isbn="9780000000002", rating=5, rating_votes=3)
-    ohne = Observation(source="voebb", source_item_id="3", title="Gar keine",
+    ohne = Observation(source="onleihe", source_item_id="3", title="Gar keine",
                        author="Wer", match_reason=MatchReason.WATCHLIST,
                        isbn="9780000000003", rating=5, rating_votes=None)
 
@@ -1141,10 +1191,10 @@ def test_a_single_voice_is_not_evidence(store: Store) -> None:
     # "belegt" heisst "aus geprueter Quelle" — nicht "statistisch belastbar".
     # Wie duenn die Stimmenlage ist, sagt die Zahl daneben, keine erfundene
     # Grenze (Befund aus dem Review zu Ticket 54).
-    knapp_row = store.rating(subject_of(knapp), 2, origin=BY_LIBRARY_READERS)
+    knapp_row = store.rating(subject_of(knapp), 2, origin=BY_ONLEIHE_READERS)
     assert knapp_row.confidence == "belegt"
     assert knapp_row.votes == 3
-    assert store.rating(subject_of(ohne), 2, origin=BY_LIBRARY_READERS) is None
+    assert store.rating(subject_of(ohne), 2, origin=BY_ONLEIHE_READERS) is None
 
 
 def test_a_foreign_voice_survives_a_new_profile_version(store: Store) -> None:
@@ -1154,14 +1204,42 @@ def test_a_foreign_voice_survives_a_new_profile_version(store: Store) -> None:
     schon richtig — im Store nicht."""
     from datetime import datetime
 
-    from ebook_watchlist.ratings import BY_LIBRARY_READERS, BY_MODEL
+    from ebook_watchlist.ratings import BY_MODEL, BY_ONLEIHE_READERS
 
     store.put_rating("isbn:9780000000009", stars=4, confidence="belegt",
                      reason="1641 Stimmen", profile_version=0,
-                     now=datetime(2026, 9, 6), origin=BY_LIBRARY_READERS, votes=1641)
+                     now=datetime(2026, 9, 6), origin=BY_ONLEIHE_READERS, votes=1641)
     store.put_rating("isbn:9780000000009", stars=2, confidence="teils", reason="Modell",
                      profile_version=1, now=datetime(2026, 9, 6), origin=BY_MODEL)
 
     # Das Modellurteil gegen Profil 1 veraltet mit Profil 2 — die fremde nicht.
     assert store.rating("isbn:9780000000009", 2, origin=BY_MODEL) is None
-    assert store.rating("isbn:9780000000009", 2, origin=BY_LIBRARY_READERS).stars == 4
+    assert store.rating("isbn:9780000000009", 2, origin=BY_ONLEIHE_READERS).stars == 4
+
+
+def test_an_apostrophe_escaped_the_wrong_way_does_not_cost_the_judgement() -> None:
+    """Gemessen an einem echten Urteil ueber "Das Knochenband": das Modell
+    schuetzte die Apostrophe um einen zitierten Achsennamen mit einem
+    Backslash. In JSON ist das kein Escape — fuenf tadellose Felder fielen
+    deshalb als "Antwort ist kein gueltiges JSON" aus."""
+    antwort = (
+        '{"stars": 2, "confidence": "vermutet", "reason": "ob die Figur die von '
+        # Rohzeichenkette: ``"\'"`` ist in Python nur ein Apostroph, und der
+        # Test pruefte dann gar nichts — genau so ist er beim ersten Versuch
+        # durchgerutscht und ueberlebte die Mutation.
+        + r"der Achse \'Die Figur traegt alles\' geforderte Bruchstelle traegt"
+        + '"}'
+    )
+    assert r"\'" in antwort
+
+    urteil = parse_answer(antwort, 1, load_rating_scheme())
+
+    assert urteil.stars == 2
+    assert "'Die Figur traegt alles'" in urteil.reason
+
+
+def test_genuinely_broken_json_still_fails(monkeypatch) -> None:
+    """Die Nachsicht gilt einer Lesart, nicht dem Raten: was auch danach kein
+    JSON ist, bleibt unbewertet (ADR 7)."""
+    with pytest.raises(RatingUnavailable, match="kein gültiges JSON"):
+        parse_answer('{"stars": 2, "confidence" "vermutet"}', 1, load_rating_scheme())

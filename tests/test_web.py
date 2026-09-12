@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -23,7 +24,7 @@ def client(data_dir: Path) -> TestClient:
 def test_an_untouched_installation_says_so_instead_of_looking_broken(
     client: TestClient,
 ) -> None:
-    response = client.get("/")
+    response = client.get("/uebersicht")
     assert response.status_code == 200
     assert "Noch kein Lauf verzeichnet" in response.text
 
@@ -32,7 +33,7 @@ def test_the_run_journal_is_shown(client: TestClient) -> None:
     run_main([])
     run_main([])
 
-    body = client.get("/").text
+    body = client.get("/uebersicht").text
 
     assert body.count("<tr") >= 3  # header plus two runs
     assert "cli" in body
@@ -45,7 +46,7 @@ def test_a_failing_source_is_named_on_the_dashboard(
     (data_dir / "fake-source.yaml").write_text("not: a list\n", encoding="utf-8")
     run_main([])
 
-    body = client.get("/").text
+    body = client.get("/uebersicht").text
 
     assert "schiefgegangen" in body
     assert "must be a list of items" in body
@@ -61,7 +62,7 @@ def test_digests_are_listed_and_servable(client: TestClient, data_dir: Path) -> 
     run_main([])
 
     name = f"digest-{datetime.now():%Y-%m-%d}.html"
-    assert name in client.get("/").text
+    assert name in client.get("/uebersicht").text
 
     digest = client.get(f"/digest/{name}")
     assert digest.status_code == 200
@@ -92,7 +93,7 @@ def test_broken_configuration_is_reported_rather_than_a_stack_trace(
 ) -> None:
     (data_dir / "profile.yaml").unlink()
 
-    response = client.get("/")
+    response = client.get("/uebersicht")
 
     assert response.status_code == 500
     assert "lässt sich nicht laden" in response.text
@@ -106,7 +107,7 @@ def test_the_web_process_never_takes_the_run_lock(client: TestClient) -> None:
     held = FileLock(str(paths.lock_path()), timeout=0)
     held.acquire()
     try:
-        assert client.get("/").status_code == 200
+        assert client.get("/uebersicht").status_code == 200
     finally:
         held.release()
 
@@ -118,7 +119,7 @@ def test_each_source_gets_a_line_of_its_own(client: TestClient) -> None:
     """Bisher musste die Seite Gesundheit aus Laufergebnissen erraten."""
     run_main([])
 
-    body = client.get("/").text
+    body = client.get("/uebersicht").text
 
     assert "Quellen" in body
     assert "zuletzt geprüft" in body
@@ -132,7 +133,7 @@ def test_a_paused_source_says_so_rather_than_vanishing(
     name = store.sources()[0].name
     store.set_enabled(name, False, now=datetime.now())
 
-    body = client.get("/").text
+    body = client.get("/uebersicht").text
 
     assert "pausiert" in body
     # Der interne Name steht bewusst nicht mehr da — die Leserin liest die Art
@@ -149,7 +150,7 @@ def test_a_source_broken_for_days_is_marked_as_such(
     for _ in range(3):
         store.record_probe(name, ok=False, error="kaputt", now=datetime.now())
 
-    body = client.get("/").text
+    body = client.get("/uebersicht").text
 
     assert "seit 3 Prüfungen" in body
 
@@ -191,7 +192,7 @@ def test_a_broken_configuration_is_a_page_not_a_traceback_on_post(
 
 @pytest.mark.parametrize(
     ("pfad", "name"),
-    [("/", "Übersicht"), ("/watchlist", "Watchlist"), ("/vorschlaege", "Vorschläge"),
+    [("/", "Home"), ("/watchlist", "Watchlist"), ("/vorschlaege", "Vorschläge"),
      ("/profil", "Profil")],
 )
 def test_the_navigation_marks_the_page_you_are_on(
@@ -217,7 +218,7 @@ def test_a_digest_is_offered_as_a_report_not_as_a_file_name(
     digests.mkdir(parents=True, exist_ok=True)
     (digests / "digest-2026-09-07.html").write_text("<p>x</p>", encoding="utf-8")
 
-    body = client.get("/").text
+    body = client.get("/uebersicht").text
 
     assert ">Tagesbericht</a>" in body
     assert ">digest-2026-09-07.html</a>" not in body
@@ -237,7 +238,7 @@ def test_a_digest_is_dated_by_the_day_it_reports_on(
     for name in ("digest-2026-09-07.html", "digest-2026-09-08.html"):
         (digests / name).write_text("<p>x</p>", encoding="utf-8")
 
-    body = client.get("/").text
+    body = client.get("/uebersicht").text
 
     assert "07.09.2026" in body
     assert "08.09.2026" in body
@@ -253,7 +254,7 @@ def test_a_moment_is_written_the_same_way_everywhere(
     """
     run_main([])
 
-    body = client.get("/").text
+    body = client.get("/uebersicht").text
 
     assert "seit " in body
 
@@ -267,3 +268,56 @@ def test_a_moment_is_written_the_same_way_everywhere(
     mit_jahr = [m for m in momente if re.match(r"\d{2}\.\d{2}\.\d{4}", m)]
     assert not mit_sekunden, f"Sekunden in {mit_sekunden}"
     assert not mit_jahr, f"Jahr in einem Zeitpunkt: {mit_jahr}"
+
+
+def test_the_interface_still_starts_without_a_usable_console(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Der Autostart laeuft unter ``pythonw.exe``, damit kein Konsolenfenster
+    stehenbleibt — und hat dann keine gueltige Ausgabe.
+
+    Vorher genuegten die zwei Startzeilen der Oberflaeche, um den Prozess mit
+    Rueckgabewert 1 zu beenden, ohne eine Spur: die Fehlermeldung nahm
+    denselben kaputten Weg. Gemessen an der Aufgabenplanung, nicht vermutet.
+    """
+    import importlib
+
+    class OhneHandle:
+        """Was ``pythonw.exe`` ohne Konsole liefert: da, aber unbeschreibbar."""
+
+        def write(self, _text: str) -> int:
+            raise OSError("kein gueltiges Handle")
+
+        def flush(self) -> None:
+            raise OSError("kein gueltiges Handle")
+
+    monkeypatch.setattr(sys, "stderr", OhneHandle())
+    monkeypatch.setattr(sys, "stdout", OhneHandle())
+
+    importlib.import_module("ebook_watchlist.web.__main__")._sichere_ausgabe()
+    print("eine Zeile, die sonst niemand liest", file=sys.stderr)
+
+    assert "eine Zeile" in (data_dir / "web.log").read_text(encoding="utf-8")
+
+
+def test_the_cwa_link_appears_only_when_an_address_is_configured(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ein Verweis auf eine fremde Anwendung, die es nur hier gibt.
+
+    Fest verdrahtet waere `books.localhost` fuer jeden anderen ein toter Link
+    (ADR 12). Die Adresse steht deshalb in der Umgebung, und ohne sie bleibt
+    die Kopfzeile, wie sie war.
+    """
+    from ebook_watchlist.web.app import TEMPLATES
+
+    ohne = client.get("/watchlist").text
+    assert "CWA" not in ohne
+
+    monkeypatch.setitem(TEMPLATES.env.globals, "cwa_url", "http://books.example/")
+    mit = client.get("/watchlist").text
+
+    assert 'href="http://books.example/"' in mit
+    # Eine fremde Anwendung oeffnet in einem neuen Tab, und `noopener` gehoert
+    # dazu, damit sie kein `window.opener` auf Buchfink bekommt.
+    assert 'target="_blank" rel="noopener"' in mit

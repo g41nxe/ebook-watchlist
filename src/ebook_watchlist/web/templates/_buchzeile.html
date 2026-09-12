@@ -1,0 +1,168 @@
+{# Eine Buchzeile — dieselbe auf Watchlist, Vorschlägen und Startseite
+   (Issue #9).
+
+   Vorher schrieb jede der drei Seiten ihre eigene Fassung, und die Teile,
+   die wirklich gleich sind, waren Zeile für Zeile kopiert. Geteilt ist
+   deshalb das Gerüst; was eine Seite eigenes hat, kommt als **Steckplatz**
+   herein, fertig gerendert (`{% raw %}{% set x %}…{% endset %}{% endraw %}`).
+
+   Die Zonen, von links: Auswahl · Cover · Anlass/Titel/Autor · Kennzahlen ·
+   Preis · Handlungen. Was eine Seite nicht mitgibt, erscheint nicht — die
+   Watchlist kennt keinen Pitch, ein Fund keine Verfügbarkeit.
+
+   Der Preis behält seine eigene schmale Spalte mit einer festen Zeile
+   darüber, damit die Beträge über alle drei Seiten hinweg auf derselben
+   Höhe stehen (ab `sm`; auf dem Telefon gibt es nichts, wogegen
+   auszurichten wäre).
+#}
+{% from "_cover.html" import cover %}
+
+{% macro zeile(
+    titel,
+    titel_url=none,
+    autor=none,
+    cover_file=none,
+    borrowable=false,
+    deal=false,
+    pille=none,
+    unter_autor=none,
+    kennzahlen=none,
+    pitch=none,
+    oben=none,
+    oben_farbe="text-soft",
+    preis=none,
+    preis_inhalt=none,
+    aktionen=none,
+    aktionen_unter_preis=false,
+    auswahl=none,
+    umschliessend=false
+) %}
+{# Ein Steckplatz aus `{% raw %}{% set %}{% endraw %}` ist nie leer: er
+   liefert eine Zeichenkette aus Leerzeichen, und die ist wahr. Ohne diese
+   Zeilen baute die Zeile jede Zone, die eine Seite vorsorglich anlegt —
+   sichtbar an der Kennzahlenspalte, die fuer einen Fund ohne Urteil und ohne
+   Pitch leer blieb und auf dem Telefon trotzdem eine ganze Reihe kostete
+   (`basis-full`). #}
+{% set pille = pille.strip() or none if pille else none %}
+{% set unter_autor = unter_autor.strip() or none if unter_autor else none %}
+{% set kennzahlen = kennzahlen.strip() or none if kennzahlen else none %}
+{% set aktionen = aktionen.strip() or none if aktionen else none %}
+{% set auswahl = auswahl.strip() or none if auswahl else none %}
+{% set preis_inhalt = preis_inhalt.strip() or none if preis_inhalt else none %}
+
+{# `umschliessend`: die Vorschlagsseite macht die ganze Zeile zum Label ihres
+   Kästchens — auf dem Telefon ist ein Kästchen von 16 Pixeln kein Ziel.
+   Alles Anklickbare darin traegt deshalb `stopPropagation`. #}
+{% set tag = "label" if umschliessend else "div" %}
+<{{ tag }} class="flex flex-wrap items-start gap-x-4 gap-y-2 py-3
+            {{ 'cursor-pointer hover:bg-card' if umschliessend }}">
+  {# Das Kaestchen auf halber Hoehe, wie Preis und Handlungen: oben
+     ausgerichtet klebte es an der Titelzeile und sah wie deren Aufzaehlungs-
+     punkt aus. Der Steckplatz wird dafuer umschlossen, damit jede Seite die
+     Ausrichtung erbt, statt sie einzeln zu setzen. #}
+  {# Auf dem Telefon rutscht das Kaestchen ans Ende der Zeile und teilt sich
+     die letzte Reihe mit Preis und Zeichen: links das Kaestchen, rechts die
+     Handlungen. Vorn stehend nahm es dem Titel 36 der 327 Pixel und trennte
+     ihn vom Cover. `order-last` bei beiden — gleicher Rang heisst
+     Dokumentreihenfolge, also Kaestchen zuerst. #}
+  {% if auswahl %}
+  <span class="order-last flex shrink-0 self-center sm:order-none">{{ auswahl }}</span>
+  {% endif %}
+  {{ cover(titel, cover_file, borrowable, deal, strecken=true) }}
+
+  {# Anlass, Titel, Autor — die schmalere der beiden Textspalten.
+
+     Grundbreite null (`flex-[1_1_0%]`), keine feste `basis`: sonst fordern
+     die beiden Textspalten ihre Grundbreite zuerst und draengen Preis und
+     Knoepfe auf eine zweite Zeile — gemessen 872 px Bedarf bei 720 px Platz,
+     die Zeile wuchs dabei von 125 auf 167 px. Mit Basis null bekommen die
+     festen Teile ihren Platz zuerst, und die zwei Textspalten teilen sich,
+     was uebrig bleibt: 1 zu 1,6 zugunsten des Pitches. #}
+  <div class="min-w-40 flex-[1_1_0%]">
+    {# Hoechstens zwei Zeilen. Ein Viertel der Titel der Quelle traegt hinter
+       einem Strich einen ganzen Werbesatz ("… | Er ist ein kranker Moerder.
+       Und er hat es auf deine Tochter abgesehen."); ungekuerzt wuchs so eine
+       Zeile auf das Doppelte ihrer Nachbarin, und die Liste liess sich nicht
+       mehr ueberfliegen. Gekuerzt wird nur die Ansicht: den ganzen Titel
+       zeigen die Fundseite und der Hinweis beim Ueberfahren. #}
+    <p class="line-clamp-2 font-serif text-base font-semibold tracking-tight">
+      {% if titel_url %}
+      <a href="{{ titel_url }}" title="{{ titel }}" onclick="event.stopPropagation()"
+         class="hover:underline underline-offset-2">{{ titel }}</a>
+      {% else %}<span title="{{ titel }}">{{ titel }}</span>{% endif %}
+    </p>
+    <p class="truncate text-sm text-soft">{{ autor or "unbekannt" }}</p>
+    {# Anlass und Quelle in einer Zeile unter dem Autor: die Pille sagt,
+       *warum* das Buch hier steht, das Symbol *wo* es zu holen ist — beides
+       Herkunft, beides klein, beides an derselben Stelle. #}
+    {% if unter_autor or pille %}
+    <div class="mt-1 flex flex-wrap items-center gap-2">
+      {{ unter_autor if unter_autor }}
+      {{ pille if pille }}
+    </div>
+    {% endif %}
+  </div>
+
+  {# Kennzahlen und Pitch — die breitere Spalte. Sie bekommt den groesseren
+     Teil, weil der Pitch der laengste Inhalt der Zeile ist. #}
+  {% if kennzahlen or pitch %}
+  {# `basis-full` auf dem Telefon: sonst blieb neben dem Pitch genug Platz fuer
+     das Kaestchen, und es stand mitten im Text statt in der letzten Reihe.
+     Ab `sm` wieder Grundbreite null, damit die festen Teile ihren Platz
+     zuerst bekommen. #}
+  <div class="min-w-40 basis-full flex-[1.6_1_0%] sm:basis-0">
+    {% if kennzahlen %}{{ kennzahlen }}{% endif %}
+    {# Drei Zeilen, aus demselben Grund wie beim Titel: der Pitch ist ein
+       Satz, der Klappentext ein Absatz — nebeneinander in einer Liste muessen
+       beide dieselbe Hoehe kosten duerfen. #}
+    {% if pitch %}
+    <p class="line-clamp-2 sm:line-clamp-3 {{ 'mt-1' if kennzahlen }}
+              text-sm text-ink">{{ pitch }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# Preis und Handlungen sitzen auf halber Hoehe der Zeile, nicht an ihrem
+     Fuss: die Textspalten sind unterschiedlich hoch, unten ausgerichtet
+     haengt der Betrag mal am Pitch, mal am Autor.
+
+     Die Zeichen stehen unter dem Preis, nicht neben ihm: nebeneinander kostet
+     die Zone 136 Pixel Zeilenbreite, untereinander 96 — die Breite des
+     Preises, die ohnehin gebraucht wird. Auf dem Telefon bleiben sie
+     nebeneinander, dort ist die Zeile ohnehin gestapelt. #}
+  {# Auf dem Telefon steht die Zeile gestapelt, und Preis und Zeichen bilden
+     die letzte Reihe. Rechtsbuendig, nicht eingerueckt: eingerueckt stand der
+     Betrag unter dem Cover und die Zeichen mitten im Text — mit dem rechten
+     Rand als Kante liegen sie ueber allen Zeilen hinweg an derselben Stelle. #}
+  {# Preis und Handlungen stehen nebeneinander — ausser wo unter dem Betrag
+     drei Zeichen stehen (`aktionen_unter_preis`, Stapelseite): die brauchen
+     dieselbe Breite wie die Preisspalte und bekommen deshalb eine eigene
+     Reihe. Ein einzelnes Menue unter dem Betrag sah dagegen aus, als waere es
+     heruntergefallen. #}
+  <div class="order-last flex flex-1 items-center justify-end gap-3
+              sm:order-none sm:w-auto sm:flex-none sm:self-center
+              {{ 'sm:flex-col sm:items-end sm:gap-2.5' if aktionen_unter_preis }}">
+    {% if preis is not none or oben %}
+    {# Der Betrag steht mittig ueber der Reihe der Zeichen, nicht rechts
+       ausgerichtet: die Reihe ist 92 Pixel breit, die Preisspalte 96 — rechts
+       gesetzt sass er ueber dem letzten Zeichen statt ueber allen dreien.
+       Die feste Breite bleibt, damit die Betraege ueber alle Zeilen hinweg
+       dieselbe Spalte teilen. #}
+    <div class="flex shrink-0 items-baseline gap-2 leading-tight
+                sm:w-24 sm:flex-col sm:items-center sm:gap-0">
+      <span class="h-4 text-xs {{ oben_farbe }}">{{ oben or "" }}</span>
+      {# `preis_inhalt` fuer den einen Fall, in dem der Betrag mehr ist als eine
+         Zahl: waehrend ein enger Lauf nachsieht, steht der zuletzt bekannte
+         gedaempft da, mit einem Zeichen daneben (Ticket 51). Die Spalte bleibt
+         dieselbe, damit die Betraege ueber alle Zeilen ausgerichtet sind. #}
+      {% if preis_inhalt %}{{ preis_inhalt }}
+      {% else %}
+      <span class="text-lg font-semibold tabular-nums {{ 'text-amber' if deal }}">
+        {{ preis or "—" }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if aktionen %}<div class="shrink-0">{{ aktionen }}</div>{% endif %}
+  </div>
+</{{ tag }}>
+{% endmacro %}

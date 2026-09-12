@@ -23,6 +23,29 @@ DEFAULT_HOST = "0.0.0.0"  # noqa: S104 - deliberate, see above
 DEFAULT_PORT = 8437
 
 
+def _sichere_ausgabe() -> None:
+    """Eine Ausgabe, auf die sich schreiben laesst — notfalls eine Datei.
+
+    Im Autostart laeuft die Oberflaeche unter ``pythonw.exe``, damit kein
+    Konsolenfenster stehenbleibt, das man versehentlich zuklickt. Dann gibt es
+    keine gueltigen Ausgabe-Handles: ``sys.stderr`` ist entweder ``None`` oder
+    zeigt ins Leere, und schon die zwei Startzeilen unten beenden den Prozess
+    mit Rueckgabewert 1 — ohne eine Spur, weil die Fehlermeldung denselben Weg
+    nimmt. Gemessen, nicht vermutet: mit Umleitung laeuft derselbe Aufruf.
+
+    Statt dessen schreibt die Oberflaeche dann nach ``data/web.log``, neben die
+    uebrigen Aufzeichnungen. Das gilt auch fuer uvicorn: seine Protokollierung
+    greift ``sys.stderr`` erst in ``uvicorn.run()`` ab, also nach hier.
+    """
+    try:
+        sys.stderr.write("")
+        sys.stderr.flush()
+    except (AttributeError, OSError, ValueError):
+        paths.data_dir().mkdir(parents=True, exist_ok=True)
+        ziel = (paths.data_dir() / "web.log").open("a", buffering=1, encoding="utf-8")
+        sys.stdout = sys.stderr = ziel
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="ebw-web", description="Serve the local Buchfink dashboard."
@@ -38,6 +61,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.data_dir is not None:
         os.environ["EBW_DATA_DIR"] = str(args.data_dir)
 
+    _sichere_ausgabe()
     print(f"data:  {paths.data_dir()}", file=sys.stderr)
     print(f"serve: http://{args.host}:{args.port}/", file=sys.stderr)
     uvicorn.run(

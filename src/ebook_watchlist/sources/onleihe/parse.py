@@ -1,4 +1,4 @@
-"""Turning VÖBB HTML into values. Pure functions — no network, no config.
+"""Turning Onleihe HTML into values. Pure functions — no network, no config.
 
 Every parser here raises :class:`SourceStructureError` when the markup stops
 looking like what the research documented. That loudness is the point: a
@@ -27,10 +27,10 @@ def soup(html: str) -> BeautifulSoup:
 
 def _leading_int(node: Tag | None, what: str) -> int:
     if node is None:
-        raise SourceStructureError(f"VÖBB detail page: no {what} element")
+        raise SourceStructureError(f"Onleihe detail page: no {what} element")
     match = _INT.search(node.get_text(" ", strip=True))
     if match is None:
-        raise SourceStructureError(f"VÖBB detail page: {what} holds no integer")
+        raise SourceStructureError(f"Onleihe detail page: {what} holds no integer")
     return int(match.group())
 
 
@@ -234,7 +234,7 @@ def parse_search_results(html: str, base: str = sel.BASE) -> list[Candidate] | N
 
     if sel.SESSION_EXPIRED_MARKER in text:
         raise SourceStructureError(
-            "VÖBB search: session expired — pagination must re-supply the query params"
+            "Onleihe search: session expired — pagination must re-supply the query params"
         )
 
     cards = page.select(sel.CARD)
@@ -242,7 +242,7 @@ def parse_search_results(html: str, base: str = sel.BASE) -> list[Candidate] | N
         if sel.NO_HITS_MARKER in text:
             return None
         raise SourceStructureError(
-            "VÖBB search: no result cards and no 'keine Titeltreffer' marker — "
+            "Onleihe search: no result cards and no 'keine Titeltreffer' marker — "
             "the results markup changed (or a captcha was served)"
         )
 
@@ -253,7 +253,7 @@ def parse_search_results(html: str, base: str = sel.BASE) -> list[Candidate] | N
         href = link.get("href") if link else None
         if not title or not href:
             raise SourceStructureError(
-                "VÖBB search: a result card is missing its title or detail link"
+                "Onleihe search: a result card is missing its title or detail link"
             )
         candidates.append(
             Candidate(

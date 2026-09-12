@@ -1,4 +1,4 @@
-"""Every VÖBB-specific string in one place (ADR 7).
+"""Every Onleihe-specific string in one place (ADR 7).
 
 When the Onleihe redesigns, this module is the whole diff. Nothing else in the
 codebase may hard-code a selector or a German label for this Source.

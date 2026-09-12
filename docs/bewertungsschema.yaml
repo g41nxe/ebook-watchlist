@@ -121,6 +121,29 @@ begruendung:
     2. WORAN IM BUCH das festzumachen ist: die konkrete Figur, Konstellation
        oder Situation. Nicht das Etikett.
     3. WAS DEN STERN KOSTET, bei allem unter fünf. Ausdrücklich.
+    4. LESBAR FÜR JEMANDEN, DER DAS BUCH NICHT KENNT. Die Begründung steht
+       allein auf einer Seite; wer sie liest, hat den Klappentext nicht neben
+       sich.
+
+  # Die Begründung ist ein Protokoll zum Nachprüfen — aber eines, das gelesen
+  # wird. Diese drei Regeln stehen hier, weil sie in echten Urteilen gerissen
+  # wurden, nicht als Vorsichtsmaßnahme.
+  form: |
+    HÖCHSTENS DREI SÄTZE, und jeder sagt EINE Sache. Vier Beobachtungen mit
+    Gedankenstrichen und Kommas aneinandergehängt sind kein Satz, sondern eine
+    Liste ohne Aufzählungszeichen: bis zum Ende hat die Leserin den Anfang
+    verloren.
+
+    WER ETWAS AUS DEM BUCH NENNT, FÜHRT ES EIN. "nach dem Blitz" setzt voraus,
+    dass jemand den Klappentext gelesen hat; "nach dem Blitzeinschlag, der den
+    Strom im Hochhaus lahmlegt" setzt nichts voraus. Dasselbe gilt für Namen:
+    beim ersten Mal steht dabei, wer das ist.
+
+    KEIN VERFAHRENSDEUTSCH. Sätze über das Urteil statt über das Buch —
+    "erschlossen, nicht belegt", "die Achse ist bedient", "das ist eingerechnet"
+    — gehören nicht in den Text. Worauf das Urteil ruht, sagt die confidence
+    daneben; was fehlt, wird als SACHE gesagt: "der Klappentext sagt nichts
+    darüber, wie schnell erzählt wird".
 
   verboten:
     - untugend: Tatsache statt Grund
@@ -131,6 +154,15 @@ begruendung:
       beispiel: Cyberpunk-Dystopie.
     - untugend: Verstecktes Nichtwissen
       beispiel: Zur Erzählweise kann ich nichts sagen. → stattdessen nachschlagen
+    - untugend: Anspielung statt Angabe
+      beispiel: >-
+        Der Klappentext lässt offen, ob nach dem Blitz gedrängt oder ausgekostet
+        wird. → Wer "den Blitz" nicht kennt, liest hier nichts.
+    - untugend: Ein Satz, der nicht enden will
+      beispiel: >-
+        A ist genau die Figur, die das Profil verlangt, B erzwingt die
+        Konstellation, und C bedient den Ton — der fünfte Stern fehlt bei D:
+        … → drei Sätze daraus.
 
   # Illustration, gemessen an einem Profil, das eine tragende, beschädigte
   # Erzählstimme und enge Konstellationen verlangt. Der Inhalt gehört diesem

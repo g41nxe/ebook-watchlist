@@ -1,0 +1,22 @@
+# Laufzeitdaten gehoeren ins Volume, nicht ins Image (ADR 12).
+data/
+data-sicherung/
+
+.git/
+.venv/
+.scratch/
+.claude/
+.design-sync/
+ds-bundle/
+testlauf/
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Bauergebnis der Oberflaeche — entsteht im Image neu (ADR 20).
+src/ebook_watchlist/web/static/
+
+# Belege eines Design-Reviews, mehrere Megabyte Bilder.
+docs/reviews/screenshots/

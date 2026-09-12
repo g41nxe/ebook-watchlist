@@ -19,10 +19,12 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    and_,
     create_engine,
     delete,
     event,
     func,
+    or_,
     select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
@@ -596,8 +598,12 @@ class Store:
 
     def latest_by_book(
         self, profile_slug: str, book_ids: Iterable[int]
-    ) -> dict[int, Observation]:
-        """Die zuletzt gesehene Beobachtung je Buch — was die Watchlist zeigt.
+    ) -> dict[int, list[Observation]]:
+        """Die zuletzt gesehenen Beobachtungen je Buch — was die Watchlist zeigt.
+
+        Eine Liste, neueste zuerst, mit **einer Zeile je Quelle**: welche davon
+        einen Preis nennt und welche eine Verfuegbarkeit, entscheidet die
+        Watchlist-Zeile selbst.
 
         Dieselbe max-id-Unterabfrage wie :meth:`latest_observations`, nur ueber
         ``book_id`` statt ueber das Quellen-Paar: die Kosten haengen an der Zahl
@@ -612,14 +618,22 @@ class Store:
                 ObservationRow.profile_slug == profile_slug,
                 ObservationRow.book_id.in_(wanted),
             )
-            .group_by(ObservationRow.book_id)
+            # Je Buch **und Quelle**, nicht je Buch: eine einzige Beobachtung je
+            # Buch war die der zuletzt eingefuegten Quelle, also eine Frage der
+            # Reihenfolge in ``profile.yaml``. Mit zwei Bibliotheken entschied
+            # das darueber, welche von beiden die Zeile beschreibt — sagte die
+            # eine "ausleihbar" und die andere "verliehen", stand in der
+            # Watchlist die falsche von beiden.
+            .group_by(ObservationRow.book_id, ObservationRow.source)
         )
-        found: dict[int, Observation] = {}
+        found: dict[int, list[Observation]] = {}
         with self.session() as session:
-            stmt = select(ObservationRow).where(ObservationRow.id.in_(latest_ids))
+            stmt = select(ObservationRow).where(ObservationRow.id.in_(latest_ids)).order_by(
+                ObservationRow.id.desc()
+            )
             for row in session.scalars(stmt):
                 if row.book_id is not None:
-                    found[row.book_id] = _to_observation(row)
+                    found.setdefault(row.book_id, []).append(_to_observation(row))
         return found
 
     def observations_for_book(
@@ -630,13 +644,56 @@ class Store:
         Der Snapshot ist anhaengend (ADR 5), also *ist* das die Geschichte —
         sie muss nicht gesondert gefuehrt werden. Die Grenze schuetzt die Seite
         vor einem Buch, das seit Jahren jeden Tag beobachtet wird.
+
+        Gefragt wird nach zweierlei: nach der ``book_id`` und nach den Nummern,
+        unter denen die Quellen dieses Buch fuehren. Eine Entdeckung wird ohne
+        ``book_id`` beobachtet — es gibt ja noch kein Buch (ADR 18) —, und wird
+        spaeter eines daraus, haengt ihre ganze Vorgeschichte sonst in der
+        Luft: die Buchseite sagte "Noch nichts gesehen" und die Kachel der
+        Quelle nannte keinen Preis, obwohl elf Beobachtungen dazu dastanden.
+        Nachgeschlagen statt nachgetragen — der Snapshot wird nicht
+        umgeschrieben.
+        """
+        with self.session() as session:
+            paare = session.execute(
+                select(BookSourceRow.source, BookSourceRow.source_item_id).where(
+                    BookSourceRow.book_id == book_id,
+                    BookSourceRow.source_item_id.is_not(None),
+                )
+            ).all()
+            wege = [ObservationRow.book_id == book_id]
+            wege += [
+                and_(
+                    ObservationRow.source == source,
+                    ObservationRow.source_item_id == item_id,
+                )
+                for source, item_id in paare
+            ]
+            stmt = (
+                select(ObservationRow)
+                .where(ObservationRow.profile_slug == profile_slug, or_(*wege))
+                .order_by(ObservationRow.id.desc())
+                .limit(limit)
+            )
+            return [_to_observation(row) for row in session.scalars(stmt)]
+
+    def observations_for_item(
+        self, profile_slug: str, source: str, source_item_id: str, limit: int = 200
+    ) -> list[Observation]:
+        """Die ganze Geschichte eines Funds, neueste zuerst.
+
+        Dasselbe wie :meth:`observations_for_book`, nur am Paar aus Quelle und
+        Nummer statt an einer ``book_id`` — ein Fund hat keine Buch-Zeile,
+        solange nichts ueber ihn gesagt wurde (ADR 18). Die Grenze schuetzt
+        vor einem Titel, der seit Monaten in jedem Lauf auftaucht.
         """
         with self.session() as session:
             stmt = (
                 select(ObservationRow)
                 .where(
                     ObservationRow.profile_slug == profile_slug,
-                    ObservationRow.book_id == book_id,
+                    ObservationRow.source == source,
+                    ObservationRow.source_item_id == source_item_id,
                 )
                 .order_by(ObservationRow.id.desc())
                 .limit(limit)
@@ -644,7 +701,7 @@ class Store:
             return [_to_observation(row) for row in session.scalars(stmt)]
 
     def latest_discoveries(
-        self, profile_slug: str, limit: int = 500
+        self, profile_slug: str, limit: int | None = None
     ) -> list[Observation]:
         """Die zuletzt gesehene Fassung jeder Entdeckung.
 
@@ -652,6 +709,14 @@ class Store:
         Lauf. Fuer die Triage zaehlt nur der letzte Stand — dieselbe
         max-id-je-Element-Unterabfrage wie ueberall sonst, damit die Kosten an
         der Zahl der Funde haengen und nicht an der Laenge der Geschichte.
+
+        Ohne Grenze, und das ist der Punkt: hier standen 500, der Bestand bei
+        397, und jeder Lauf legt zu. Zu langsam waere die Seite davon nicht
+        geworden, sondern unvollstaendig — die aeltesten Funde waeren aus dem
+        Stapel, aus der Zaehlung "N offen" und aus dem Bilderholen gefallen,
+        ohne dass irgendwo etwas davon steht. Die Zahl der Entdeckungen
+        waechst langsam (410 in drei Monaten) und die Abfrage kostet bei 400
+        Zeilen 7 ms; wer sie doch einmal deckeln will, sagt es beim Aufruf.
         """
         latest_ids = (
             select(func.max(ObservationRow.id))
@@ -668,8 +733,9 @@ class Store:
                 select(ObservationRow)
                 .where(ObservationRow.id.in_(latest_ids))
                 .order_by(ObservationRow.id.desc())
-                .limit(limit)
             )
+            if limit is not None:
+                stmt = stmt.limit(limit)
             return [_to_observation(row) for row in session.scalars(stmt)]
 
     def latest_prices_by_title(self, profile_slug: str, source: str) -> dict[str, int]:
@@ -795,11 +861,15 @@ class Store:
             return preise
 
     def decided_items(self, profile_slug: str) -> set[tuple[str, str]]:
-        """``(Quelle, Item-Id)``, zu denen es schon ein Buch mit Beziehung gibt.
+        """``(Quelle, Item-Id)``, zu denen es schon ein Buch mit **aktiver**
+        Beziehung gibt.
 
         Ueber ``book_source``, weil dort steht, unter welcher Nummer eine
         Quelle ein Buch fuehrt. Das ist der Weg, auf dem eine Entscheidung
         *buchweit* wirkt statt nur fuer eine Produktnummer (ADR 18).
+
+        Nur aktive: eine zurueckgenommene Entscheidung ist keine, und der Fund
+        gehoert wieder in den Stapel — dieselbe Lesart wie ``dismissed_keys``.
         """
         with self.session() as session:
             stmt = (
@@ -807,6 +877,7 @@ class Store:
                 .join(BookRelationRow, BookRelationRow.book_id == BookSourceRow.book_id)
                 .where(
                     BookRelationRow.profile_slug == profile_slug,
+                    BookRelationRow.active.is_(True),
                     BookSourceRow.source_item_id.is_not(None),
                 )
             )
@@ -851,7 +922,8 @@ class Store:
         return items, isbns
 
     def books_with_relations(self, profile_slug: str) -> dict[str, int]:
-        """ISBN -> Buch-Id, aber nur fuer Buecher, zu denen etwas gesagt wurde.
+        """ISBN -> Buch-Id, aber nur fuer Buecher, zu denen etwas gesagt wurde
+        — und noch gilt.
 
         So verschwindet ein Fund auch dann aus dem Stapel, wenn eine *andere*
         Quelle dasselbe Buch unter einer anderen Nummer fuehrt — die ISBN ist
@@ -863,6 +935,7 @@ class Store:
                 .join(BookRelationRow, BookRelationRow.book_id == BookRow.id)
                 .where(
                     BookRelationRow.profile_slug == profile_slug,
+                    BookRelationRow.active.is_(True),
                     BookRow.isbn.is_not(None),
                 )
             )
@@ -1032,6 +1105,45 @@ class Store:
             if row is not None:
                 session.expunge(row)
             return row
+
+    def books_by_id(self, book_ids: Iterable[int]) -> dict[int, BookRow]:
+        """Mehrere Buecher auf einmal — eine Abfrage statt einer je Zeile.
+
+        Die Watchlist stellte fuer neunzehn Eintraege neunzehn Fragen; gemessen
+        kosteten die 4,8 ms, die gebuendelte Fassung eine.
+        """
+        wanted = list(dict.fromkeys(book_ids))
+        if not wanted:
+            return {}
+        with self.session() as session:
+            rows = list(session.scalars(select(BookRow).where(BookRow.id.in_(wanted))))
+            for row in rows:
+                session.expunge(row)
+            return {row.id: row for row in rows}
+
+    def book_sources_of(self, book_ids: Iterable[int]) -> dict[int, list[BookSourceRow]]:
+        """Die Quellen-Verknuepfungen mehrerer Buecher, nach Buch geordnet.
+
+        Wie :meth:`book_sources`, nur gebuendelt. Die Reihenfolge je Buch
+        bleibt dieselbe (nach Quellenname), damit die Zeile ueberall gleich
+        aussieht.
+        """
+        wanted = list(dict.fromkeys(book_ids))
+        if not wanted:
+            return {}
+        gefunden: dict[int, list[BookSourceRow]] = {book_id: [] for book_id in wanted}
+        with self.session() as session:
+            rows = list(
+                session.scalars(
+                    select(BookSourceRow)
+                    .where(BookSourceRow.book_id.in_(wanted))
+                    .order_by(BookSourceRow.book_id, BookSourceRow.source)
+                )
+            )
+            for row in rows:
+                session.expunge(row)
+                gefunden[row.book_id].append(row)
+            return gefunden
 
     def book_sources(self, book_id: int) -> list[BookSourceRow]:
         with self.session() as session:

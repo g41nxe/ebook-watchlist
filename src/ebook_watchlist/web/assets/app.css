@@ -10,6 +10,12 @@
 @theme {
   --color-paper: oklch(0.98 0.006 85);
   --color-card: oklch(0.995 0.004 85);
+  /* Zwei Toene fuer Text, mehr nicht: `ink` ist der Inhalt — Titel, Absaetze,
+     Tabellenwerte —, `soft` alles, was ueber ihn spricht: Autor:in,
+     Zeitpunkte, Hinweise. Wer einen dritten Ton mischt (`text-ink/80`), macht
+     ihn nur im Hellen weicher; im Dunkeln liegt derselbe Wert zwischen den
+     beiden und wirkt wie ein Fehler. Es gab vier davon, auf sechs Seiten
+     verteilt. */
   --color-ink: oklch(0.26 0.012 60);
   --color-soft: oklch(0.52 0.012 60);
   --color-rule: oklch(0.91 0.012 80);
@@ -237,14 +243,18 @@
      um welche Quelle es geht, ohne den Wert zu stoeren. Rechts auf halber
      Hoehe und vollstaendig sichtbar — angeschnitten in der Ecke lief es dem
      Wert in die Zeile, und ein halbes Symbol liest sich als Fehler. Der
-     Inhalt haelt den Platz frei (`pr-16`). */
+     Inhalt haelt den Platz frei (`pr-12`).
+
+     40 statt 48 Pixel, seit es drei Kacheln sein koennen: die dritte Quelle
+     nimmt jeder Kachel 27 Pixel Breite, und die holt das Symbol zurueck,
+     ohne dass "nicht im Katalog" umbricht. */
   .kachelbild {
     position: absolute;
-    right: 12px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     opacity: 0.09;
     stroke: currentColor;
     fill: none;
@@ -272,6 +282,11 @@
   /* Wo mit dem Finger bedient wird, gelten 44 px als Mindestmass. */
   @media (hover: none) {
     .tun { min-height: 44px }
+    /* Ausser bei den Filterpillen: sie sind Ansichten, keine Handlungen, und
+       drei davon nebeneinander mit 44 px Hoehe sahen auf dem Telefon aus wie
+       ein Block statt wie eine Reihe. 36 px bleiben mit dem Finger gut zu
+       treffen. Steht nach `.tun`, weil beide gleich stark sind. */
+    .pille { min-height: 36px }
   }
 }
 

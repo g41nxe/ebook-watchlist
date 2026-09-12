@@ -11,14 +11,14 @@ from pathlib import Path
 
 import pytest
 
-from conftest import beam_fixture, beam_tiles, voebb_detail
+from conftest import beam_fixture, beam_tiles, onleihe_detail
 from ebook_watchlist.config import WatchlistEntry
 from ebook_watchlist.sources.beam import parse as beam_parse
-from ebook_watchlist.sources.voebb import parse as voebb_parse
-from ebook_watchlist.sources.voebb.source import VoebbSource
+from ebook_watchlist.sources.onleihe import parse as onleihe_parse
+from ebook_watchlist.sources.onleihe.source import OnleiheSource
 
 BEAM = Path(__file__).parent / "fixtures" / "beam"
-VOEBB = Path(__file__).parent / "fixtures" / "voebb"
+VOEBB = Path(__file__).parent / "fixtures" / "onleihe"
 
 
 # --- beam: aus der Bestellnummer ------------------------------------------
@@ -69,12 +69,12 @@ def test_only_a_real_isbn13_is_accepted(order_number: str, expected: str | None)
 
 
 def test_the_onleihe_states_the_isbn_outright() -> None:
-    detail = voebb_detail("detail-unavailable.html")
+    detail = onleihe_detail("detail-unavailable.html")
     assert detail.isbn == "9783641117009"
 
 
 def test_a_second_title_too() -> None:
-    detail = voebb_detail("detail-available.html")
+    detail = onleihe_detail("detail-available.html")
     assert detail.isbn == "9783104912769"
 
 
@@ -83,7 +83,7 @@ def test_a_page_without_an_isbn_row_simply_has_none() -> None:
         '<html><body><div class="exemplar-count">1 Exemplare</div>'
         '<div class="availability-count">1 Verfügbar</div></body></html>'
     )
-    assert voebb_parse.parse_detail(html).isbn is None
+    assert onleihe_parse.parse_detail(html).isbn is None
 
 
 def test_the_isbn_row_survives_the_abbr_markup() -> None:
@@ -95,7 +95,7 @@ def test_the_isbn_row_survives_the_abbr_markup() -> None:
         '<abbr title="Internationale Standardbuchnummer">ISBN</abbr>:</b>'
         "<span>978-3-641-11700-9</span></p></body></html>"
     )
-    assert voebb_parse.parse_detail(html).isbn == "9783641117009"
+    assert onleihe_parse.parse_detail(html).isbn == "9783641117009"
 
 
 # --- bis in die Observation ------------------------------------------------
@@ -106,10 +106,10 @@ def test_the_isbn_reaches_the_observation() -> None:
         def get(self, url: str, params: dict | None = None) -> str:
             return (VOEBB / "detail-unavailable.html").read_text(encoding="utf-8")
 
-    source = VoebbSource(client=StubClient())  # type: ignore[arg-type]
+    source = OnleiheSource(client=StubClient())  # type: ignore[arg-type]
     entry = WatchlistEntry(
         title="Die sieben Schwestern",
-        resolved_links={"voebb": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
+        resolved_links={"onleihe": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
     )
 
     observation = source.check(entry)
@@ -120,9 +120,9 @@ def test_the_isbn_reaches_the_observation() -> None:
 
 def test_both_sources_agree_on_the_same_book() -> None:
     """Der empirische Befund, auf dem ADR 18 die Identität aufbaut."""
-    voebb = voebb_detail("detail-unavailable.html")
+    onleihe = onleihe_detail("detail-unavailable.html")
     # beam führt dasselbe Buch unter Produkt 395021; live geprüft am 2026-09-04.
-    assert voebb.isbn == "9783641117009"
+    assert onleihe.isbn == "9783641117009"
 
 
 # --- beam-Detailseite: der Fall, den der Livelauf aufgedeckt hat -----------

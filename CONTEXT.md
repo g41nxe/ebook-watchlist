@@ -44,13 +44,22 @@ What a Profile has to do with a Book. Several hold at once — a book can be
 owned *and* have been watched. Relations are deactivated rather than deleted,
 so "watched until you bought it" stays visible.
 
-| kind | deutsch | what it says |
-| --- | --- | --- |
-| `watching` | in Beobachtung | on the Watchlist, reported at every price |
-| `owned` | im Besitz | the reader has it |
-| `liked` | Mag ich | read, and it was good |
-| `disliked` | Kein Interesse | read, and it was not |
-| `dismissed` | Ausgeschlossen | never offer this book again |
+| kind | deutsch (the state) | on the button | what it says |
+| --- | --- | --- | --- |
+| `watching` | in Beobachtung | Beobachten | on the Watchlist, reported at every price |
+| `owned` | im Besitz | Hab ich | the reader has it |
+| `liked` | Mag ich | Mag ich | read, and it was good |
+| `disliked` | Kein Interesse | Doof | read, and it was not |
+| `dismissed` | Ausgeschlossen | Ausschließen | never offer this book again |
+
+Two words, two questions (ADR 29 and its addendum). The state name answers
+"what is this book to me?" and stands where books are described in prose — the
+profile, the Digest, the Watchlist status — like a shelf label. The button word
+answers "what do you do with it?" and stands on *every* button: the Suggestion
+pile, the start page, the Watchlist menu, the find page and the book page. For
+`liked` and `disliked` both roles fall on the same word; that is one word doing
+two jobs, not drift. What never happens is the swap: a state name that is no
+button word never reaches a button.
 
 `disliked` and `dismissed` are different statements, and neither implies the
 other. `disliked` is a verdict *after reading* and says something about taste.
@@ -81,14 +90,41 @@ ordinary Delta, with history, rather than a mutable flag on an entry.
 ### Source
 *deutsch: Quelle*
 
-A place that is polled for data, behind a common interface. Two kinds in v1:
+A place that is polled for data, behind a common interface. Two kinds, three
+sources:
 
-- **Library Source** — reports availability/borrowable status for a title.
-  First implementation: VÖBB Onleihe (Berlin).
+- **Library Source** (*deutsch: Bibliothek*) — reports availability/borrowable
+  status for a title. Two of them: `onleihe` and `overdrive`, both run by the
+  VÖBB in Berlin and each with its own holdings. A source is therefore named
+  after the **platform**, never after the library — and where the reader knows
+  that name, the interface shows it instead of the kind (`registry.DISPLAY`).
 - **Shop Source** — reports price and catalogue presence for a title.
   First implementation: beam-shop.de (DRM-free German ebook shop).
 
 More Sources of either kind can be added without changing the core.
+
+### Resolution
+*deutsch: Zuordnung*
+
+Deciding which entry in a Source's catalogue a watched book actually *is* —
+title and author in, one stable product number out (ADR 9). A Source searches,
+the shared matcher ranks, and a confidence gate decides: accept it, hand it to
+the reader to confirm, or call it not found. An accepted Resolution is pinned
+and reused every Run, so the search happens once, not daily.
+
+The matcher compares normalised titles, but an exact **identifier** wins over
+any title score: `Dark Matter` and `Der Zeitenläufer (Dark Matter)` are the
+same book and score 26 out of 100, while their ISBN is identical.
+
+### Thunder
+*deutsch: die Schnittstelle von OverDrive*
+
+OverDrive's public JSON API (`thunder.api.overdrive.com`), and the only door
+the `overdrive` source knocks on. Its HTML site carries no result cards at all
+— JavaScript builds them — so there is no HTML to parse in the first place
+(ADR 31). No key, no login, and the field names live in
+`sources/overdrive/selectors.py`, exactly where the Onleihe keeps its CSS
+selectors.
 
 ### Snapshot
 *deutsch: Aufzeichnung*
@@ -307,6 +343,16 @@ the next Run reports the accumulated Deltas. A lock serialises concurrent Runs.
 ### Seed file
 *deutsch: Saatgutdatei*
 
-An optional YAML file used to import/bootstrap a Profile and its Watchlist into
-the database. Not the live store — once imported, the database is the source of
-truth and edits happen through the UI.
+A YAML file under the data directory. Which of them are seed and which are live
+is not uniform, and saying "the database is the source of truth" flatly was
+wrong:
+
+| File | Role |
+| --- | --- |
+| `watchlist.yaml` | **Seed.** Imported once into Book Relations of kind `watching`; the database is the truth afterwards and edits happen through the UI. |
+| `owned.yaml`, `dismissed.yaml` | **Seed.** Imported once into Relations and Ratings. |
+| `profile.yaml` | **Live configuration, not seed.** There is no profile table; `load_profile()` reads the file on every request. Thresholds, the rating model, the sweep weekday, Reference Authors and Genre Categories all come from it at runtime. Its Interests are *additionally* seeded into the `interest` table, so those two exist in both places. |
+
+Separate from all of these, and not in the data directory at all: the Reading
+Profile and the Rating Scheme live under `docs/` and are read relative to the
+package root. They are versioned with the code, not carried with the data.

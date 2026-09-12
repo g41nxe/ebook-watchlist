@@ -1,0 +1,84 @@
+name: buchfink
+
+services:
+  buchfink:
+    build: .
+    image: buchfink:local
+    container_name: buchfink
+    restart: unless-stopped
+    # tini als PID 1. Das Einstiegsskript laesst die Laufschleife im
+    # Hintergrund laufen; ohne init blieben deren beendete Prozesse als
+    # Zombies stehen, weil die Oberflaeche als PID 1 niemanden einsammelt.
+    init: true
+    environment:
+      # Lokale Zeit, nicht UTC: der Dateiname des Tagesberichts ist das lokale
+      # Kalenderdatum (ADR 12).
+      TZ: ${TZ:-Europe/Berlin}
+      # Die beiden Wege des Bewertungstors, in dieser Reihenfolge (`rating.py`,
+      # `build_rater`). Beide leer heisst: alle Funde erscheinen unbewertet —
+      # kein Fehler, nur kein Tor.
+      #
+      # 1. Ein API-Schluessel aus der Console, getrennt abgerechnet.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # 2. Die mitgebaute `claude`-CLI, angemeldet mit einem langlebigen Token
+      #    aus `claude setup-token`. Kein zusaetzliches Guthaben — das
+      #    Abonnement traegt es.
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      EBW_DATA_DIR: /data
+      # Gesetzt: die Kopfzeile bekommt einen Punkt "CWA", der in einem neuen
+      # Tab zur eigenen Calibre-Web-Installation fuehrt. Leer: kein Punkt.
+      EBW_CWA_URL: ${EBW_CWA_URL:-}
+    volumes:
+      # Die Datenbank gehoert in ein benanntes Volume. Ueber einen Bind-Mount
+      # von D:\ liefe SQLite durch die Virtualisierungsschicht von Docker
+      # Desktop, und dort sind seine Sperren im WAL-Modus dokumentiert
+      # unzuverlaessig — bis zur beschaedigten Datei. Hier liegen auch
+      # `covers/`, `digests/`, Logs und die Lauf-Sperre.
+      - buchfink-data:/data
+
+      # Reiner Text, keine Sperren: diese vier duerfen von D:\ kommen, damit
+      # du sie mit deinem Editor bearbeitest.
+      #
+      # `profile.yaml` ist dabei **keine** Saatgutdatei, auch wenn die drei
+      # anderen es sind: `load_profile()` liest sie bei jeder Anfrage neu
+      # (CONTEXT.md, Eintrag "Seed file").
+      - ./data/profile.yaml:/data/profile.yaml:ro
+      - ./data/watchlist.yaml:/data/watchlist.yaml:ro
+      - ./data/owned.yaml:/data/owned.yaml:ro
+      - ./data/dismissed.yaml:/data/dismissed.yaml:ro
+
+      # Wohin `scripts/sicherung.py` schreibt. Eine Sicherung gehoert nach
+      # draussen, wo du sie siehst und mitnehmen kannst — die *laufende*
+      # Datenbank dagegen nicht, siehe oben.
+      - ./data-sicherung:/sicherung
+    networks:
+      - proxy
+    labels:
+      # Die Anmeldung beim Proxy besteht aus zwei Teilen, und die sind
+      # zugleich die Absicherung: dieses Label und die Mitgliedschaft im
+      # `proxy`-Netz unten. Beides passiert nicht versehentlich. Welcher
+      # Traefik das aufgreift, steht hier bewusst nicht — diese Datei nennt
+      # kein anderes Projekt.
+      - traefik.enable=true
+      - traefik.http.routers.buchfink.rule=Host(`buchfink.localhost`)
+      - traefik.http.routers.buchfink.entrypoints=web
+      - traefik.http.services.buchfink.loadbalancer.server.port=8437
+
+volumes:
+  # Ausdruecklich extern, aus zwei Gruenden. Erstens haette Compose sonst ein
+  # eigenes, projektbenanntes Volume angelegt statt des befuellten. Zweitens,
+  # und wichtiger: `docker compose down -v` loescht projekteigene Volumes — bei
+  # einem externen greift es nicht. Die Datenbank soll ein Tippfehler nicht
+  # ausloeschen koennen.
+  #
+  # Einmalig anzulegen:  docker volume create buchfink-data
+  buchfink-data:
+    external: true
+
+networks:
+  # Gehoert keinem Projekt. Einmalig ausserhalb aller Compose-Dateien anlegen:
+  #     docker network create proxy
+  # Dadurch ueberlebt es ein `docker compose down` in jedem einzelnen Projekt,
+  # und keine Datei muss den Namen einer anderen kennen.
+  proxy:
+    external: true

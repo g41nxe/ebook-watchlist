@@ -1,5 +1,13 @@
 # runtime data (ADR 12)
 data/
+# Sicherungen der Datenbank aus dem Container (docs/betrieb.md)
+data-sicherung/
+
+# Umgebung des Containers — traegt Schluessel und Token. Alles, was so
+# heisst: eine `.env.bak` neben der `.env` traegt dasselbe Geheimnis und war
+# von `.env` allein nicht gedeckt. Die Vorlage ist die eine Ausnahme.
+.env*
+!.env.example
 
 # python
 __pycache__/

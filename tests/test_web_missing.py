@@ -56,7 +56,7 @@ def eintraege(db: Store):
 
 def test_all_sources_silent_is_a_question(db: Store) -> None:
     buch_id = eintrag(db, "Hardwired", beam=str(LinkOutcome.NOT_FOUND),
-                      voebb=str(LinkOutcome.NOT_FOUND))
+                      onleihe=str(LinkOutcome.NOT_FOUND))
 
     assert eintraege(db)[buch_id].missing
 
@@ -66,7 +66,7 @@ def test_one_source_finding_it_is_no_question(db: Store) -> None:
     sie führt die meisten nicht. Eine Meldung je Quelle hätte jeden Titel jeden
     Tag gemeldet, genau der Fehler aus Ticket 04."""
     buch_id = eintrag(db, "Die Straße", beam=str(LinkOutcome.LINKED),
-                      voebb=str(LinkOutcome.NOT_FOUND))
+                      onleihe=str(LinkOutcome.NOT_FOUND))
 
     assert not eintraege(db)[buch_id].missing
 

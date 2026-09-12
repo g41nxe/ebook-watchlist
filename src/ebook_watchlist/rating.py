@@ -63,6 +63,21 @@ DEFAULT_THRESHOLD = 3
 #: sondern "nachgesehen und es steht nirgends" (bewertungsschema.md, 3).
 BELEGT, TEILS, VERMUTET = "belegt", "teils", "vermutet"
 
+#: Wie das der Leserin gesagt wird. Die gespeicherten Werte bleiben, wie sie
+#: sind — sie stehen im Bewertungsschema, im Prompt und in tausend Zeilen der
+#: Datenbank. Gezeigt wird ein Wort, das fuer sich steht: "teils" allein neben
+#: vier Sternen beantwortet keine Frage, "teilweise belegt" schon.
+CONFIDENCE_LABELS: dict[str, str] = {
+    BELEGT: "im Text belegt",
+    TEILS: "teilweise belegt",
+    VERMUTET: "nur vermutet",
+}
+
+
+def confidence_label(confidence: str) -> str:
+    """Das Wort fuer die Leserin. Unbekanntes bleibt, wie es ist."""
+    return CONFIDENCE_LABELS.get(confidence, confidence)
+
 # Die Herkunft steht in ``ratings`` — der Store braucht sie und darf
 # dieses Modul nicht importieren.
 
@@ -338,6 +353,31 @@ def prompt_for_many(
     )
 
 
+def _json_object(text: str):
+    """Das JSON-Objekt aus einer Modellantwort — mit einer einzigen Nachsicht.
+
+    Das Modell schuetzt Apostrophe in seiner Begruendung mitunter mit einem
+    Backslash, und das ist in JSON kein Escape. Gemessen an einem echten
+    Urteil ueber "Das Knochenband": fuenf Felder, richtige Sterne, tadellose
+    Begruendung — und es kostete das ganze Urteil, im Lauf still als "ohne
+    Urteil".
+
+    Genau diese eine Lesart wird nachgesehen, weil sie keine zweite hat. Wer
+    weiter flickt, faengt an zu raten, und dann ist unbewertet ehrlicher
+    (ADR 7).
+    """
+    match = re.search(r"\{.*\}", text, re.S)
+    if match is None:
+        raise RatingUnavailable("Antwort enthält kein JSON")
+    try:
+        return json.loads(match.group(0))
+    except ValueError as exc:
+        try:
+            return json.loads(match.group(0).replace(r"\'", "'"))
+        except ValueError:
+            raise RatingUnavailable(f"Antwort ist kein gültiges JSON: {exc}") from exc
+
+
 def parse_many(
     text: str, observations: Sequence[Observation], version: int, scheme: Scheme
 ) -> dict[tuple[str, str], Rating]:
@@ -351,13 +391,7 @@ def parse_many(
     Was fehlt, fehlt: der Aufrufer behandelt jedes Buch ohne Urteil als
     unbewertet und zeigt es trotzdem.
     """
-    match = re.search(r"\{.*\}", text, re.S)
-    if match is None:
-        raise RatingUnavailable("Antwort enthält kein JSON")
-    try:
-        data = json.loads(match.group(0))
-    except ValueError as exc:
-        raise RatingUnavailable(f"Antwort ist kein gültiges JSON: {exc}") from exc
+    data = _json_object(text)
     if not isinstance(data, dict):
         raise RatingUnavailable("Antwort ist kein Objekt mit Buchnummern")
 
@@ -379,13 +413,7 @@ def parse_answer(text: str, version: int, scheme: Scheme) -> Rating:
     Eine unlesbare Antwort ist kein Anlass zu raten: sie fuehrt dazu, dass das
     Buch unbewertet bleibt und trotzdem erscheint.
     """
-    match = re.search(r"\{.*\}", text, re.S)
-    if match is None:
-        raise RatingUnavailable("Antwort enthält kein JSON")
-    try:
-        data = json.loads(match.group(0))
-    except ValueError as exc:
-        raise RatingUnavailable(f"Antwort ist kein gültiges JSON: {exc}") from exc
+    data = _json_object(text)
 
     try:
         stars = int(data["stars"])
@@ -617,6 +645,12 @@ class ClaudeCodeRater:
                 f"{self.executable} antwortete nicht in {self.timeout}s"
             ) from exc
         if completed.returncode != 0:
+            # Die Huelle nennt den Grund auch dann noch, wenn der Rueckgabewert
+            # schon Alarm schlaegt — und sie ist die einzige, die ihn nennt:
+            # "Not logged in · Please run /login" stand in stdout, stderr blieb
+            # leer, und uebrig blieb die nichtssagende Zeile "claude endete mit
+            # 1". Wirft sie nicht, faellt es auf die Zeile darunter zurueck.
+            _cli_text(completed.stdout)
             detail = (completed.stderr or "").strip().splitlines()
             raise RatingUnavailable(
                 f"{self.executable} endete mit {completed.returncode}"

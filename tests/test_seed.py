@@ -207,7 +207,7 @@ def test_seeding_is_per_source(store: Store) -> None:
 
     store.mark_interest_seeded(carter.id, "beam", now=NOW)
 
-    assert store.is_interest_seeded(carter.id, "voebb") is False
+    assert store.is_interest_seeded(carter.id, "onleihe") is False
 
 
 # --- was der Review gefunden hat -------------------------------------------
@@ -230,7 +230,7 @@ def test_a_hyphenated_author_is_not_guessed_at() -> None:
 
 
 def test_a_restriction_names_the_kind_of_source_not_its_name(store: Store) -> None:
-    """"voebb" und "beam" hart einzutragen wäre bei jeder umbenannten Quelle
+    """"onleihe" und "beam" hart einzutragen wäre bei jeder umbenannten Quelle
     falsch gewesen. Wie eine Quelle heißt, sagt die Konfiguration."""
     seed(
         store,
@@ -240,7 +240,7 @@ def test_a_restriction_names_the_kind_of_source_not_its_name(store: Store) -> No
     )
     relation = store.relations("t", kind=str(RelationKind.WATCHING))[0]
     assert '"restrict": "library"' in relation.details
-    assert "voebb" not in relation.details
+    assert "onleihe" not in relation.details
 
 
 def test_relation_details_are_validated_too(store: Store) -> None:

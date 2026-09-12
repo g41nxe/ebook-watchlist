@@ -1,0 +1,52 @@
+{# Was die Quellen über dieses Buch gesagt haben, eine Zeile je Sichtung.
+
+   Eine Stelle für Buch- und Fundseite (Issue #9). Immer mit Inhalt: die
+   Buchseite fragt vorher `has_history`, und einen Fund ohne Beobachtung gibt
+   es nicht — er entsteht ja aus einer. Gezeigt werden die letzten fünf: der Snapshot ist anhängend (ADR 5) und wird nie kürzer, die Seite muss
+   es sein — ein Titel, der seit elf Läufen dasselbe kostet, hatte elf Zeilen
+   mit elfmal demselben Betrag.
+
+   Der Wrapper durfte schon scrollen, die Tabelle wollte nur nicht: mit
+   `w-full` allein schrumpfte sie auf die Breite des Telefons, und dort zerfiel
+   „4,99 €" in zwei Zeilen und die Kopfzelle „Dort anders genannt" in drei.
+   Eine Mindestbreite lässt sie stattdessen scrollen.
+#}
+{% macro beobachtungen(sichtungen, verborgen=0) %}
+<div class="overflow-x-auto">
+<table class="w-full min-w-xl border-collapse text-sm whitespace-nowrap">
+  <thead>
+    <tr class="border-b border-rule text-left text-soft">
+      <th class="py-1.5 pr-3 font-semibold">Wann</th>
+      <th class="py-1.5 pr-3 font-semibold">Quelle</th>
+      <th class="py-1.5 pr-3 font-semibold">Preis</th>
+      <th class="py-1.5 pr-3 font-semibold">Bibliothek</th>
+      <th class="py-1.5 font-semibold">Dort anders genannt</th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-hair">
+    {% for sighting in sichtungen %}
+    <tr class="align-top">
+      <td class="py-2 pr-3 tabular-nums whitespace-nowrap text-soft">
+        {{ sighting.when.strftime("%d.%m. %H:%M") if sighting.when else "" }}</td>
+      <td class="py-2 pr-3">{{ sighting.source }}</td>
+      <td class="py-2 pr-3 tabular-nums {{ 'text-amber' if sighting.deal }}">
+        {{ sighting.price or "—" }}</td>
+      <td class="py-2 pr-3 {{ 'text-accent' if sighting.availability == 'ausleihbar' }}">
+        {{ sighting.availability or "—" }}</td>
+      {# Nur, wenn die Quelle anders benennt — sonst wiederholte die Spalte in
+         jeder Zeile denselben Titel, und der eine Fall, auf den es ankommt,
+         ginge darin unter (ADR 9). #}
+      <td class="py-2 whitespace-normal
+                 {{ 'text-danger' if sighting.other_title else 'text-soft' }}">
+        {{ sighting.other_title or "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if verborgen %}
+{# Nicht verschwiegen, nur nicht gezeigt: der Snapshot behält jede Sichtung. #}
+<p class="mt-2 text-xs text-soft">
+  {{ verborgen }} ältere Sichtung{{ "en" if verborgen > 1 }} nicht gezeigt.</p>
+{% endif %}
+{% endmacro %}

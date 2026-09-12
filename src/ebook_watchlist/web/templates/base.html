@@ -39,27 +39,53 @@
   <symbol id="ic-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-.9 4.6"/><path d="M20 5v6h-6"/></symbol>
   <symbol id="ic-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   <symbol id="ic-hourglass" viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3v4l4 5 4-5V3M8 21v-4l4-5 4 5v4"/></symbol>
+  <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></symbol>
+  {# Beobachten heisst: von weitem im Blick behalten. Die Lupe sagt "suchen",
+     das Fernglas "im Auge behalten" — und es ist bei 16 px noch als Paar
+     Linsen erkennbar. #}
+  <symbol id="ic-binoculars" viewBox="0 0 24 24"><path d="M9.5 4.5h-3l-2.2 7.5M14.5 4.5h3l2.2 7.5"/><circle cx="6.3" cy="15.5" r="4.3"/><circle cx="17.7" cy="15.5" r="4.3"/><path d="M10.8 15.5h2.4"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6"/></symbol>
+  {# "Mag ich" und "Kein Interesse": ein Herz und ein durchgestrichener Kreis.
+     Kein zweites Kreuz fuer "Kein Interesse" — das traegt "Ausgeschlossen",
+     und die beiden sagen Verschiedenes: das eine ein Urteil ueber das Buch,
+     das andere eine Anweisung ans Werkzeug. #}
+  <symbol id="ic-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.7-7.5-9.5A4.5 4.5 0 0 1 12 7.6a4.5 4.5 0 0 1 7.5 2.9C19.5 15.3 12 20 12 20z"/></symbol>
+  {# Pfeil aus einem Kasten heraus: das uebliche Zeichen dafuer, dass ein Link
+     die Anwendung verlaesst. #}
+  <symbol id="ic-extern" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="ic-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m6 18 12-12"/></symbol>
 </svg>
 
 <header class="sticky top-0 z-20 border-b border-rule bg-card/85 backdrop-blur">
-  {# Auf dem Telefon bricht die Navigation in eine eigene Reihe. Vorher stand
-     alles in einer Zeile ohne Umbruch, und die schmalste Breite, in die das
-     passte, war 451 px: ein Telefon mit 375 px zoomte deshalb *jede* Seite
-     heraus, statt sie zu zeigen. Die vier Links brauchen zusammen rund 306 px
-     und haben in einer eigenen Reihe 327 px zur Verfuegung. #}
-  <div class="mx-auto flex max-w-3xl flex-wrap items-center gap-x-3 gap-y-1
-              px-6 py-2 sm:py-3">
+  {# Auf dem Telefon steht alles in *einer* Reihe: Zeichen und vier Links.
+     Vorher brach die Navigation darunter um, und die Kopfzeile kostete 105 der
+     812 Pixel des Bildschirms — ein Achtel fuer einen Namen, den man nach dem
+     ersten Blick kennt.
+
+     Die Rechnung bei 375 px, also 327 px Inhalt: die Links messen 294 px, mit
+     `px-1.5` statt `px-2.5` sind es 262, dazu drei Zwischenraeume (12) und das
+     Zeichen mit 28 px plus Abstand (36) — zusammen 310. Wer einen fuenften
+     Punkt hinzufuegt, muss neu rechnen. #}
+  <div class="mx-auto flex max-w-3xl flex-wrap items-center gap-x-2 gap-y-1
+              px-6 py-2 sm:gap-x-3 sm:py-3">
     {# Der Namensgeber, und hier nicht dieselbe Datei wie im Tab.
        Urspruenglich war es eine: ein Zeichen, das die Anwendung meint, sollte
        nicht zweimal gezeichnet sein. Der Vogel traegt die 40 px der Kopfzeile,
        aber nicht die 16 des Tabs — dort zerfaellt er zu einem Kruemel, waehrend
        das gezeichnete Zeichen als Rechteck mit Abzeichen lesbar bleibt.
        Zwei Groessen, zwei Zeichen; wer eines aendert, muss ans andere
-       denken. #}
-    <img src="{{ url_for('static', path='buchfink.png') }}?v={{ asset_version }}"
-         alt="" width="40" height="40" class="h-10 w-10 shrink-0">
-    <div>
-      <div class="font-semibold tracking-tight">Buchfink</div>
+       denken.
+
+       Zeichen und Name fuehren auf die Startseite. Der Punkt "Home" tut das
+       auch: das Zeichen weiss man erst nach dem ersten Klick, und die Reihe
+       traegt vier Punkte, seit die Uebersicht aus dem Menue ist. #}
+    <a href="/" title="Zur Startseite" class="shrink-0">
+      <img src="{{ url_for('static', path='buchfink.png') }}?v={{ asset_version }}"
+           alt="" width="40" height="40" class="h-7 w-7 sm:h-10 sm:w-10"></a>
+    {# Der Name steht auf dem Telefon nicht: der Vogel daneben sagt dasselbe,
+       und die 100 px, die "Buchfink" braucht, fehlen der Navigation. #}
+    <div class="hidden sm:block">
+      <div class="font-semibold tracking-tight"><a href="/">Buchfink</a></div>
       {# Die Zeile der Anwendung, auf jeder Seite dieselbe. Vorher stand hier
          der Profilname — der ist auf jeder Seite ebenfalls derselbe und hat
          nie etwas unterschieden. `error.html` setzt den Block trotzdem um:
@@ -72,20 +98,46 @@
         Weniger Suchen. Mehr Lesen.</div>
       {% endblock %}
     </div>
-    {# Volle Breite auf dem Telefon, damit die Reihe umbricht statt zu
-       ueberlaufen; ab `sm` sitzt sie wieder rechts in derselben Zeile. #}
-    <nav class="flex w-full flex-wrap gap-1 text-sm sm:ml-auto sm:w-auto">
+    {# Auf dem Telefon nimmt die Navigation den Rest der Reihe, ab `sm` sitzt
+       sie rechts in derselben Zeile. #}
+    <nav class="flex flex-1 flex-wrap justify-end gap-1 text-sm
+                sm:ml-auto sm:flex-none sm:justify-start">
       {% set pfad = request.url.path %}
-      {% for ziel, name in (("/", "Übersicht"), ("/watchlist", "Watchlist"),
+      {% for ziel, name in (("/", "Home"), ("/watchlist", "Watchlist"),
                             ("/vorschlaege", "Vorschläge"), ("/profil", "Profil")) %}
       {# Wo man steht, stand bisher nirgends — vier gleich aussehende Links.
          `aria-current` sagt es der Vorlesehilfe, die Farbe dem Auge. #}
       {% set aktiv = pfad == ziel %}
       <a href="{{ ziel }}"{% if aktiv %} aria-current="page"{% endif %}
-         class="tun inline-flex h-7 items-center rounded px-2.5
+         class="tun inline-flex h-7 items-center rounded px-1.5 sm:px-2.5
                 hover:bg-hair hover:text-ink
                 {{ 'bg-hair text-ink' if aktiv else 'text-soft' }}">{{ name }}</a>
       {% endfor %}
+
+      {# Eine fremde Anwendung, kein Buchfink-Punkt — deshalb bewusst anders:
+         abgesetzt durch einen Strich, umrandet statt flach, mit dem Pfeil, der
+         "verlaesst die Seite" heisst, und in einem neuen Tab. Wer die Kopfzeile
+         ueberfliegt, soll nicht erst beim Klicken merken, dass er woanders
+         landet. Ohne `EBW_CWA_URL` steht hier nichts.
+
+         **Auf dem Telefon nur das Symbol.** Die Rechnung oben schliesst mit
+         "wer einen fuenften Punkt hinzufuegt, muss neu rechnen" — dieser Punkt
+         ist der fuenfte, und mit dem Wort "CWA" mass die Navigation 301 px in
+         einem Container von 291: sie brach in zwei Zeilen um, und die
+         Kopfzeile war wieder 108 px hoch. Genau die Regression, die `4e2ea5e`
+         behoben hatte. Das Symbol allein sagt ohnehin, was der Punkt tut; den
+         Namen traegt `aria-label` fuer die Vorlesehilfe und `title` fuer die
+         Maus. #}
+      {% if cwa_url %}
+      <a href="{{ cwa_url }}" target="_blank" rel="noopener"
+         title="Calibre-Web-Automated — die eigene Sammlung, in neuem Tab"
+         aria-label="Calibre-Web-Automated — die eigene Sammlung, in neuem Tab"
+         class="tun ml-1 inline-flex h-7 items-center gap-1 rounded border
+                border-rule px-1.5 text-soft sm:ml-2 sm:px-2.5
+                hover:border-soft hover:text-ink">
+        <span class="hidden sm:inline">CWA</span>
+        <svg class="i text-[0.85em] opacity-70"><use href="#ic-extern"/></svg></a>
+      {% endif %}
     </nav>
   </div>
 </header>

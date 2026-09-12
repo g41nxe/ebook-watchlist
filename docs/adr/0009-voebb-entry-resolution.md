@@ -1,5 +1,12 @@
 # 9. VÖBB Entry Resolution
 
+> **Nachtrag:** „Es gibt keine JSON-Schnittstelle" ist unten eine Feststellung
+> über die **Onleihe**, keine Regel gegen Schnittstellen. Die zweite
+> Bibliothek, OverDrive, hat eine und wird über sie gefragt — die Begründung
+> steht in **ADR 31**. Ebenfalls seit der zweiten Bibliothek: der Quellname ist
+> `onleihe`, nicht `voebb`, und eine übereinstimmende ISBN entscheidet die
+> Zuordnung dort, wo der Titelvergleich an einer Übersetzung scheitert.
+
 A Watchlist Entry is resolved to a concrete Onleihe title automatically from the
 title + author the user typed. No manual URL entry.
 

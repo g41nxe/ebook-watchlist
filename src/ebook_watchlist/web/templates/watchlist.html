@@ -12,17 +12,20 @@
 
 <form method="post" action="/watchlist/add"
       class="mb-8 flex flex-wrap items-end gap-3 rounded-lg border border-rule bg-card p-4">
-  <label class="flex flex-col gap-1">
+  {# Auf dem Telefon volle Breite: mit fester Breite blieben rechts neben
+     jedem Feld 90 Pixel Nichts, und zwei Felder untereinander sahen aus wie
+     zwei verschiedene Formulare. #}
+  <label class="flex w-full flex-col gap-1 sm:w-auto">
     <span class="text-xs font-medium text-soft">Titel</span>
     <input name="title" required autocomplete="off"
-           class="w-52 rounded border border-rule bg-paper h-9 px-2 text-sm text-ink
-                  outline-none focus:border-accent">
+           class="w-full rounded border border-rule bg-paper h-9 px-2 text-sm text-ink
+                  outline-none focus:border-accent sm:w-52">
   </label>
-  <label class="flex flex-col gap-1">
+  <label class="flex w-full flex-col gap-1 sm:w-auto">
     <span class="text-xs font-medium text-soft">Autor:in</span>
     <input name="author" autocomplete="off"
-           class="w-52 rounded border border-rule bg-paper h-9 px-2 text-sm text-ink
-                  outline-none focus:border-accent">
+           class="w-full rounded border border-rule bg-paper h-9 px-2 text-sm text-ink
+                  outline-none focus:border-accent sm:w-52">
   </label>
   {# Knopf und Hinweis in einer eigenen Gruppe: das Formular richtet seine
      Felder an der Unterkante aus (`items-end`), und daran haengend sass der

@@ -37,7 +37,7 @@ from .render import render_html, render_text
 from .seed import seed
 from .sources import build_sources
 from .sources.base import RunContext
-from .store import Store
+from .store import ENTRY_TRIGGER, Store
 
 EXIT_OK = 0
 EXIT_ALREADY_RUNNING = 0
@@ -93,6 +93,18 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--skip-probes",
         action="store_true",
         help="do not self-check the Sources before the Run",
+    )
+    parser.add_argument(
+        "--fruehestens-nach",
+        type=float,
+        default=None,
+        metavar="STUNDEN",
+        help=(
+            "nicht laufen, wenn der letzte Lauf weniger als so viele Stunden "
+            "her ist. Voreinstellung: die Kadenz aus dem Profil "
+            "('run_every_hours') bei '--trigger cron', sonst keine Grenze. "
+            "0 schaltet sie ab"
+        ),
     )
     parser.add_argument(
         "--trigger",
@@ -259,11 +271,17 @@ def _ask_the_library(store: Store, client: HttpClient, profile: Profile) -> None
     print(f"DNB: {len(offen)} gefragt, {gefunden} beantwortet")
 
 
-def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
+def _apply_gate(store: Store, deltas, profile: Profile, now: datetime, sources=()):
     """Entdeckungen gegen das Leseprofil pruefen (ADR 19).
 
     Ohne Schluessel gibt es kein Tor — dann bleibt alles unbewertet und wird
     gezeigt. Das ist der Zustand vor Ticket 12 und ausdruecklich erlaubt.
+
+    Die Quellen gehen mit, damit das Tor den ganzen Klappentext holen kann,
+    bevor es urteilt: die Kachel einer Trefferliste traegt im Median 197
+    Zeichen und ist zu 85 % abgeschnitten, die Detailseite rund das Zehnfache.
+    Es sind hoechstens so viele Anfragen wie das Budget Buecher zulaesst, und
+    es sind dieselben, die der Rueckstands-Schritt sonst spaeter stellt.
     """
     rater = build_rater(profile.rating_model)
     if rater is None:
@@ -283,6 +301,11 @@ def _apply_gate(store: Store, deltas, profile: Profile, now: datetime):
         budget=profile.rating_budget,
         batch_size=profile.rating_batch_size,
         now=now,
+        full_blurbs=(
+            lambda observations: _with_full_blurbs(store, profile, observations, sources)
+        )
+        if sources
+        else None,
     )
     if report.held_back or report.over_budget:
         # Fuer das Log. Was die Leserin sehen muss, steht im Digest — stderr
@@ -346,6 +369,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _dismissals(profile, sources)
         if args.command == "rate":
             return _rate(profile, args.anzahl, sources, client)
+        if zu_frueh := _too_soon(profile, datetime.now(), _gap(args, profile)):
+            print(zu_frueh)
+            return EXIT_OK
         try:
             return _run(
                 profile,
@@ -362,6 +388,60 @@ def main(argv: Sequence[str] | None = None) -> int:
             return EXIT_CONFIG_ERROR
     finally:
         lock.release()
+
+
+def _gap(args, profile) -> float:
+    """Wie viele Stunden dieser Aufruf abwarten muss.
+
+    Die Taktung steckt nicht im Wirt, sondern hier: das Journal weiss, wann
+    zuletzt gelaufen wurde, und die Kadenz steht im Profil
+    (``run_every_hours``). Ein Wirt darf deshalb dumm sein und oft rufen — er
+    fragt, der Lauf entscheidet. Das ist zugleich der einzige Weg, auf dem
+    eine geaenderte Kadenz sofort gilt, ohne dass irgendwo ein Zeitplan
+    nachgezogen werden muss (ADR 4).
+
+    Die Grenze gilt der **Maschine**, nicht der Leserin. Wer `ebw` tippt oder
+    auf der Startseite "Lauf jetzt starten" drueckt, hat sich entschieden —
+    ein Knopf, der den ganzen Tag ueber nichts tut, ist kaputt, egal wie gut
+    der Grund ist. Ausdruecklich gesetzt gewinnt die Zahl in jedem Fall.
+    """
+    if args.fruehestens_nach is not None:
+        return args.fruehestens_nach
+    return profile.run_every_hours if args.trigger == "cron" else 0
+
+
+def _too_soon(profile, now: datetime, stunden: float) -> str:
+    """Ob seit dem letzten Rundgang zu wenig Zeit vergangen ist.
+
+    Zurück kommt der Satz, der das erklärt — leer heißt: los.
+
+    Gezählt werden nur Rundgänge. Ein **Eintrag** ist keiner: den schreiben der
+    enge Lauf und das Nachladen eines Klappentextes, und zählten sie mit, fiele
+    der tägliche Lauf aus, weil die Leserin abends einmal „nachsehen" gedrückt
+    hat (dieselbe Unterscheidung wie in ``last_finished_run``).
+
+    Kein Fehler, sondern eine Auskunft: der Rückgabewert bleibt 0. Wer zu dicht
+    taktet, tut ja nichts Falsches — er ist nur zu eifrig, und eine
+    Fehlermeldung dafür machte aus jedem zweiten Cron-Lauf einen Alarm.
+    """
+    if stunden <= 0:
+        return ""
+    letzter = next(
+        (
+            run
+            for run in Store(paths.db_path()).recent_runs(profile.slug, limit=20)
+            if run.trigger != ENTRY_TRIGGER
+        ),
+        None,
+    )
+    if letzter is None or letzter.started_at is None:
+        return ""
+    if now - letzter.started_at >= timedelta(hours=stunden):
+        return ""
+    return (
+        f"Lauf übersprungen — der letzte ist von {letzter.started_at:%d.%m. %H:%M} "
+        f"und damit keine {stunden:g} Stunden her (--fruehestens-nach 0 läuft trotzdem)."
+    )
 
 
 def _dismissals(profile, sources) -> int:
@@ -424,7 +504,13 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
 
     print(f"{len(offen)} Klappentexte nachladen …")
     now = datetime.now()
-    run_id = store.start_run(profile.slug, "cli", now, pid=os.getpid())
+    # Als Eintrag, nicht als Rundgang: die Beobachtungen brauchen eine Zeile
+    # im Journal, aber diese Zeile darf nicht als *der* letzte Lauf gelten.
+    # Seit das Tor die Klappentexte mitten im Lauf nachlaedt, waere sie sonst
+    # genau das — frueher fertig als der Rundgang, der sie angestossen hat,
+    # und die Startseite meldete "zuletzt geprueft … 0 Aenderungen"
+    # (dieselbe Unterscheidung wie beim engen Lauf, Ticket 51).
+    run_id = store.start_run(profile.slug, ENTRY_TRIGGER, now, pid=os.getpid())
     geholt: dict[tuple[str, str], Observation] = {}
     frisch: list[Observation] = []
     for observation in offen:
@@ -433,6 +519,13 @@ def _with_full_blurbs(store: Store, profile: Profile, observations, sources):
             continue
         try:
             item = source.item(observation.source_item_id)
+        except RateLimited:
+            # 429 heisst Halt, und zwar fuer alles Weitere — dieselbe Regel wie
+            # bei den Titelbildern und bei der DNB (ADR 7). Seit das Tor die
+            # Texte mitten im Lauf nachlaedt, waeren es sonst vierzig
+            # abgelehnte Anfragen hintereinander an dieselbe Quelle.
+            print("Klappentexte: die Quelle drosselt — Rest übersprungen", file=sys.stderr)
+            break
         except Exception as exc:  # noqa: BLE001 - ein Buch, nicht der Stapel
             print(f"  {observation.title[:44]}: {type(exc).__name__}", file=sys.stderr)
             continue
@@ -475,7 +568,7 @@ def _record_foreign_ratings(store: Store, observations: Sequence[Observation]) -
     Anzahl fehlt, wird nichts geschrieben — ein Schnitt ohne sie ist keine
     Auskunft.
     """
-    from .ratings import BY_LIBRARY_READERS, subject_of
+    from .ratings import BY_ONLEIHE_READERS, subject_of
 
     now = datetime.now()
     for observation in observations:
@@ -495,7 +588,7 @@ def _record_foreign_ratings(store: Store, observations: Sequence[Observation]) -
             reason=f"Durchschnitt der Leser:innen aus {stimmen} Stimmen",
             profile_version=0,
             now=now,
-            origin=BY_LIBRARY_READERS,
+            origin=BY_ONLEIHE_READERS,
             votes=stimmen,
         )
 
@@ -894,7 +987,14 @@ def _run(
     # Das Tor sitzt hinter dem Snapshot: ein Ausfall kostet ein Urteil, nie
     # Geschichte. Und hinter der Preisregel: ein Buch zu bewerten, das ohnehin
     # niemand zu sehen bekommt, waere Verschwendung (ADR 19).
-    deltas, gate_report = _apply_gate(store, deltas, profile, started_at)
+    deltas, gate_report = _apply_gate(store, deltas, profile, started_at, sources)
+
+    # Erst hinter dem Tor, denn erst dann steht fest, was im Stapel bleibt.
+    # Bis hierher wurden Bilder fuer Funde nur beim Beurteilen des Rueckstands
+    # geholt — das Tor im Lauf beurteilt aber selbst, und was es durchliess,
+    # stand danach ohne Bild da.
+    _fetch_suggestion_covers(store, profile, client)
+
     for source_name, interest_id in context.swept:
         store.mark_interest_seeded(interest_id, source_name, now=started_at)
 

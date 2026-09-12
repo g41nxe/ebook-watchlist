@@ -198,6 +198,10 @@ class RunLauncher:
             extra = {"start_new_session": True}
         with log.open("wb") as sink:
             return subprocess.Popen(  # noqa: S603 - fixed argv, no user input
+                # ``--trigger ui`` ist hier nicht nur eine Notiz fuer das
+                # Journal: der Mindestabstand zwischen zwei Rundgaengen
+                # (``run.MIN_RUN_GAP``) gilt nur ``cron``. Hier hat ein Mensch
+                # gedrueckt, und der meint es.
                 [sys.executable, "-m", "ebook_watchlist.run", "--trigger", "ui"],
                 stdin=subprocess.DEVNULL,
                 stdout=sink,

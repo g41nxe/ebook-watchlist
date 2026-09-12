@@ -2,6 +2,7 @@
 {% block title %}Profil — Buchfink{% endblock %}
 
 {% block content %}
+{% from "_abschnitt.html" import abschnitt %}
 <h1 class="mb-1 font-serif text-2xl font-semibold tracking-tight">Profil</h1>
 <p class="mb-6 max-w-xl text-sm text-soft">
   Was das Werkzeug über dich zu wissen glaubt.
@@ -82,9 +83,7 @@
 
 </div>
 
-<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  <svg class="i"><use href="#ic-user"/></svg>Autor:innen
-</h2>
+{{ abschnitt("Autor:innen", "ic-user") }}
 {% if not view.authors %}
 <p class="py-2 text-sm text-soft italic">Keine hinterlegt.</p>
 {% endif %}
@@ -103,9 +102,7 @@
   {% endfor %}
 </ul>
 
-<h2 class="mt-8 mb-3 flex items-center gap-2 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  <svg class="i"><use href="#ic-tag"/></svg>Themen
-</h2>
+{{ abschnitt("Themen", "ic-tag") }}
 {% if not view.themen %}
 <p class="py-2 text-sm text-soft italic">Keine hinterlegt.</p>
 {% endif %}
@@ -118,9 +115,7 @@
   {% endfor %}
 </ul>
 
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  Wann etwas gemeldet wird
-</h2>
+{{ abschnitt("Wann etwas gemeldet wird", "ic-clock") }}
 <dl class="space-y-2 text-sm">
   <div class="flex flex-wrap gap-x-3">
     <dt class="w-52 shrink-0 text-soft">Schnäppchen ohne Nachfrage</dt>
@@ -138,9 +133,7 @@
 </dl>
 
 {% if view.no_gos %}
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  Gegenanzeigen
-</h2>
+{{ abschnitt("Gegenanzeigen", "ic-warn") }}
 <ul class="flex flex-wrap gap-2">
   {% for no_go in view.no_gos %}
   <li class="rounded border border-rule px-2 py-0.5 text-sm text-soft">{{ no_go }}</li>
@@ -150,9 +143,7 @@
 
 {# Zwei Dokumente, nicht eins (ADR 21): das Leseprofil sagt, wonach geurteilt
    wird, das Bewertungsschema wie. Nur das erste traegt eine Version. #}
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  Das Leseprofil
-</h2>
+{{ abschnitt("Das Leseprofil", "ic-doc") }}
 {% if view.leseprofil %}
 <div class="rounded-lg border border-rule bg-card px-5 py-4">
   <p class="mb-3 text-sm text-soft">
@@ -175,7 +166,7 @@
   <details>
     <summary class="cursor-pointer text-sm text-accent">Leseprofil anzeigen</summary>
     <pre class="mt-3 max-h-[32rem] overflow-auto rounded bg-paper p-4 text-xs
-                leading-relaxed whitespace-pre-wrap text-ink/90">{{ view.leseprofil }}</pre>
+                leading-relaxed whitespace-pre-wrap text-ink">{{ view.leseprofil }}</pre>
   </details>
 </div>
 {% else %}
@@ -184,9 +175,7 @@
 </p>
 {% endif %}
 
-<h2 class="mt-8 mb-3 border-b border-rule pb-2 text-sm font-semibold text-soft">
-  Das Bewertungsschema
-</h2>
+{{ abschnitt("Das Bewertungsschema", "ic-star") }}
 {% if view.scheme %}
 <div class="rounded-lg border border-rule bg-card px-5 py-4">
   <p class="mb-3 text-sm text-soft">
@@ -198,7 +187,7 @@
   <details>
     <summary class="cursor-pointer text-sm text-accent">Bewertungsschema anzeigen</summary>
     <pre class="mt-3 max-h-[32rem] overflow-auto rounded bg-paper p-4 text-xs
-                leading-relaxed whitespace-pre-wrap text-ink/90">{{ view.scheme }}</pre>
+                leading-relaxed whitespace-pre-wrap text-ink">{{ view.scheme }}</pre>
   </details>
 </div>
 {% else %}

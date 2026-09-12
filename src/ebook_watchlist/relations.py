@@ -53,6 +53,37 @@ RELATION_LABELS: dict[RelationKind, str] = {
 }
 
 
+#: Was auf dem **Knopf** steht, der ein Buch in eine Beziehung bringt —
+#: auf *jedem* Knopf: Stapel, Startseite, Watchlist-Menue, Fund- und Buchseite
+#: (Issue #5, ADR 29 mit Nachtrag).
+#:
+#: Zwei Listen mit klarer Zustaendigkeit, nicht vier Fassungen einer. Der
+#: Zustandsname oben antwortet auf "was ist dieses Buch fuer mich?" und steht,
+#: wo Buecher beschrieben werden — im Profil, in "Frueher: …", im Tagesbericht
+#: — wie ein Regalschild. Der Knopf antwortet auf "was tust du damit?" und
+#: traegt ein Taetigkeitswort. "Hab ich" verstoesst absichtlich gegen die Regel
+#: oben: die galt fuer Regalschilder; auf einem Knopf ist der Ich-Satz die
+#: Antwort, nicht der Name.
+#:
+#: Bei `liked` und `disliked` fallen beide Rollen auf dasselbe Wort: "Mag ich"
+#: ist Regalschild und Antwort zugleich. Das ist keine Drift, sondern ein Wort,
+#: das beides kann — die Listen duerfen sich treffen, sie duerfen nur nicht
+#: die Rollen tauschen.
+ACTION_LABELS: dict[RelationKind, str] = {
+    # "Ausschliessen", nicht "Verwerfen": verworfen wird ein Vorschlag,
+    # ausgeschlossen ein Buch — und genau das tut der Knopf, bei jeder Quelle
+    # und dauerhaft (ADR 18). Der Zustandsname daneben heisst "Ausgeschlossen".
+    RelationKind.DISMISSED: "Ausschließen",
+    RelationKind.OWNED: "Hab ich",
+    RelationKind.WATCHING: "Beobachten",
+    RelationKind.LIKED: "Mag ich",
+    # "Doof" statt "Kein Interesse": das Gegenstueck zu "Mag ich" ist ein
+    # Urteil ueber das Buch, kein hoeflicher Rueckzug — und "kein Interesse"
+    # klingt wie "nicht mehr zeigen", was der Knopf daneben tut.
+    RelationKind.DISLIKED: "Doof",
+}
+
+
 def label_of(kind: RelationKind | str) -> str:
     """Wie diese Beziehung heisst. Unbekanntes bleibt, wie es ist."""
     try:
@@ -64,6 +95,11 @@ def label_of(kind: RelationKind | str) -> str:
 def labelled(*kinds: RelationKind) -> tuple[tuple[str, str], ...]:
     """``(schluessel, name)`` in der angegebenen Reihenfolge."""
     return tuple((str(kind), RELATION_LABELS[kind]) for kind in kinds)
+
+
+def labelled_actions(*kinds: RelationKind) -> tuple[tuple[str, str], ...]:
+    """``(schluessel, knopfwort)`` in der angegebenen Reihenfolge."""
+    return tuple((str(kind), ACTION_LABELS[kind]) for kind in kinds)
 
 
 class InterestKey(StrEnum):

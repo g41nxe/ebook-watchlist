@@ -14,10 +14,10 @@ from ebook_watchlist.config import WatchlistEntry
 from ebook_watchlist.http import NotFound
 from ebook_watchlist.models import Availability
 from ebook_watchlist.sources.base import SourceStructureError
-from ebook_watchlist.sources.voebb import parse
-from ebook_watchlist.sources.voebb.source import VoebbSource, title_id_from_url
+from ebook_watchlist.sources.onleihe import parse
+from ebook_watchlist.sources.onleihe.source import OnleiheSource, title_id_from_url
 
-FIXTURES = Path(__file__).parent / "fixtures" / "voebb"
+FIXTURES = Path(__file__).parent / "fixtures" / "onleihe"
 
 
 def fixture(name: str) -> str:
@@ -121,17 +121,17 @@ def test_title_id_is_extracted_from_the_detail_url() -> None:
 
 def test_check_reads_the_pinned_detail_page() -> None:
     client = StubClient(fixture("detail-unavailable.html"))
-    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    source = OnleiheSource(client=client)  # type: ignore[arg-type]
     entry = WatchlistEntry(
         title="Die sieben Schwestern",
         author="Lucinda Riley",
-        resolved_links={"voebb": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
+        resolved_links={"onleihe": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
     )
 
     observation = source.check(entry)
 
     assert observation is not None
-    assert observation.source == "voebb"
+    assert observation.source == "onleihe"
     assert observation.source_item_id == "373164461"
     assert observation.availability is Availability.UNAVAILABLE
     assert observation.reservation_count == 16
@@ -142,11 +142,11 @@ def test_check_reads_the_pinned_detail_page() -> None:
 
 def test_check_reports_the_scraped_title_so_a_bad_resolve_is_visible() -> None:
     client = StubClient(fixture("detail-available.html"))
-    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    source = OnleiheSource(client=client)  # type: ignore[arg-type]
     entry = WatchlistEntry(
         title="Ganz anderer Titel",
         author="Jemand Anders",
-        resolved_links={"voebb": "mediaInfo,0-0-1474715999-200-0-0-0-0-0-0-0.html"},
+        resolved_links={"onleihe": "mediaInfo,0-0-1474715999-200-0-0-0-0-0-0-0.html"},
     )
 
     observation = source.check(entry)
@@ -158,7 +158,7 @@ def test_check_reports_the_scraped_title_so_a_bad_resolve_is_visible() -> None:
 
 def test_unpinned_entry_is_skipped_until_resolution_exists() -> None:
     client = StubClient("")
-    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    source = OnleiheSource(client=client)  # type: ignore[arg-type]
 
     assert source.check(WatchlistEntry(title="Noch nicht aufgelöst")) is None
     assert client.requests == []
@@ -171,19 +171,19 @@ def test_a_vanished_title_skips_that_entry_instead_of_failing_the_source() -> No
         def get(self, url: str, params: dict | None = None) -> str:
             raise NotFound(f"{url} answered 404")
 
-    source = VoebbSource(client=GoneClient())  # type: ignore[arg-type]
+    source = OnleiheSource(client=GoneClient())  # type: ignore[arg-type]
     entry = WatchlistEntry(
         title="Aus dem Bestand entfernt",
-        resolved_links={"voebb": "mediaInfo,0-0-999-200-0-0-0-0-0-0-0.html"},
+        resolved_links={"onleihe": "mediaInfo,0-0-999-200-0-0-0-0-0-0-0.html"},
     )
     assert source.check(entry) is None
 
 
 def test_an_unkeyable_link_raises_rather_than_inventing_an_identity() -> None:
     client = StubClient(fixture("detail-available.html"))
-    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    source = OnleiheSource(client=client)  # type: ignore[arg-type]
     entry = WatchlistEntry(
-        title="Falsch gepinnt", resolved_links={"voebb": "irgendwas,0-0-0.html"}
+        title="Falsch gepinnt", resolved_links={"onleihe": "irgendwas,0-0-0.html"}
     )
     with pytest.raises(SourceStructureError, match="title id"):
         source.check(entry)
@@ -211,10 +211,10 @@ def test_a_title_outside_a_series_has_none() -> None:
 
 def test_check_carries_the_series_into_the_observation() -> None:
     client = StubClient(fixture("detail-unavailable.html"))
-    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    source = OnleiheSource(client=client)  # type: ignore[arg-type]
     entry = WatchlistEntry(
         title="Die sieben Schwestern",
-        resolved_links={"voebb": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
+        resolved_links={"onleihe": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
     )
     observation = source.check(entry)
     assert observation is not None
@@ -312,11 +312,11 @@ def test_check_carries_the_blurb_into_the_observation() -> None:
     """Ein Buch, das nur die Bibliothek fuehrt, hat damit einen Klappentext —
     ohne eine einzige zusaetzliche Anfrage."""
     client = StubClient(fixture("detail-available.html"))
-    source = VoebbSource(client=client)  # type: ignore[arg-type]
+    source = OnleiheSource(client=client)  # type: ignore[arg-type]
     entry = WatchlistEntry(
         title="Sieben Richtige",
         author="Volker Jarck",
-        resolved_links={"voebb": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
+        resolved_links={"onleihe": "mediaInfo,0-0-373164461-200-0-0-0-0-0-0-0.html"},
     )
 
     observation = source.check(entry)
