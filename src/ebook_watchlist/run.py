@@ -24,7 +24,7 @@ from .cleaning import clean_blurb
 from .config import ConfigError, Profile, load_dismissals, load_owned, load_profile, load_watchlist
 from .configuration import NotSeeded
 from .configuration import load as load_configuration
-from .covers import CoverStore
+from .covers import CoverStore, fetch_for_books
 from .covers import file_name as cover_file_name
 from .diff import compute_deltas, keys_of, suppress_unseeded_interests
 from .digest import GateNote, build_digest
@@ -188,46 +188,6 @@ def _cleaned(observation: Observation) -> Observation:
     if blurb == observation.blurb:
         return observation
     return replace(observation, blurb=blurb)
-
-
-def _fetch_covers(store: Store, client: HttpClient, observations: Sequence[Observation]) -> None:
-    """Titelbilder holen — einmal pro Buch, und nur für Bücher (Ticket 15).
-
-    Eine Entdeckung bekommt keins: das wären dreihundert Anfragen pro Lauf statt
-    einer Handvoll, und für ein Buch, zu dem die Leserin keine Beziehung hat,
-    gibt es ohnehin keine Zeile, an der ein Bild hängen könnte (ADR 18).
-
-    Ein Bild ist Beiwerk. Schlägt es fehl, läuft der Rest weiter — nur eine
-    Drosselung bricht ab, denn dann hat der Shop Halt gesagt.
-
-    Läuft **hinter** dem Snapshot: vorher stand dieser Schritt davor, und ein
-    403 auf ein Bild riss den ganzen Lauf ab, bevor eine einzige Beobachtung
-    geschrieben war.
-    """
-    covers = CoverStore(paths.covers_dir())
-    done: set[int] = set()
-    for observation in observations:
-        book_id, url = observation.book_id, observation.cover_url
-        if not book_id or not url or book_id in done:
-            continue
-        done.add(book_id)
-        book = store.book(book_id)
-        if book is None or book.cover_file:
-            continue
-        try:
-            name = covers.fetch(client, url)
-        except RateLimited:
-            print("Titelbilder: der Shop drosselt — Rest übersprungen", file=sys.stderr)
-            return
-        except Exception as exc:  # noqa: BLE001 - bewusst: ein Bild ist Beiwerk
-            # Dieselbe Ueberlegung wie bei einer einzelnen Quelle in _collect:
-            # was hier schiefgeht, darf hoechstens dieses eine Bild kosten. Ein
-            # Lauf, der an einem Titelbild stirbt, waere die teuerste denkbare
-            # Art, ein Platzhalterbild zu vermeiden.
-            print(f"Titelbild {book_id}: {type(exc).__name__}: {exc}", file=sys.stderr)
-            continue
-        if name:
-            store.set_cover(book_id, name)
 
 
 def _ask_the_library(store: Store, client: HttpClient, profile: Profile) -> None:
@@ -644,7 +604,7 @@ def _fetch_suggestion_covers(
 ) -> None:
     """Titelbilder fuer den Stapel — genau fuer die, die stehen bleiben.
 
-    Anders als ``_fetch_covers``: eine Entdeckung hat keine ``book``-Zeile, an
+    Anders als ``covers.fetch_for_books``: eine Entdeckung hat keine ``book``-Zeile, an
     der ein Dateiname haengen koennte. Der Name ergibt sich aus der Adresse
     (``covers.file_name``), die Seite sieht ihn auf der Platte nach — geholt
     werden muss er trotzdem einmal.
@@ -979,7 +939,7 @@ def _run(
     # davor, und ein 403 auf ein Bild riss den Lauf ab, bevor eine einzige
     # Beobachtung geschrieben war — dieselbe Regel wie beim Tor eine Zeile
     # weiter unten: ein Ausfall kostet nie Geschichte.
-    _fetch_covers(store, client, observations)
+    fetch_for_books(store, client, observations)
     _record_foreign_ratings(store, observations)
     _fetch_candidate_covers(store, profile, client)
     _ask_the_library(store, client, profile)

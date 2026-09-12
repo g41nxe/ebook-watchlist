@@ -140,8 +140,8 @@ def test_one_broken_image_does_not_stop_the_others(tmp_path: Path, monkeypatch) 
     import requests
 
     from ebook_watchlist import paths
+    from ebook_watchlist.covers import fetch_for_books
     from ebook_watchlist.models import MatchReason, Observation
-    from ebook_watchlist.run import _fetch_covers
     from ebook_watchlist.store import Store
 
     monkeypatch.setenv("EBW_DATA_DIR", str(tmp_path))
@@ -170,7 +170,7 @@ def test_one_broken_image_does_not_stop_the_others(tmp_path: Path, monkeypatch) 
         )
 
     client = Blocking()
-    _fetch_covers(store, client, [seen(first.id), seen(second.id)])
+    fetch_for_books(store, client, [seen(first.id), seen(second.id)])
 
     assert client.calls == 2
     assert store.book(first.id).cover_file is None

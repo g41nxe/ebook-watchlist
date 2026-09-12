@@ -206,3 +206,54 @@ def test_the_digest_dates_itself_from_the_last_real_run(data_dir: Path, db: Stor
     naechster = db.start_run(profile.slug, "cli", NOW)
 
     assert db.last_finished_run(profile.slug, naechster).id == gross
+
+
+# --- das Titelbild ----------------------------------------------------------
+
+
+def test_a_narrow_run_fetches_the_cover(data_dir: Path, db: Store) -> None:
+    """Ein Buch, das über den engen Lauf hereinkommt, stand sonst bis zum
+    nächsten Rundgang ohne Bild da — die Adresse lag in der Beobachtung, nur
+    geholt hat sie niemand. Am 12.9.2026 traf das "Splittt" und "Connnect"."""
+    from ebook_watchlist import single
+    from ebook_watchlist.covers import MIN_BYTES, file_name
+    from ebook_watchlist.models import MatchReason, Observation
+
+    bild = b"\xff\xd8\xff" + b"x" * MIN_BYTES
+    adresse = "https://www.beam-shop.de/media/image/aa/bb/cc/9783757989606_600x600.jpg"
+    buch_id = eintrag(db, "Splittt")
+
+    class Findet:
+        name = "beam"
+
+        def watch(self, watchlist: object, context: object) -> list:
+            return [
+                Observation(
+                    source="beam",
+                    source_item_id="927640",
+                    title="Splittt",
+                    match_reason=MatchReason.WATCHLIST,
+                    book_id=buch_id,
+                    cover_url=adresse,
+                )
+            ]
+
+    class HoltDasBild:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def get_bytes(self, url: str) -> bytes:
+            assert url == adresse
+            return bild
+
+    echte_quellen, echter_client = single.build_sources, single.HttpClient
+    single.build_sources = lambda profile, client: [Findet()]  # type: ignore[assignment]
+    single.HttpClient = HoltDasBild  # type: ignore[assignment]
+    try:
+        single.check_one(buch_id)
+    finally:
+        single.build_sources = echte_quellen  # type: ignore[assignment]
+        single.HttpClient = echter_client  # type: ignore[assignment]
+
+    assert (paths.covers_dir() / file_name(adresse)).is_file()
+    assert db.book(buch_id).cover_file == file_name(adresse)

@@ -32,6 +32,7 @@ from . import paths
 from .config import Profile, WatchlistEntry, load_profile
 from .configuration import NotSeeded
 from .configuration import load as load_configuration
+from .covers import fetch_for_books
 from .http import HttpClient, build_user_agent
 from .models import Observation
 from .sources import build_sources
@@ -128,6 +129,11 @@ def check_one(book_id: int, *, now: datetime | None = None) -> Report:
                 # Shop-Preis.
                 stolperer.append(f"{source.name}: {type(exc).__name__}")
         store.append(run_id, profile.slug, found, now)
+        # Erst die Geschichte, dann das Beiwerk — dieselbe Reihenfolge wie im
+        # Rundgang. Vorher holte der enge Lauf gar kein Bild, und ein Buch, das
+        # ueber "Jetzt pruefen" hereinkam, stand bis zum naechsten Rundgang
+        # ohne Titelbild da.
+        fetch_for_books(store, client, found)
         return Report(observations=tuple(found), trouble="; ".join(stolperer))
     finally:
         # **Immer**, auch auf jedem Fehlerweg. Eine Zeile ohne Ende sieht fuer
