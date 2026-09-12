@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/bilder/hero.jpg" alt="Ein Buchfink zeigt drei Schritte: lesen, ohne zu suchen; kaufen, wenn es sich lohnt; Neues finden, das zu dir passt" width="900">
+  <img src="docs/bilder/github.jpg" alt="Banner im Cartoon-Stil: links der Schriftzug BUCHFINK mit dem Slogan Mehr lesen. Weniger suchen., rechts eine warme Schreibtischszene mit dem Vogel-Maskottchen, Bücherstapeln und der geöffneten Watchlist" width="900">
 </p>
 
 # Buchfink
